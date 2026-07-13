@@ -39,9 +39,16 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Development Setup
 
-Setup instructions will be added when Stage 1 (Secure Kernel) code lands. Planned stack:
+Requires **Rust stable** ([rustup](https://rustup.rs)):
 
-- Rust (secure core)
+```bash
+cargo test --workspace
+cargo run -p sovereign-cli -- init
+cargo run -p sovereign-cli -- demo
+```
+
+Planned stack beyond the secure kernel:
+
 - TypeScript + React + Tauri (desktop UI)
 - Python (isolated agent workers)
 

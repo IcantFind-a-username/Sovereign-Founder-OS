@@ -19,7 +19,7 @@ Secure Agent Runtime
 
 ## Stages and Exit Criteria
 
-### Stage 0: Project Constitution — Current
+### Stage 0: Project Constitution — Complete
 
 **Deliverables:**
 - [x] VISION.md
@@ -35,15 +35,17 @@ Secure Agent Runtime
 
 ---
 
-### Stage 1: Secure Kernel
+### Stage 1: Secure Kernel — In Progress
 
 **Deliverables:**
-- Local encrypted Vault
-- Device identity and signing
-- Deterministic Policy Engine
-- Capability Token issuer/validator
-- Sandboxed tool executor
-- Append-only signed audit ledger
+- [x] Local encrypted Vault (`crates/vault`)
+- [x] Device identity and signing (`crates/identity`)
+- [x] Deterministic Policy Engine (`crates/policy`)
+- [x] Capability Token issuer/validator (`crates/capability`)
+- [x] Sandboxed tool executor — MVP stub (`crates/sandbox`)
+- [x] Append-only signed audit ledger (`crates/audit-ledger`)
+- [ ] WASM/container isolation for sandbox
+- [ ] Adversarial integration tests
 
 **Exit criteria:** A malicious agent cannot read files or execute external actions without authorization.
 

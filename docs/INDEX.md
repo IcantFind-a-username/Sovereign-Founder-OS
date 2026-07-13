@@ -2,13 +2,18 @@
 
 Complete documentation for Sovereign Founder OS. All design intent is public and version-controlled in this repository.
 
+## Language Policy
+
+English root docs for international contributors; complete Chinese blueprint in `docs/zh/`. See [LANGUAGE.md](LANGUAGE.md).
+
 ## Start Here
 
 | Document | Language | Description |
 | --- | --- | --- |
-| [README.md](../README.md) | EN / 中文 | Project entry point |
+| [README.md](../README.md) | EN + 中文 link | Project entry point |
 | [VISION.md](../VISION.md) | English | Product vision and principles |
 | [ROADMAP.md](../ROADMAP.md) | English | Development stages and milestones |
+| [docs/zh/README.md](zh/README.md) | 中文 | Complete design specifications |
 
 ## Architecture & Security
 

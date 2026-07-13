@@ -1,0 +1,16 @@
+[package]
+name = "sovereign-capability"
+description = "Capability token issuer and validator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sovereign-contracts = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+sovereign-policy = { workspace = true }

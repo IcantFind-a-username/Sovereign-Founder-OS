@@ -1,0 +1,21 @@
+[package]
+name = "sovereign-audit-ledger"
+description = "Append-only signed audit ledger"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sovereign-contracts = { workspace = true }
+sovereign-identity = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

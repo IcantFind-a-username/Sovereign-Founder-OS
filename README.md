@@ -86,9 +86,28 @@ All detailed design specifications are public in [`docs/zh/`](docs/zh/):
 
 ## Current Status
 
-**Stage 0: Project Constitution** — documentation and architecture definition.
+**Stage 1: Secure Kernel** — in active development.
 
-Next milestone: **Sovereign Runtime Alpha** — secure kernel with model failover, policy engine, and one complete enterprise workflow.
+```text
+crates/
+  contracts/      shared types (events, tokens, policy)
+  identity/       device keys and signing
+  audit-ledger/   append-only signed event log
+  policy/         deterministic permission engine
+  capability/     short-lived execution tokens
+  vault/          local encrypted storage
+  sandbox/        isolated tool execution (stub)
+apps/
+  cli/            sovereign CLI
+```
+
+Run locally:
+
+```bash
+cargo test --workspace
+cargo run -p sovereign-cli -- init
+cargo run -p sovereign-cli -- demo
+```
 
 See [ROADMAP.md](ROADMAP.md) for the full development plan.
 

@@ -1,0 +1,23 @@
+[package]
+name = "sovereign-cli"
+description = "CLI for Sovereign Agent Runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "sovereign"
+path = "src/main.rs"
+
+[dependencies]
+sovereign-audit-ledger = { workspace = true }
+sovereign-capability = { workspace = true }
+sovereign-contracts = { workspace = true }
+sovereign-identity = { workspace = true }
+sovereign-policy = { workspace = true }
+sovereign-sandbox = { workspace = true }
+sovereign-vault = { workspace = true }
+clap = { workspace = true }
+dirs = { workspace = true }
+serde_json = { workspace = true }

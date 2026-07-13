@@ -1,0 +1,106 @@
+use chrono::Utc;
+use sovereign_contracts::{ActionRequest, AutomationLevel, DataClass, PolicyDecision};
+use uuid::Uuid;
+
+/// High-risk tools that always require human approval before execution.
+const HIGH_RISK_TOOLS: &[&str] = &[
+    "email.send",
+    "payment.transfer",
+    "contract.sign",
+    "deploy.production",
+    "file.delete",
+    "social.publish",
+];
+
+/// Operations blocked for cloud-bound data classes.
+const CLOUD_BLOCKED_CLASSES: &[DataClass] = &[DataClass::Red];
+
+/// Deterministic policy engine. LLM output never bypasses this layer.
+#[derive(Debug, Default)]
+pub struct PolicyEngine;
+
+impl PolicyEngine {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn evaluate(&self, request: ActionRequest) -> PolicyDecision {
+        let mut allowed = true;
+        let mut reason = "allowed by default policy".to_string();
+        let mut requires_approval = false;
+
+        if CLOUD_BLOCKED_CLASSES.contains(&request.data_class) && request.tool.starts_with("cloud.") {
+            allowed = false;
+            reason = "red-zone data cannot be sent to cloud tools".to_string();
+        }
+
+        if request.automation_level >= AutomationLevel::L2ApproveExecute {
+            requires_approval = true;
+            reason = "L2+ actions require human approval".to_string();
+        }
+
+        let tool_key = format!("{}.{}", request.tool, request.operation);
+        if HIGH_RISK_TOOLS.iter().any(|t| tool_key == *t || request.tool == *t) {
+            requires_approval = true;
+            if !allowed {
+                reason = format!("{reason}; high-risk tool");
+            } else {
+                reason = "high-risk tool requires explicit approval".to_string();
+            }
+        }
+
+        if request.resource.contains("..") || request.resource.starts_with('/') {
+            allowed = false;
+            reason = "path traversal or absolute path access denied".to_string();
+        }
+
+        PolicyDecision {
+            decision_id: Uuid::new_v4(),
+            allowed,
+            reason,
+            requires_approval,
+            evaluated_at: Utc::now(),
+            request,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn req(tool: &str, op: &str, class: DataClass, level: AutomationLevel) -> ActionRequest {
+        ActionRequest {
+            actor_id: "agent_1".into(),
+            venture_id: "ven_1".into(),
+            tool: tool.into(),
+            operation: op.into(),
+            resource: "customer:123".into(),
+            data_class: class,
+            automation_level: level,
+        }
+    }
+
+    #[test]
+    fn blocks_red_data_to_cloud() {
+        let engine = PolicyEngine::new();
+        let decision = engine.evaluate(req("cloud.model", "infer", DataClass::Red, AutomationLevel::L1Draft));
+        assert!(!decision.allowed);
+    }
+
+    #[test]
+    fn high_risk_requires_approval() {
+        let engine = PolicyEngine::new();
+        let decision = engine.evaluate(req("email", "send", DataClass::Green, AutomationLevel::L2ApproveExecute));
+        assert!(decision.requires_approval);
+    }
+
+    #[test]
+    fn blocks_path_traversal() {
+        let engine = PolicyEngine::new();
+        let mut request = req("file", "read", DataClass::Green, AutomationLevel::L1Draft);
+        request.resource = "../secrets".into();
+        let decision = engine.evaluate(request);
+        assert!(!decision.allowed);
+    }
+}
