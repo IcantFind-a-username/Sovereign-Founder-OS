@@ -1,0 +1,34 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build
+target/
+dist/
+build/
+node_modules/
+*.egg-info/
+__pycache__/
+.venv/
+venv/
+
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets/
+
+# Local notes (not for publication)
+notes/
+
+# Rust
+Cargo.lock
