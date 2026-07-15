@@ -85,6 +85,11 @@ README.md ───────────── Entry & quick overview
 
 Architectural decision records live in [`rfcs/`](../rfcs/). They specify individual designs and evolve through implementation and review.
 
+| RFC | Status | Description |
+| --- | --- | --- |
+| [0001 — Canonical Task Contract](../rfcs/0001-canonical-task-contract.md) | Draft | Stable task and execution envelope |
+| [0002 — WASM Sandbox and Plugin Capabilities](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md) | Draft | Default-deny plugin isolation and authority model |
+
 ## Security Artifacts (Planned)
 
 - `security/threat-model/` — versioned threat models
