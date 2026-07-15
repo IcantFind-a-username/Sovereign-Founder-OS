@@ -44,7 +44,11 @@ impl DeviceIdentity {
         STANDARD.encode(signature.to_bytes())
     }
 
-    pub fn verify(public_key_b64: &str, message: &[u8], signature_b64: &str) -> Result<(), IdentityError> {
+    pub fn verify(
+        public_key_b64: &str,
+        message: &[u8],
+        signature_b64: &str,
+    ) -> Result<(), IdentityError> {
         let public_bytes = STANDARD
             .decode(public_key_b64)
             .map_err(|e| IdentityError::InvalidKey(e.to_string()))?;
@@ -122,10 +126,14 @@ mod tests {
 
     #[test]
     fn persist_identity() {
-        let dir = std::env::temp_dir().join("sovereign-id-test");
+        let id = DeviceIdentity::generate();
+        let dir = std::env::temp_dir().join(format!(
+            "sovereign-id-test-{}-{}",
+            std::process::id(),
+            id.device_id
+        ));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("device.json");
-        let id = DeviceIdentity::generate();
         id.save(&path).unwrap();
         let loaded = DeviceIdentity::load(&path).unwrap();
         assert_eq!(id.device_id, loaded.device_id);

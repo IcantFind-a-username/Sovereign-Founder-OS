@@ -2,7 +2,9 @@
 
 ## Overview
 
-Sovereign Founder OS is the complete product. Its business modules share an authoritative Enterprise Graph, use the Crew Orchestrator to coordinate AI work, and rely on the Sovereign Trust Layer for controlled execution and continuity.
+Sovereign Founder OS is the complete product. In the target architecture, its business modules will share an authoritative Sovereign Enterprise Graph, use the Crew Orchestrator to coordinate AI work, and rely on the Sovereign Trust Layer for controlled execution and continuity.
+
+Target product hierarchy:
 
 ```text
 Sovereign Founder OS
@@ -25,10 +27,34 @@ Sovereign Founder OS
 
 The current implementation focuses on the Sovereign Runtime secure kernel. That is an implementation sequence, not a separate product identity: every runtime capability exists to support real Founder OS workflows.
 
-## Runtime and Trust Flow
+## Current Stage 1 Architecture
+
+The executable workspace currently consists of the Rust CLI, seven Runtime crates, and a cross-crate adversarial test package:
 
 ```text
-Founder Console + Product Modules
+sovereign-cli
+├── contracts
+├── identity
+├── policy
+├── capability
+├── vault
+├── audit-ledger
+└── sandbox
+    └── import-free Wasmtime path (Phase A)
+
+sovereign-adversarial-tests
+```
+
+Stage 1 currently provides prototypes for device signing, deterministic policy decisions, scoped and expiring capability tokens, encrypted local storage, a signed append-only audit ledger, and capability-gated sandbox execution. The isolated Wasmtime path permits pure computation only and applies fuel, epoch, memory, table, and instance limits. It exposes no host imports or WASI.
+
+The current sandbox is not a production plugin boundary: artifact compilation remains in-process, the mechanical `sandbox-check` uses an ephemeral issuer, and no guest can yet invoke an audited external side effect. The Founder Command Center, Sovereign Enterprise Graph, Crew Orchestrator, Model Mesh, Domain Packs, Recovery Mesh, durable authorization, and production host interfaces are not implemented yet. See [ROADMAP.md](ROADMAP.md) and [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
+
+The remaining sections describe the target architecture unless they explicitly state a current Stage 1 capability.
+
+## Target Runtime and Trust Flow (Planned)
+
+```text
+Founder Command Center + Product Modules
               │
               ▼
        Mission Compiler
@@ -71,7 +97,7 @@ Founder Console + Product Modules
  Encrypted Replication & Recovery Mesh
 ```
 
-## Six Planes
+## Target Six-Plane Architecture (Planned)
 
 | Plane | Responsibility |
 | --- | --- |
@@ -82,7 +108,7 @@ Founder Console + Product Modules
 | **Trust** | Identity, keys, signatures, audit, software provenance |
 | **Recovery** | Replication, checkpoints, failover, disaster recovery |
 
-## Sovereign Enterprise Graph
+## Sovereign Enterprise Graph (Planned)
 
 The authoritative state of a company. Key entities:
 
@@ -114,7 +140,7 @@ Every agent operation must:
 | **Recovery Controller** | Restore system | Modify normal business records |
 | **Human Owner** | Final approval | Be bypassed for high-risk ops |
 
-## Agent Execution Flow
+## Target Agent Execution Flow (Planned)
 
 ```text
 Untrusted external content
@@ -145,7 +171,7 @@ Auditor + Signed Event Ledger
 
 **Critical invariant:** "What the model suggests" and "What the system allows" are always separated.
 
-## Crew Orchestrator
+## Crew Orchestrator (Planned)
 
 The Crew Orchestrator turns a business goal into a temporary, constrained AI team. Agents are not permanently assigned roles. Crews are assembled per task based on:
 
@@ -161,7 +187,7 @@ Typical ephemeral roles: Researcher, Strategist, Builder, Critic, Operator, Eval
 
 When the task completes, the crew dissolves. Only results, evidence, and decision records persist.
 
-## Model Mesh
+## Model Mesh (Planned)
 
 A unified Model Gateway routes requests to:
 
@@ -177,9 +203,9 @@ Every call records: provider, model, cost, latency, quality, and data disclosure
 
 Automatic failover: primary provider → secondary provider → local model degradation.
 
-## Plugin Architecture
+## Plugin Architecture (In Progress)
 
-Plugins are **untrusted by default**.
+The target architecture treats plugins as **untrusted by default**. Stage 1 currently implements only the import-free Wasmtime Phase A path described above.
 
 - Signed manifest declaring exact permissions
 - Low-risk plugins: WASM/WASI sandbox
@@ -188,9 +214,9 @@ Plugins are **untrusted by default**.
 - No permanent API keys
 - No arbitrary network access
 
-## Event Sourcing
+## Event Sourcing (Partially Implemented)
 
-Authoritative state is built from signed, append-only events:
+The current audit-ledger crate implements a signed, append-only hash chain. The target architecture builds authoritative enterprise state from richer events such as:
 
 ```text
 event_id, venture_id, actor_id, action, resource,
@@ -198,14 +224,14 @@ capability_id, timestamp, payload_hash, previous_event_hash,
 device_signature, policy_decision_hash
 ```
 
-Snapshots are derived from the event chain. Tampering is detectable. Recovery replays from checkpoints.
+Tamper detection exists in the current ledger prototype. Derived snapshots and recovery replay from checkpoints are planned.
 
-## Technology Stack
+## Technology Stack (Planned)
 
 | Layer | Technology | Scope |
 | --- | --- | --- |
 | Sovereign Runtime | **Rust** | Vault, crypto, policy, capability tokens, audit ledger, sandbox, mesh |
-| UI & SDK | **TypeScript + React + Tauri** | Desktop app, Founder Console, approval UI |
+| UI & SDK | **TypeScript + React + Tauri** | Desktop app, Founder Command Center, approval UI |
 | Agent Workers | **Python** (isolated, untrusted) | Workflows, RAG, domain packs, evals |
 | Protocols | JSON Schema, Protobuf/gRPC, WIT/WASI, MCP, A2A | Contracts, IPC, plugins, tools |
 
@@ -226,7 +252,7 @@ sovereign/
 └── docs/
 ```
 
-## Comparison with Personal AI Assistants
+## Target Comparison with Personal AI Assistants
 
 | Personal AI Assistant | Sovereign Founder OS |
 | --- | --- |

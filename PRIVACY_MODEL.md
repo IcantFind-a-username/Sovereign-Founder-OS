@@ -59,7 +59,7 @@ policy_approval   — which policy rule authorized the call
 timestamp         — when the call occurred
 ```
 
-Users can review disclosure history in the Founder Console.
+Users can review disclosure history in the Founder Command Center.
 
 ## Encryption Architecture
 

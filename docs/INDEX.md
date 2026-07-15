@@ -54,10 +54,10 @@ The following documents contain the full, detailed product and engineering speci
 
 | # | Document | Topics |
 | --- | --- | --- |
-| 01 | [AI Founder OS 初步设想](zh/01-AI-Founder-OS-初步设想.md) | Venture Graph, Founder Cockpit, ephemeral crews, privacy zones, v1 workflows |
-| 02 | [Sovereign Founder OS 主权升级](zh/02-Sovereign-Founder-OS-主权升级.md) | Enterprise Digital Twin, jurisdiction engine, tax, security immune system, cryptography, PQC |
+| 01 | [AI Founder OS 初步设想](zh/01-AI-Founder-OS-初步设想.md) | Venture Graph, Founder Command Center, ephemeral crews, privacy zones, v1 workflows |
+| 02 | [Sovereign Founder OS 主权升级](zh/02-Sovereign-Founder-OS-主权升级.md) | Sovereign Enterprise Graph, jurisdiction engine, tax, security immune system, cryptography, PQC |
 | 03 | [开源项目企划书 v0.1](zh/03-开源项目企划书-v0.1.md) | Full project plan: product system, Sovereign Runtime, OpenClaw comparison, repo layout, chaos tests, business model |
-| 04 | [GUI 设计](zh/04-GUI设计.md) | Founder Cockpit, three UI modes, seven navigation areas, approval center, onboarding |
+| 04 | [GUI 设计](zh/04-GUI设计.md) | Founder Command Center, three UI modes, seven navigation areas, approval center, onboarding |
 
 See [zh/README.md](zh/README.md) for the Chinese documentation guide.
 
@@ -84,6 +84,11 @@ README.md ───────────── Entry & quick overview
 ## RFCs
 
 Architectural decision records live in [`rfcs/`](../rfcs/). They specify individual designs and evolve through implementation and review.
+
+| RFC | Status | Description |
+| --- | --- | --- |
+| [0001 — Canonical Task Contract](../rfcs/0001-canonical-task-contract.md) | Draft | Stable task and execution envelope |
+| [0002 — WASM Sandbox and Plugin Capabilities](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md) | Draft | Default-deny plugin isolation and authority model |
 
 ## Security Artifacts (Planned)
 

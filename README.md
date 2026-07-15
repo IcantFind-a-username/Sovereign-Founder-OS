@@ -75,10 +75,10 @@ Read the **[Sovereign Founder OS Manifesto →](MANIFESTO.md)** for the principl
 
 | Concept | Description |
 | --- | --- |
-| **Enterprise Graph** | Structured digital twin of the company — not chat history |
+| **Sovereign Enterprise Graph** | Canonical structured digital twin of the company — not chat history |
 | **Mutually Constrained Autonomy** | Planner, Policy Guard, Executor, Auditor, Recovery Controller, Human Owner — no single node holds all power |
 | **Capability Tokens** | Short-lived, scoped, revocable execution permissions |
-| **Resilient Trust Mesh** | Multi-node encrypted replication with automatic failover |
+| **Resilient Trust Mesh** *(planned)* | Target multi-node trust architecture; the Recovery Mesh is its replication and failover subsystem |
 
 ## Documentation
 
@@ -128,7 +128,7 @@ crates/
   policy/         deterministic permission engine
   capability/     short-lived execution tokens
   vault/          local encrypted storage
-  sandbox/        isolated tool execution (stub)
+  sandbox/        default-deny Wasmtime isolation (Phase A)
 apps/
   cli/            sovereign CLI
 ```
@@ -138,8 +138,11 @@ Run locally:
 ```bash
 cargo test --workspace
 cargo run -p sovereign-cli -- init
+cargo run -p sovereign-cli -- sandbox-check
 cargo run -p sovereign-cli -- demo
 ```
+
+The isolated path currently permits import-free pure computation only. Environment, filesystem, network, WASI, and every other host import are denied. `sandbox-check` is a mechanical Phase A check using an ephemeral test issuer—not a production trust anchor. Artifact compilation is still in-process and is not covered by guest fuel or Store limits. The effectful tool step in `demo` remains explicitly labelled as a simulation until signed manifests, exact invocation binding, bounded compilation workers, durable authorization, and audited host interfaces are implemented. See [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 
 See [ROADMAP.md](ROADMAP.md) for the full development plan.
 
@@ -166,6 +169,6 @@ You are free to use, modify, and distribute this project under Apache 2.0 terms.
 ---
 
 <p align="center">
-  <strong>Built on many models. Dependent on none.</strong><br>
-  <strong>Protected by cryptography. Controlled by the founder.</strong>
+  <strong>Designed for many models. Dependent on no single provider.</strong><br>
+  <strong>Cryptographically verifiable. Founder-controlled by design.</strong>
 </p>

@@ -84,7 +84,7 @@ See [THREAT_MODEL.md](THREAT_MODEL.md) and [ROADMAP.md](ROADMAP.md) Stage 5.
 
 In scope:
 - Sovereign Runtime core
-- Founder OS application
+- Sovereign Founder OS product surfaces
 - Official plugins and packs distributed by this project
 
 Out of scope:

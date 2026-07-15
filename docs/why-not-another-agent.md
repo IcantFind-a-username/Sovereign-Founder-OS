@@ -68,6 +68,7 @@ We may provide OpenClaw Skill compatibility — importing existing skills into a
 - You accept configuring permissions yourself
 
 **Use Sovereign Founder OS when:**
+- You want help discovering, validating, and launching a one-person business
 - You are running a business (even as a solo founder)
 - Agents will access sensitive enterprise data
 - Model provider failure would be catastrophic

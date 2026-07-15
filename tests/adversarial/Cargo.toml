@@ -1,15 +1,12 @@
 [package]
-name = "sovereign-cli"
-description = "CLI for Sovereign Runtime"
+name = "sovereign-adversarial-tests"
+description = "Cross-crate adversarial tests for Sovereign Runtime"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-
-[[bin]]
-name = "sovereign"
-path = "src/main.rs"
+publish = false
 
 [dependencies]
 sovereign-audit-ledger = { workspace = true }
@@ -19,6 +16,6 @@ sovereign-identity = { workspace = true }
 sovereign-policy = { workspace = true }
 sovereign-sandbox = { workspace = true }
 sovereign-vault = { workspace = true }
-clap = { workspace = true }
-dirs = { workspace = true }
+chrono = { workspace = true }
 serde_json = { workspace = true }
+tempfile = "3"

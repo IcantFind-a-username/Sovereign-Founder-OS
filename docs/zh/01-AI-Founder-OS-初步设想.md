@@ -42,9 +42,9 @@
 
 ---
 
-## 二、小白真正看到的产品形态：Founder Cockpit
+## 二、小白真正看到的产品形态：Founder Command Center（早期概念名：Founder Cockpit）
 
-首页不应该是 Agent 聊天室，而应该是一个非常简单的 Founder Cockpit。
+首页不应该是 Agent 聊天室，而应该是一个非常简单的 Founder Command Center。
 
 用户看到四个东西：
 

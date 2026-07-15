@@ -16,8 +16,8 @@ Sovereign Founder OS 是完整产品和唯一主品牌。普通用户使用 Vent
 
 | 文档 | 标题 | 核心内容 |
 | --- | --- | --- |
-| [01](01-AI-Founder-OS-初步设想.md) | AI Founder OS 初步设想 | 产品定位、Venture Graph、Founder Cockpit、临时 Crew、三层隐私区、L0–L3 自动化、五条初版工作流、技术路线、商业模式 |
-| [02](02-Sovereign-Founder-OS-主权升级.md) | 主权型升级 | Enterprise Digital Twin、Jurisdiction Engine、税务引擎、企业免疫系统、密码学控制平面、PQC、分布式韧性、四阶段落地 |
+| [01](01-AI-Founder-OS-初步设想.md) | AI Founder OS 初步设想 | 产品定位、Venture Graph、Founder Command Center、临时 Crew、三层隐私区、L0–L3 自动化、五条初版工作流、技术路线、商业模式 |
+| [02](02-Sovereign-Founder-OS-主权升级.md) | 主权型升级 | Sovereign Enterprise Graph、Jurisdiction Engine、税务引擎、企业免疫系统、密码学控制平面、PQC、分布式韧性、四阶段落地 |
 | [03](03-开源项目企划书-v0.1.md) | 开源项目企划书 v0.1 | 完整产品结构、Sovereign Runtime、与 OpenClaw 差异化、六平面架构、SPOF 清单、插件安全、Chaos CLI、Stage 0–7、商业模式 |
 | [04](04-GUI设计.md) | GUI 设计 | 三种界面深度、七个一级导航、Approval Center、隐私指示器、五步引导向导、首批六个页面 |
 
