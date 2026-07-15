@@ -141,7 +141,9 @@ High-risk contract:   user + legal professional
 
 A one-person company does not mean all authority on one device and one key.
 
-## Resilient Trust Mesh
+## Resilient Trust Mesh (Target Design)
+
+**Resilient Trust Mesh** names the overall cross-node trust architecture. **Recovery Mesh** is the subsystem within it that handles encrypted replication, checkpoints, failover, and recovery.
 
 Trust nodes (not all required in Alpha):
 

@@ -18,7 +18,7 @@ const SANDBOX_CHECK_MODULE: &[u8] = &[
 ];
 
 #[derive(Parser)]
-#[command(name = "sovereign", about = "Sovereign Agent Runtime CLI", version)]
+#[command(name = "sovereign", about = "Sovereign Runtime CLI", version)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

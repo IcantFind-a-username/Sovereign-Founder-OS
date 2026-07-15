@@ -1,6 +1,6 @@
 [package]
 name = "sovereign-adversarial-tests"
-description = "Cross-crate adversarial tests for Sovereign Agent Runtime"
+description = "Cross-crate adversarial tests for Sovereign Runtime"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -2,14 +2,16 @@
 
 ## Development Philosophy
 
-**Build the secure Runtime first. Prove it with one real workflow. Expand from there.**
+**Sovereign Founder OS is the product. Build its minimum Trust Layer first, prove it through one real founder workflow, and expand from there.**
+
+Implementation starts with the Sovereign Runtime secure kernel because real business automation needs enforceable authority and recovery. This sequencing does not redefine the complete product as developer infrastructure.
 
 Wrong path: simultaneously building global legal, global tax, blockchain wallet, auto-marketing, multi-agent chat, desktop, mobile, and enterprise cloud.
 
 Right path:
 
 ```text
-Secure Agent Runtime
+Sovereign Runtime secure kernel
   → Demonstrable adversarial tests
   → One real enterprise workflow
   → Distributed recovery
@@ -104,7 +106,7 @@ Describe service
   → Create invoice draft
   → Build delivery plan
   → Generate security checklist
-  → Update Enterprise Graph
+  → Update Sovereign Enterprise Graph
 ```
 
 **Exit criteria:** A new user completes a real business flow without reading source code.
@@ -135,7 +137,7 @@ Describe service
 9.  Export all company data and recovery package
 ```
 
-> We killed the model, the server and the plugin. The company kept running.
+> Target result: Kill the model, the server and the plugin. The company keeps running.
 
 ---
 
@@ -241,7 +243,7 @@ Minimum requirements before public Alpha:
 ## First GUI Pages (Stage 4)
 
 1. Onboarding (5-step wizard)
-2. Founder Home (Command Center)
+2. Founder Command Center
 3. Work Detail
 4. Approval Center
 5. Security Center

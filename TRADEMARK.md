@@ -5,7 +5,7 @@
 The following names and phrases are trademarks of the Sovereign Founder OS project:
 
 - **Sovereign Founder OS**
-- **Sovereign Agent Runtime**
+- **Sovereign Runtime**
 - **Mutually Constrained Autonomy** (as used in this project's security architecture)
 - **Agent Security Gauntlet** (as used in this project's benchmark suite)
 

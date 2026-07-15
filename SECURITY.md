@@ -83,8 +83,8 @@ See [THREAT_MODEL.md](THREAT_MODEL.md) and [ROADMAP.md](ROADMAP.md) Stage 5.
 ## Scope
 
 In scope:
-- Sovereign Agent Runtime core
-- Founder OS application
+- Sovereign Runtime core
+- Sovereign Founder OS product surfaces
 - Official plugins and packs distributed by this project
 
 Out of scope:
@@ -96,4 +96,4 @@ Out of scope:
 
 - [THREAT_MODEL.md](THREAT_MODEL.md)
 - [PRIVACY_MODEL.md](PRIVACY_MODEL.md)
-- [security/](security/) — attack trees and disclosures (as published)
+- `security/` *(planned)* — attack trees and disclosures
