@@ -62,6 +62,8 @@ Sovereign Runtime secure kernel
     - [x] Crash-safe execution journal: durable intent before consume, terminal result after, Indeterminate recovery
     - [ ] Crash-safe signed-audit intent/result ordering (ledger migration) and execution receipts
   - [ ] Phase D: reviewed WIT host interfaces and high-risk backend
+    - [x] First host effect: audited, path-safe local outbox file-write broker (no network)
+    - [ ] Reviewed WIT Component host interface and per-host-call authorization
 - [ ] Adversarial integration tests
   - [x] Phase A: malicious Wasm import, loop, memory, table, ABI, and state tests
   - [x] Phase B foundation: manifest/artifact/input substitution, strict fields, trust state, V1/V2 separation, same-process replay, and backend downgrade tests

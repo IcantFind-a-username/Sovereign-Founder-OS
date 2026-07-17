@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/authority",
     "crates/contracts",
+    "crates/effects",
     "crates/execution",
     "crates/identity",
     "crates/artifact",
@@ -25,6 +26,7 @@ repository = "https://github.com/IcantFind-a-username/Sovereign-Founder-OS"
 [workspace.dependencies]
 sovereign-authority = { path = "crates/authority" }
 sovereign-contracts = { path = "crates/contracts" }
+sovereign-effects = { path = "crates/effects" }
 sovereign-execution = { path = "crates/execution" }
 sovereign-identity = { path = "crates/identity" }
 sovereign-artifact = { path = "crates/artifact" }

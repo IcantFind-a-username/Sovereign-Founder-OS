@@ -77,7 +77,7 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 **Mitigations:**
 - **Alpha target:** Red-zone data never leaves the device through any model or tool path
 - **Alpha target:** agents never hold root keys
-- **Current:** both Wasmtime paths expose no filesystem, network, environment, WASI, or other host imports
+- **Current:** both Wasmtime paths expose no filesystem, network, environment, WASI, or other host imports; the only host effect is an owner-controlled local outbox file write, performed by the trusted host after full authorization, refusing Red data and path escape
 - **Alpha target:** Data Disclosure Record for every cloud model call
 - **Alpha target:** output scanning for sensitive patterns
 

@@ -294,7 +294,7 @@ Stage 1 initially provides neither network nor filesystem interfaces.
 
 Future filesystem access uses virtual grant handles rooted by the host, rejects symlink and traversal escape, and exposes only specific read or output capabilities. Future network access uses an egress broker that revalidates resolved IPs, redirects, TLS identity, data classification, and disclosure records on every request.
 
-Until those brokers exist, manifests requesting filesystem or network access are rejected.
+Until those brokers exist, manifests requesting filesystem or network access are rejected. As a first host-mediated effect, the `sovereign-effects` crate provides an owner-controlled local outbox: the trusted host — never guest code — writes an approved document to a rooted, single-component, atomically-written file after the full authorization chain has succeeded. It performs no network effect, refuses Red data and symlink/traversal escape, and is the reference shape for the Phase D "one local reference tool with opaque grants".
 
 Red data can never enter a network grant. Amber disclosure requires minimization, preview, and evidence. Personal data is never written to a public blockchain.
 

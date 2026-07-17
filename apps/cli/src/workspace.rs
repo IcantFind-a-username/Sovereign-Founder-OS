@@ -9,17 +9,19 @@
 //! - every mutation is evaluated by the deterministic policy engine first and
 //!   leaves a signed, hash-chained audit event;
 //! - actions the policy classifies as high-risk (sending a document) are not
-//!   executed: they enter a pending-approval queue for the human owner, and
-//!   even an approval only records the decision — Stage 1 has no external
-//!   effects, so delivery is explicitly deferred, never simulated;
+//!   executed on the model's say-so: they enter a pending-approval queue for
+//!   the human owner, and only the owner's signed approval unlocks the effect;
 //! - the founder can export every byte of their business state at any time.
 //!
 //! Honest labels: documents are template-generated (no model is involved)
 //! and the graph schema is a prototype. Approving a send runs the real RFC
 //! 0003 chain — owner-signed approval evidence, a Capability V2 token issued
-//! from it, and a pure-compute delivery-preparation step in the verified
-//! sandbox — but actual delivery is still deferred: Stage 1 performs no
-//! external effects, and owner keys live in the prototype vault.
+//! from it, a pure-compute preparation step in the verified sandbox, and then
+//! the first real host effect: the approved document is written to the local
+//! `outbox/` directory through an audited, path-safe broker. That local file
+//! write is genuine and revocable; delivering the file to the customer
+//! remains the founder's own action, and no network effect exists. Owner keys
+//! live in the prototype vault.
 
 use std::path::{Path, PathBuf};
 
@@ -159,6 +161,19 @@ pub struct SignedApprovalRecord {
     pub capability_idempotency: Uuid,
     pub guest_exit_code: i32,
     pub fuel_consumed: u64,
+    /// The real host effect performed after authorization: the approved
+    /// document written to the local outbox. Absent only if this record
+    /// predates the outbox effect.
+    #[serde(default)]
+    pub outbox: Option<OutboxWrite>,
+}
+
+/// Receipt for the audited local file the runtime actually wrote.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutboxWrite {
+    pub relative_path: String,
+    pub content_sha256: String,
+    pub bytes: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -447,12 +462,12 @@ impl Store {
     }
 
     /// The human owner decides. Approving runs the full RFC 0003 chain: the
-    /// owner's approval key signs evidence bound to one exact
-    /// delivery-preparation invocation, a Capability V2 token is issued from
-    /// that evidence, and the pure-compute preparation step executes in the
-    /// verified Wasmtime sandbox. Actual delivery remains deferred — Stage 1
-    /// performs no external effects — and any failure in the chain leaves the
-    /// approval pending (fail closed).
+    /// owner's approval key signs evidence bound to one exact preparation
+    /// invocation, a Capability V2 token is issued from that evidence, the
+    /// pure-compute step executes in the verified Wasmtime sandbox, and the
+    /// approved document is written to the local outbox through the audited
+    /// broker. Any failure in the chain leaves the approval pending (fail
+    /// closed); delivery to the customer stays the founder's own action.
     pub fn decide(&self, approval_id: Uuid, approve: bool) -> Result<Workspace, WorkspaceError> {
         let mut workspace = self.load()?;
         let approval = workspace
@@ -526,6 +541,17 @@ impl Store {
                         "fuel": record.fuel_consumed,
                     }),
                 )?;
+                if let Some(outbox) = &record.outbox {
+                    self.record(
+                        "effect.file_written",
+                        &resource,
+                        serde_json::json!({
+                            "outbox_path": outbox.relative_path,
+                            "content_sha256": outbox.content_sha256,
+                            "bytes": outbox.bytes,
+                        }),
+                    )?;
+                }
             }
             None => {
                 self.record(
@@ -753,6 +779,20 @@ impl Store {
             )
             .map_err(kernel)?;
 
+        // The first real host effect: with the whole chain verified and the
+        // capability durably consumed, write the approved document to the
+        // owner's local outbox. This is audited and revocable; delivery to the
+        // customer remains the founder's own action.
+        let outbox =
+            sovereign_effects::OutboxBroker::open(self.root.join("outbox")).map_err(kernel)?;
+        let receipt = outbox
+            .write_document(
+                &document.id.simple().to_string(),
+                sovereign_effects::EffectDataClass::Amber,
+                document.body.as_bytes(),
+            )
+            .map_err(kernel)?;
+
         Ok(SignedApprovalRecord {
             approval_id: approval_claims.approval_id,
             approver_subject_id: approval_claims.approver_subject_id,
@@ -764,6 +804,11 @@ impl Store {
             capability_idempotency: idempotency,
             guest_exit_code: result.exit_code,
             fuel_consumed: result.fuel_consumed,
+            outbox: Some(OutboxWrite {
+                relative_path: receipt.relative_path,
+                content_sha256: receipt.content_sha256_hex,
+                bytes: receipt.bytes,
+            }),
         })
     }
 
@@ -1038,6 +1083,7 @@ mod tests {
                 "approval.requested",
                 "approval.granted",
                 "capability.executed",
+                "effect.file_written",
             ]
         );
         ledger.verify_chain().unwrap();
@@ -1053,6 +1099,18 @@ mod tests {
             recovered[0].state,
             sovereign_execution::ExecutionState::Completed { .. }
         ));
+
+        // The real host effect happened: the approved document is a genuine
+        // file in the local outbox, matching the receipt.
+        let outbox_receipt = evidence.outbox.as_ref().unwrap();
+        let written = std::fs::read(
+            dir.path()
+                .join("outbox")
+                .join(&outbox_receipt.relative_path),
+        )
+        .unwrap();
+        assert_eq!(written, workspace.documents[0].body.as_bytes());
+        assert_eq!(outbox_receipt.bytes, written.len());
     }
 
     #[test]
