@@ -51,6 +51,8 @@ enum Commands {
         #[arg(long)]
         no_open: bool,
     },
+    /// Demonstrate model-gateway health-aware failover and the Red-data guard
+    ModelCheck,
 }
 
 fn data_dir() -> PathBuf {
@@ -67,8 +69,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::SandboxCheck => cmd_sandbox_check()?,
         Commands::Status => cmd_status()?,
         Commands::Ui { port, no_open } => ui::run(port, data_dir(), !no_open)?,
+        Commands::ModelCheck => cmd_model_check(),
     }
     Ok(())
+}
+
+fn cmd_model_check() {
+    use sovereign_model::{
+        DeterministicProvider, Health, ModelGateway, ModelRequest, ProviderTrust,
+    };
+
+    println!("Model gateway · health-aware failover + Red-data guard");
+    println!("(providers are deterministic local stand-ins, not LLMs)\n");
+
+    // Primary local model is down; a cloud backup is healthy; a local
+    // fallback is healthy. Removing/downing the primary must not stop work.
+    let gateway = ModelGateway::new(vec![
+        Box::new(DeterministicProvider::local("local-primary", Health::Down)),
+        Box::new(DeterministicProvider::cloud(
+            "cloud-backup",
+            Health::Healthy,
+        )),
+        Box::new(DeterministicProvider::local(
+            "local-fallback",
+            Health::Healthy,
+        )),
+    ]);
+    println!("providers: {:?}", gateway.provider_ids());
+
+    let amber = ModelRequest {
+        task: "draft_outreach".into(),
+        prompt: "Draft a short note to Dr. Tan.".into(),
+        data_class: DataClass::Amber,
+        max_output_chars: 4096,
+    };
+    match gateway.complete(&amber) {
+        Ok((response, disclosure)) => {
+            println!("\n== Amber request ==");
+            println!(
+                "  primary down -> served by {} ({:?})",
+                response.provider_id, response.provider_trust
+            );
+            println!("  failover path: {:?}", disclosure.skipped);
+        }
+        Err(error) => println!("  unexpected: {error}"),
+    }
+
+    let red = ModelRequest {
+        task: "classify_customer_pii".into(),
+        prompt: "<red-zone customer record>".into(),
+        data_class: DataClass::Red,
+        max_output_chars: 4096,
+    };
+    match gateway.complete(&red) {
+        Ok((response, disclosure)) => {
+            println!("\n== Red request ==");
+            println!(
+                "  cloud backup skipped for confidentiality; served locally by {} ({:?})",
+                response.provider_id, response.provider_trust
+            );
+            let leaked = disclosure.provider_trust != ProviderTrust::Local;
+            println!("  red data left the device: {leaked}");
+        }
+        Err(error) => println!("  Red request denied (no local provider): {error}"),
+    }
+
+    println!("\nModels are replaceable. Red data stays local. Output is a draft, never authority.");
 }
 
 fn cmd_sandbox_check() -> Result<(), Box<dyn std::error::Error>> {

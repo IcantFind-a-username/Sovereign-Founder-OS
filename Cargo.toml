@@ -6,6 +6,7 @@ members = [
     "crates/effects",
     "crates/execution",
     "crates/identity",
+    "crates/model",
     "crates/artifact",
     "crates/audit-ledger",
     "crates/policy",
@@ -29,6 +30,7 @@ sovereign-contracts = { path = "crates/contracts" }
 sovereign-effects = { path = "crates/effects" }
 sovereign-execution = { path = "crates/execution" }
 sovereign-identity = { path = "crates/identity" }
+sovereign-model = { path = "crates/model" }
 sovereign-artifact = { path = "crates/artifact" }
 sovereign-audit-ledger = { path = "crates/audit-ledger" }
 sovereign-policy = { path = "crates/policy" }

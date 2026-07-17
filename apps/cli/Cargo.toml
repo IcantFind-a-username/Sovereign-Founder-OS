@@ -20,6 +20,7 @@ sovereign-contracts = { workspace = true }
 sovereign-effects = { workspace = true }
 sovereign-execution = { workspace = true }
 sovereign-identity = { workspace = true }
+sovereign-model = { workspace = true }
 sovereign-policy = { workspace = true }
 sovereign-sandbox = { workspace = true }
 sovereign-vault = { workspace = true }

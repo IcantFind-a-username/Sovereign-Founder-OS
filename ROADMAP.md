@@ -74,15 +74,16 @@ Sovereign Runtime secure kernel
 
 ---
 
-### Stage 2: Model Resilience
+### Stage 2: Model Resilience — Minimal foundation
 
 **Deliverables:**
-- Unified model interface
-- Multi-vendor routing (≥2 cloud + 1 local)
-- Health detection
-- Automatic degradation and failover
+- [x] Unified model interface (`crates/model`: `ModelProvider` trait, `ModelGateway`)
+- [x] Ordered multi-provider routing with local/cloud trust
+- [x] Health detection (Healthy/Degraded/Down) and automatic failover
+- [x] Data-disclosure records and a Red-data-stays-local guard
+- [ ] Real provider adapters behind an egress broker (deterministic stand-ins today)
 
-**Exit criteria:** Removing the primary model configuration does not stop core workflows.
+**Exit criteria:** Removing the primary model configuration does not stop core workflows. *(Demonstrated: `sovereign model-check`; providers are deterministic local stand-ins, not LLMs.)*
 
 ---
 

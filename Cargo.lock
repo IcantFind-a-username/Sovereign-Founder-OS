@@ -1435,6 +1435,7 @@ dependencies = [
  "sovereign-effects",
  "sovereign-execution",
  "sovereign-identity",
+ "sovereign-model",
  "sovereign-policy",
  "sovereign-sandbox",
  "sovereign-vault",
@@ -1490,6 +1491,15 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "sovereign-model"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sovereign-contracts",
  "thiserror 2.0.18",
 ]
 
