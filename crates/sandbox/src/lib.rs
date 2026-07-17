@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 
 use chrono::Utc;
 use sovereign_artifact::{OperationSelector, PreparedInvocation};
+use sovereign_capability::approval::SignedApprovalV1;
 use sovereign_capability::v2::{
     CapabilityTokenV2, CapabilityV2Error, CapabilityV2ValidationContext, CapabilityValidatorV2,
     TrustedClock as CapabilityV2Clock,
@@ -190,6 +191,18 @@ impl<C: CapabilityV2Clock> VerifiedSandboxExecutor<C> {
         &mut self,
         request: VerifiedExecutionRequest<'_>,
     ) -> Result<WasmExecutionResult, SandboxError> {
+        self.execute_approved(request, None)
+    }
+
+    /// Execute with RFC 0003 signed approval evidence for approval-required
+    /// decisions. `execute` delegates here with no evidence; tokens carrying
+    /// an approval claim fail closed unless the matching signed approval is
+    /// presented and the validator was configured with approval trust.
+    pub fn execute_approved(
+        &mut self,
+        request: VerifiedExecutionRequest<'_>,
+        approval: Option<&SignedApprovalV1>,
+    ) -> Result<WasmExecutionResult, SandboxError> {
         let selector = request.invocation.operation();
         if !self.allowed_operations.contains(selector) {
             return Err(SandboxError::VerifiedOperationNotAllowed {
@@ -197,7 +210,7 @@ impl<C: CapabilityV2Clock> VerifiedSandboxExecutor<C> {
             });
         }
 
-        self.validator.authorize_and_consume(
+        self.validator.authorize_and_consume_approved(
             request.token,
             CapabilityV2ValidationContext {
                 venture_id: request.venture_id,
@@ -206,6 +219,7 @@ impl<C: CapabilityV2Clock> VerifiedSandboxExecutor<C> {
                 policy_decision: request.policy_decision,
                 prepared_invocation: request.invocation,
             },
+            approval,
         )?;
 
         self.wasm.execute_verified(request.invocation)

@@ -638,10 +638,14 @@ pub enum AuditRole {}
 #[derive(Debug)]
 pub enum AdmissionRole {}
 
+#[derive(Debug)]
+pub enum ApprovalRole {}
+
 impl role_sealed::Sealed for PublisherRole {}
 impl role_sealed::Sealed for AuthorityRole {}
 impl role_sealed::Sealed for AuditRole {}
 impl role_sealed::Sealed for AdmissionRole {}
+impl role_sealed::Sealed for ApprovalRole {}
 
 impl SigningRole for PublisherRole {
     const NAME: &'static str = "publisher";
@@ -665,6 +669,12 @@ impl SigningRole for AdmissionRole {
     const NAME: &'static str = "artifact-admission";
     const CONTENT_TYPE: &'static str = "application/sovereign.artifact-admission+json;v=1";
     const EXTERNAL_AAD: &'static [u8] = b"sovereign:artifact-admission:v1";
+}
+
+impl SigningRole for ApprovalRole {
+    const NAME: &'static str = "approval";
+    const CONTENT_TYPE: &'static str = "application/sovereign.approval+json;v=1";
+    const EXTERNAL_AAD: &'static [u8] = b"sovereign:approval:v1";
 }
 
 /// Ed25519 signer whose role is enforced by the type system and COSE domain.

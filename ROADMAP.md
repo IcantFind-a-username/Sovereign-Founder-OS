@@ -53,6 +53,7 @@ Sovereign Runtime secure kernel
     - [x] Immutable artifact snapshot, strict schema/resource binding, and `PreparedInvocation`
     - [x] Exact-bound Capability V2 and verified pure-compute Core Wasm path (process-local)
     - [x] Locally signed admission record and content-addressed artifact store
+    - [x] Signed human approval evidence bound into Capability V2 (RFC 0003, process-local one-use)
     - [ ] Verified executor requires a locally admitted artifact handle
     - [ ] Killable compilation worker and trusted compiled cache
     - [ ] Component/WIT input ABI

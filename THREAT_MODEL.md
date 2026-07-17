@@ -29,7 +29,7 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 - **Current:** role-separated signing primitives, publisher/Authority trust stores, and Capability V1/V2 validators
 - **Current:** cryptographic vault prototype (Rust core)
 - **Current:** signed append-only audit ledger prototype
-- **Alpha target:** verified human-owner approval for high-risk actions. Capability V2 currently fails closed whenever approval is required.
+- **Current foundation:** RFC 0003 signed human approval evidence — approval-required Capability V2 tokens are issued only with owner-signed, exactly bound, one-use (process-local) evidence, and still fail closed without it. Durable cross-process approval consumption remains an Alpha target.
 
 ### Untrusted (always)
 

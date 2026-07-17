@@ -190,7 +190,7 @@ canonical_input_digest
 resource_bindings_digest
 primary_resource
 policy_decision_id and policy_digest
-approval_evidence (explicitly null in the current foundation)
+approval_evidence (RFC 0003 summary claim; null when no approval is required)
 idempotency_key
 issued_at and expires_at
 max_uses = 1
@@ -199,7 +199,7 @@ backend = core_wasm
 canonicalization_profile = rfc8785-jcs+sovereign-digest-v1
 ```
 
-Stage 1 Capability V1 tokens do not contain all these bindings. They may gate the initial import-free isolation slice, but must never authorize real host side effects. Capability V2 is necessary but not sufficient before effectful host interfaces are enabled: durable Authority Store consumption, verified approval evidence where required, crash-safe evidence ordering, local artifact admission, and reviewed host interfaces are also mandatory. The current V2 issuer rejects every approval-required request, and the validator rejects any self-supplied non-null approval evidence.
+Stage 1 Capability V1 tokens do not contain all these bindings. They may gate the initial import-free isolation slice, but must never authorize real host side effects. Capability V2 is necessary but not sufficient before effectful host interfaces are enabled: durable Authority Store consumption, verified approval evidence where required, crash-safe evidence ordering, local artifact admission, and reviewed host interfaces are also mandatory. Approval-required requests are issued only with verified RFC 0003 signed approval evidence; without it they fail closed, and self-supplied or unexpected evidence is rejected.
 
 ## Invocation and Cache TOCTOU Rules
 
