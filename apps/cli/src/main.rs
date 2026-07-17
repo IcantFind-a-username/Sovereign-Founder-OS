@@ -42,11 +42,14 @@ enum Commands {
     SandboxCheck,
     /// Show vault entry names
     Status,
-    /// Serve the local Security Center dashboard on 127.0.0.1
+    /// Run the local app (Workspace + Security Center) on 127.0.0.1
     Ui {
         /// Port to bind on loopback
         #[arg(long, default_value_t = 7787)]
         port: u16,
+        /// Do not open the browser automatically
+        #[arg(long)]
+        no_open: bool,
     },
 }
 
@@ -63,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Demo { fast } => demo::run(fast, data_dir())?,
         Commands::SandboxCheck => cmd_sandbox_check()?,
         Commands::Status => cmd_status()?,
-        Commands::Ui { port } => ui::run(port, data_dir())?,
+        Commands::Ui { port, no_open } => ui::run(port, data_dir(), !no_open)?,
     }
     Ok(())
 }

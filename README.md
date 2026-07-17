@@ -115,6 +115,30 @@ Specialist designs, product drafts, positioning, and historical documents live u
 | Agent Workers | Python (isolated, untrusted boundary) |
 | Protocols | JSON Schema, gRPC, WASI, MCP, A2A |
 
+## See It
+
+The local app (`sovereign ui`, English/中文) — your business state in an
+encrypted local vault, every send request stopped for human approval, and a
+one-click attack gauntlet where every denial is a real enforcement path:
+
+| Founder Workspace (工作台) | Security Center |
+| --- | --- |
+| ![Founder Workspace in Chinese](docs/screenshots/workspace-zh.png) | ![Security Center gauntlet](docs/screenshots/security-center-en.png) |
+
+## Quick Start
+
+With Rust installed:
+
+```bash
+git clone https://github.com/IcantFind-a-username/Sovereign-Founder-OS
+cd Sovereign-Founder-OS
+cargo run -p sovereign-cli -- ui     # opens http://127.0.0.1:7787
+```
+
+Prebuilt binaries for Linux, macOS, and Windows are attached to
+[GitHub Releases](https://github.com/IcantFind-a-username/Sovereign-Founder-OS/releases)
+when versions are tagged — download, unpack, and run `sovereign ui`.
+
 ## Current Status
 
 **Stage 1: Secure Kernel** — in active development.

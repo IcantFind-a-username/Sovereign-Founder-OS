@@ -42,18 +42,49 @@ const UI_HTML: &str = include_str!("../assets/ui.html");
 
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
 
-pub fn run(port: u16, root: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(port: u16, root: PathBuf, open_browser: bool) -> Result<(), Box<dyn std::error::Error>> {
     let server = Server::http(("127.0.0.1", port))
         .map_err(|error| format!("cannot bind 127.0.0.1:{port}: {error}"))?;
+    let url = format!("http://127.0.0.1:{port}");
     println!("Sovereign Founder OS · local app");
-    println!("  http://127.0.0.1:{port}");
+    println!("  {url}");
     println!("  loopback only · encrypted local state · Ctrl-C to stop");
+    if open_browser {
+        launch_browser(&url);
+    }
 
     for mut request in server.incoming_requests() {
         let response = route(&mut request, port, &root);
         let _ = request.respond(response);
     }
     Ok(())
+}
+
+/// Best-effort convenience only: a failure to open a browser is silent and
+/// harmless; the printed URL remains the source of truth.
+fn launch_browser(url: &str) {
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = std::process::Command::new("open");
+        command.arg(url);
+        command
+    };
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "start", "", url]);
+        command
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(url);
+        command
+    };
+    let _ = command
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
 }
 
 type UiResponse = Response<std::io::Cursor<Vec<u8>>>;
