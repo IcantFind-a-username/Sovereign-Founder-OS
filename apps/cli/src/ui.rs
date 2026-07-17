@@ -218,8 +218,8 @@ fn gauntlet_json() -> serde_json::Value {
     }
 }
 
-fn check(results: &mut Vec<serde_json::Value>, name: &str, pass: bool, detail: &str) {
-    results.push(serde_json::json!({ "name": name, "pass": pass, "detail": detail }));
+fn check(results: &mut Vec<serde_json::Value>, key: &str, name: &str, pass: bool, detail: &str) {
+    results.push(serde_json::json!({ "key": key, "name": name, "pass": pass, "detail": detail }));
 }
 
 fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
@@ -277,6 +277,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
     let baseline = executor.execute(gauntlet.request(&token, &invocation, &decision));
     check(
         &mut results,
+        "baseline",
         "Baseline: authorized execution",
         baseline.is_ok(),
         "signed plugin ran in the import-free Wasmtime sandbox under an exact one-use capability",
@@ -285,6 +286,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
     let replay = executor.execute(gauntlet.request(&token, &invocation, &decision));
     check(
         &mut results,
+        "replay",
         "Token replay",
         matches!(
             replay,
@@ -309,6 +311,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
         .is_ok();
     check(
         &mut results,
+        "substitution",
         "Input substitution after authorization",
         substitution_denied && honest_reuse,
         "swapped input was denied by digest mismatch; the untouched token still ran the authorized input",
@@ -319,6 +322,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
     let greedy_result = gauntlet.verify(&greedy, &invoice_component);
     check(
         &mut results,
+        "greedy_manifest",
         "Manifest demands host capabilities",
         matches!(greedy_result, Err(ArtifactError::HostCapabilitiesForbidden)),
         "a manifest requesting filesystem access was rejected before any code ran",
@@ -348,6 +352,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
         executor.execute(gauntlet.request(&stress_token, &stress_invocation, &stress_decision));
     check(
         &mut results,
+        "infinite_loop",
         "Infinite-loop plugin",
         matches!(loop_result, Err(SandboxError::FuelExhausted)),
         "runaway guest was killed by deterministic fuel metering; the attempt still consumed its token",
@@ -364,6 +369,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
     });
     check(
         &mut results,
+        "red_cloud",
         "Red-zone data to a cloud model",
         !red.allowed,
         &format!("deterministic policy denial: {}", red.reason),
@@ -374,6 +380,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
     let approval = gauntlet.issue(&invocation, &l3_decision, l3_idempotency);
     check(
         &mut results,
+        "approval",
         "High-impact action without human approval",
         matches!(
             approval,
@@ -402,6 +409,7 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
         AuditLedger::from_events(tampered_events, device.public_key_b64()).is_err();
     check(
         &mut results,
+        "audit_tamper",
         "Audit history tampering",
         tamper_detected,
         "rewriting one recorded action broke the signed hash chain and was detected",

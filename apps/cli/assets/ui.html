@@ -22,14 +22,22 @@
   body {
     background: var(--surface);
     color: var(--ink);
-    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     padding: 28px clamp(16px, 4vw, 48px) 64px;
     max-width: 1100px;
     margin-inline: auto;
   }
+  .topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   header h1 { font-size: 20px; font-weight: 650; letter-spacing: .2px; }
   header .sub { color: var(--ink-2); margin-top: 4px; }
   header .honest { color: var(--ink-3); font-size: 13px; margin-top: 10px; max-width: 70ch; }
+  .lang { display: flex; border: 1px solid var(--panel-edge); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  .lang button {
+    background: transparent; color: var(--ink-2); border: 0; border-radius: 0;
+    font: 600 13px/1 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 8px 14px; cursor: pointer;
+  }
+  .lang button.active { background: var(--panel-edge); color: var(--ink); }
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 26px 0; }
   .tile {
     background: var(--panel); border: 1px solid var(--panel-edge);
@@ -52,13 +60,18 @@
   }
   .badge.good { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
   .badge.bad { color: var(--critical); background: color-mix(in srgb, var(--critical) 14%, transparent); }
-  button {
+  button.primary {
     background: var(--accent); color: #fff; border: 0; border-radius: 8px;
-    font: 600 14px/1 system-ui; padding: 10px 18px; cursor: pointer;
+    font: 600 14px/1 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 10px 18px; cursor: pointer;
   }
-  button:disabled { opacity: .55; cursor: wait; }
-  button.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--panel-edge); }
-  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  button.primary:disabled { opacity: .55; cursor: wait; }
+  button.ghost {
+    background: transparent; color: var(--ink-2); border: 1px solid var(--panel-edge);
+    border-radius: 8px; font: 600 14px/1 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 10px 18px; cursor: pointer;
+  }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
   .gauntlet-row { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 6px 16px; padding: 11px 14px; border-top: 1px solid var(--panel-edge); align-items: start; }
   .gauntlet-row:first-child { border-top: none; }
   .gauntlet-row .name { font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
@@ -70,59 +83,133 @@
 </style>
 </head>
 <body>
-<header>
-  <h1>SOVEREIGN FOUNDER OS · Local Security Center</h1>
-  <div class="sub" id="stage">Stage 1 · Secure Kernel</div>
-  <div class="honest">
-    Served from your own machine on 127.0.0.1 — no cloud, no account, no telemetry.
-    Everything shown is read from your real local kernel state; the gauntlet runs
-    real enforcement paths in memory. This is a Stage 1 preview, not the Founder
-    Command Center.
+<div class="topbar">
+  <header>
+    <h1 data-i18n="title">SOVEREIGN FOUNDER OS · Local Security Center</h1>
+    <div class="sub" data-i18n="stage">Stage 1 · Secure Kernel</div>
+    <div class="honest" data-i18n="honest_intro"></div>
+  </header>
+  <div class="lang" role="group" aria-label="Language">
+    <button id="lang-en">EN</button>
+    <button id="lang-zh">中文</button>
   </div>
-</header>
+</div>
 
 <div class="tiles">
-  <div class="tile"><div class="label">Device identity</div><div class="value" id="t-device">–</div><div class="meta" id="t-device-meta"></div></div>
-  <div class="tile"><div class="label">Audit events</div><div class="value" id="t-events">–</div><div class="meta" id="t-chain"></div></div>
-  <div class="tile"><div class="label">Vault entries</div><div class="value" id="t-vault">–</div><div class="meta">encrypted at rest (AES-256-GCM)</div></div>
-  <div class="tile"><div class="label">Admitted plugins</div><div class="value" id="t-plugins">–</div><div class="meta">owner-signed admission records</div></div>
+  <div class="tile"><div class="label" data-i18n="tile_device"></div><div class="value" id="t-device">–</div><div class="meta" id="t-device-meta"></div></div>
+  <div class="tile"><div class="label" data-i18n="tile_events"></div><div class="value" id="t-events">–</div><div class="meta" id="t-chain"></div></div>
+  <div class="tile"><div class="label" data-i18n="tile_vault"></div><div class="value" id="t-vault">–</div><div class="meta" data-i18n="vault_meta"></div></div>
+  <div class="tile"><div class="label" data-i18n="tile_plugins"></div><div class="value" id="t-plugins">–</div><div class="meta" data-i18n="plugins_meta"></div></div>
 </div>
 
 <section>
-  <h2>Admitted plugins — content-addressed store</h2>
-  <div class="panel"><div id="plugins" class="empty">loading…</div></div>
+  <h2 data-i18n="sec_plugins"></h2>
+  <div class="panel"><div id="plugins" class="empty" data-i18n="loading"></div></div>
 </section>
 
 <section>
-  <h2>Audit trail — signed hash chain (latest 25)</h2>
-  <div class="panel"><div id="ledger" class="empty">loading…</div></div>
+  <h2 data-i18n="sec_ledger"></h2>
+  <div class="panel"><div id="ledger" class="empty" data-i18n="loading"></div></div>
 </section>
 
 <section>
-  <h2>Security gauntlet — real attacks, run now, in memory</h2>
+  <h2 data-i18n="sec_gauntlet"></h2>
   <div class="toolbar">
-    <button id="run">Run the gauntlet</button>
-    <button id="refresh" class="ghost">Refresh state</button>
+    <button id="run" class="primary" data-i18n="btn_run"></button>
+    <button id="refresh" class="ghost" data-i18n="btn_refresh"></button>
     <span class="mono" id="gauntlet-status"></span>
   </div>
-  <div class="panel"><div id="gauntlet" class="empty">
-    Seven attacks against the running kernel: token replay, input substitution,
-    a manifest demanding host capabilities, an infinite-loop plugin, red-zone
-    data exfiltration, approval bypass, and audit tampering. Nothing is mocked.
-  </div></div>
+  <div class="panel"><div id="gauntlet" class="empty" data-i18n="gauntlet_intro"></div></div>
 </section>
 
 <footer>
-  <p><strong>Honest limits of this stage:</strong> replay defense is process-local;
-  the guest does not yet receive input bytes; no external effects exist — effectful
-  requests fail closed; the gauntlet and admission listing use hard-coded demo
-  trust anchors, not production key management.</p>
-  <p>Run <span class="mono">sovereign demo</span> first if the panels are empty.</p>
+  <p><strong data-i18n="footer_limits_title"></strong> <span data-i18n="footer_limits"></span></p>
+  <p data-i18n="footer_run_demo"></p>
 </footer>
 
 <script>
 "use strict";
+const STRINGS = {
+  en: {
+    title: "SOVEREIGN FOUNDER OS · Local Security Center",
+    stage: "Stage 1 · Secure Kernel (preview UI, not the Founder Command Center)",
+    honest_intro: "Served from your own machine on 127.0.0.1 — no cloud, no account, no telemetry. Everything shown is read from your real local kernel state; the gauntlet runs real enforcement paths in memory. This is a Stage 1 preview, not the Founder Command Center.",
+    tile_device: "Device identity", tile_events: "Audit events", tile_vault: "Vault entries", tile_plugins: "Admitted plugins",
+    vault_meta: "encrypted at rest (AES-256-GCM)", plugins_meta: "owner-signed admission records",
+    device_ready: "ready", device_none: "none", device_hint: "run `sovereign demo` to create one",
+    chain_ok: "chain verified", chain_broken: "CHAIN BROKEN", no_ledger_tile: "no ledger yet",
+    sec_plugins: "Admitted plugins — content-addressed store",
+    sec_ledger: "Audit trail — signed hash chain (latest 25)",
+    sec_gauntlet: "Security gauntlet — real attacks, run now, in memory",
+    btn_run: "Run the gauntlet", btn_refresh: "Refresh state",
+    gauntlet_intro: "Seven attacks against the running kernel: token replay, input substitution, a manifest demanding host capabilities, an infinite-loop plugin, red-zone data exfiltration, approval bypass, and audit tampering. Nothing is mocked.",
+    loading: "loading…",
+    th_status: "Status", th_component: "Component", th_manifest: "Manifest", th_risk: "Risk", th_backend: "Backend", th_admitted_by: "Admitted by",
+    th_time: "Time", th_actor: "Actor", th_action: "Action", th_resource: "Resource", th_hash: "Event hash",
+    verified: "verified", unverified: "unverified",
+    plugins_empty: "No plugins admitted yet — run `sovereign demo`.",
+    ledger_empty: "No ledger yet — run `sovereign demo`.",
+    ledger_broken: "chain verification failed",
+    running: "running real attacks…",
+    all_held: (n) => "all " + n + " boundaries held",
+    violated: (n) => n + " EXPECTATION(S) VIOLATED — this is a bug, please report it",
+    held: "held", failed: "FAILED",
+    gauntlet_error: "gauntlet error: ", request_failed: "request failed: ",
+    state_failed: "failed to load state: ",
+    footer_limits_title: "Honest limits of this stage:",
+    footer_limits: "replay defense is process-local; the guest does not yet receive input bytes; no external effects exist — effectful requests fail closed; the gauntlet and admission listing use hard-coded demo trust anchors, not production key management.",
+    footer_run_demo: "Run `sovereign demo` first if the panels are empty.",
+    attacks: {} // English names/details come from the server response
+  },
+  zh: {
+    title: "SOVEREIGN FOUNDER OS · 本地安全中心",
+    stage: "第一阶段 · 安全内核（预览界面，非创始人指挥中心）",
+    honest_intro: "本页面由你自己的设备在 127.0.0.1 上提供——无云端、无账号、无遥测。所有内容均读取自本机真实的内核状态；安全闯关在内存中运行真实的安全执行路径。这是第一阶段预览，并非创始人指挥中心。",
+    tile_device: "设备身份", tile_events: "审计事件", tile_vault: "保险库条目", tile_plugins: "已准入插件",
+    vault_meta: "静态加密（AES-256-GCM）", plugins_meta: "所有者签名的准入记录",
+    device_ready: "就绪", device_none: "未创建", device_hint: "运行 `sovereign demo` 以创建",
+    chain_ok: "哈希链已验证", chain_broken: "哈希链已损坏", no_ledger_tile: "暂无账本",
+    sec_plugins: "已准入插件 — 内容寻址存储",
+    sec_ledger: "审计记录 — 签名哈希链（最近 25 条）",
+    sec_gauntlet: "安全闯关 — 真实攻击，即刻在内存中运行",
+    btn_run: "运行安全闯关", btn_refresh: "刷新状态",
+    gauntlet_intro: "对运行中的内核发起七项攻击：令牌重放、输入替换、清单越权申请、死循环插件、红区数据外泄、绕过审批、篡改审计。全部真实执行，绝无模拟。",
+    loading: "加载中…",
+    th_status: "状态", th_component: "组件", th_manifest: "清单", th_risk: "风险等级", th_backend: "后端", th_admitted_by: "准入者",
+    th_time: "时间", th_actor: "执行者", th_action: "操作", th_resource: "资源", th_hash: "事件哈希",
+    verified: "已验证", unverified: "未通过验证",
+    plugins_empty: "尚未准入任何插件 — 请先运行 `sovereign demo`。",
+    ledger_empty: "暂无账本 — 请先运行 `sovereign demo`。",
+    ledger_broken: "哈希链验证失败",
+    running: "正在运行真实攻击…",
+    all_held: (n) => "全部 " + n + " 项边界守住",
+    violated: (n) => n + " 项安全预期被违反 — 这是缺陷，请报告",
+    held: "守住", failed: "失守",
+    gauntlet_error: "闯关运行出错：", request_failed: "请求失败：",
+    state_failed: "状态加载失败：",
+    footer_limits_title: "本阶段的真实局限：",
+    footer_limits: "重放防御仅限进程内；插件尚不能接收输入字节；尚无任何外部副作用——有副作用的请求一律失败关闭；闯关与准入列表使用硬编码的演示信任锚，并非生产级密钥管理。",
+    footer_run_demo: "若面板为空，请先运行 `sovereign demo`。",
+    attacks: {
+      baseline: { name: "基线：经授权的执行", detail: "签名插件在无导入的 Wasmtime 沙箱中、凭一次性精确能力令牌运行" },
+      replay: { name: "令牌重放", detail: "重复出示已消费的能力令牌被拒绝（进程内重放防御）" },
+      substitution: { name: "授权后替换输入", detail: "被替换的输入因摘要不匹配而被拒绝；未被动过的令牌仍可执行原授权输入" },
+      greedy_manifest: { name: "清单索要主机能力", detail: "申请文件系统访问的清单在任何代码运行之前即被拒绝" },
+      infinite_loop: { name: "死循环插件", detail: "失控的插件被确定性燃料计量终止；该次尝试仍消耗了其令牌" },
+      red_cloud: { name: "红区数据发往云端模型", detail: "确定性策略拒绝：红区数据不得发送至云端工具" },
+      approval: { name: "无人工审批的高影响操作", detail: "没有审批证据就不签发任何能力令牌 — 运行时失败即关闭" },
+      audit_tamper: { name: "篡改审计历史", detail: "改写一条已记录的操作即破坏签名哈希链并被检测到" }
+    }
+  }
+};
+
+let lang = localStorage.getItem("sovereign-ui-lang")
+  || (navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en");
+let lastState = null;
+let lastGauntlet = null;
+
 const $ = (id) => document.getElementById(id);
+const t = (key) => STRINGS[lang][key];
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -136,10 +223,10 @@ function badge(good, label) {
 }
 
 function table(headers, rows) {
-  const t = el("table");
+  const tbl = el("table");
   const thead = el("thead"); const hr = el("tr");
   headers.forEach(h => hr.appendChild(el("th", null, h)));
-  thead.appendChild(hr); t.appendChild(thead);
+  thead.appendChild(hr); tbl.appendChild(thead);
   const tbody = el("tbody");
   rows.forEach(cells => {
     const tr = el("tr");
@@ -149,84 +236,122 @@ function table(headers, rows) {
     });
     tbody.appendChild(tr);
   });
-  t.appendChild(tbody);
-  return t;
+  tbl.appendChild(tbody);
+  return tbl;
 }
 
-async function loadState() {
-  const state = await (await fetch("/api/state")).json();
-  $("stage").textContent = state.stage;
-  $("t-device").textContent = state.device_id ? "ready" : "none";
-  $("t-device-meta").textContent = state.device_id || "run `sovereign demo` to create one";
+function renderState() {
+  const state = lastState;
+  if (!state) return;
+  $("t-device").textContent = state.device_id ? t("device_ready") : t("device_none");
+  $("t-device-meta").textContent = state.device_id || t("device_hint");
   $("t-events").textContent = state.ledger.count;
   $("t-chain").replaceChildren(
     state.ledger.present
-      ? badge(state.ledger.chain_ok, state.ledger.chain_ok ? "chain verified" : "CHAIN BROKEN")
-      : el("span", null, "no ledger yet"));
+      ? badge(state.ledger.chain_ok, state.ledger.chain_ok ? t("chain_ok") : t("chain_broken"))
+      : el("span", null, t("no_ledger_tile")));
   $("t-vault").textContent = state.vault_entries.length;
   $("t-plugins").textContent = state.plugins.length;
 
   const plugins = $("plugins");
   if (!state.plugins.length) {
-    plugins.replaceChildren(el("div", "empty", "No plugins admitted yet — run `sovereign demo`."));
+    plugins.replaceChildren(el("div", "empty", t("plugins_empty")));
   } else {
     plugins.replaceChildren(table(
-      ["Status", "Component", "Manifest", "Risk", "Backend", "Admitted by"],
+      [t("th_status"), t("th_component"), t("th_manifest"), t("th_risk"), t("th_backend"), t("th_admitted_by")],
       state.plugins.map(p => p.verified
-        ? [badge(true, "verified"), {mono: p.component_digest + "…"}, {mono: p.manifest_digest + "…"},
+        ? [badge(true, t("verified")), {mono: p.component_digest + "…"}, {mono: p.manifest_digest + "…"},
            String(p.risk_class), String(p.backend), p.issuer]
-        : [badge(false, "unverified"), {mono: p.manifest_digest + "…"}, "", "", "", p.error])));
+        : [badge(false, t("unverified")), {mono: p.manifest_digest + "…"}, "", "", "", p.error])));
   }
 
   const ledger = $("ledger");
   if (!state.ledger.present) {
-    ledger.replaceChildren(el("div", "empty", "No ledger yet — run `sovereign demo`."));
+    ledger.replaceChildren(el("div", "empty", t("ledger_empty")));
   } else if (!state.ledger.chain_ok) {
     const wrap = el("div", "empty");
-    wrap.appendChild(badge(false, "chain verification failed"));
+    wrap.appendChild(badge(false, t("ledger_broken")));
     wrap.appendChild(el("div", "mono", state.ledger.error || ""));
     ledger.replaceChildren(wrap);
   } else {
+    const locale = lang === "zh" ? "zh-CN" : undefined;
     ledger.replaceChildren(table(
-      ["Time", "Actor", "Action", "Resource", "Event hash"],
+      [t("th_time"), t("th_actor"), t("th_action"), t("th_resource"), t("th_hash")],
       state.ledger.events.map(e =>
-        [new Date(e.timestamp).toLocaleString(), e.actor, e.action, e.resource, {mono: e.hash + "…"}])));
+        [new Date(e.timestamp).toLocaleString(locale), e.actor, e.action, e.resource, {mono: e.hash + "…"}])));
+  }
+}
+
+function renderGauntlet() {
+  if (!lastGauntlet) return;
+  const box = $("gauntlet");
+  box.classList.remove("empty");
+  box.replaceChildren(...lastGauntlet.map(r => {
+    const localized = STRINGS[lang].attacks[r.key];
+    const row = el("div", "gauntlet-row");
+    const name = el("div", "name");
+    name.appendChild(badge(r.pass, r.pass ? t("held") : t("failed")));
+    name.appendChild(document.createTextNode(" " + (localized ? localized.name : r.name)));
+    row.appendChild(name);
+    row.appendChild(el("div", "detail", localized ? localized.detail : r.detail));
+    return row;
+  }));
+  const failed = lastGauntlet.filter(r => !r.pass).length;
+  $("gauntlet-status").textContent = failed ? t("violated")(failed) : t("all_held")(lastGauntlet.length);
+}
+
+function applyLanguage() {
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  $("lang-en").classList.toggle("active", lang === "en");
+  $("lang-zh").classList.toggle("active", lang === "zh");
+  document.querySelectorAll("[data-i18n]").forEach(node => {
+    const value = t(node.dataset.i18n);
+    if (typeof value === "string") node.textContent = value;
+  });
+  renderState();
+  renderGauntlet();
+}
+
+function setLanguage(next) {
+  lang = next;
+  localStorage.setItem("sovereign-ui-lang", next);
+  applyLanguage();
+}
+
+async function loadState() {
+  try {
+    lastState = await (await fetch("/api/state")).json();
+    renderState();
+  } catch (error) {
+    $("stage").textContent = t("state_failed") + error;
   }
 }
 
 async function runGauntlet() {
   const button = $("run");
   button.disabled = true;
-  $("gauntlet-status").textContent = "running real attacks…";
+  $("gauntlet-status").textContent = t("running");
   try {
     const data = await (await fetch("/api/gauntlet", { method: "POST" })).json();
-    const box = $("gauntlet");
     if (!data.ok) {
-      box.replaceChildren(el("div", "empty", "gauntlet error: " + data.error));
+      $("gauntlet").replaceChildren(el("div", "empty", t("gauntlet_error") + data.error));
     } else {
-      box.replaceChildren(...data.results.map(r => {
-        const row = el("div", "gauntlet-row");
-        const name = el("div", "name"); name.appendChild(badge(r.pass, r.pass ? "held" : "FAILED"));
-        name.appendChild(document.createTextNode(" " + r.name));
-        row.appendChild(name);
-        row.appendChild(el("div", "detail", r.detail));
-        return row;
-      }));
-      const failed = data.results.filter(r => !r.pass).length;
-      $("gauntlet-status").textContent = failed
-        ? failed + " EXPECTATION(S) VIOLATED — this is a bug, please report it"
-        : "all " + data.results.length + " boundaries held";
+      lastGauntlet = data.results;
+      renderGauntlet();
     }
   } catch (error) {
-    $("gauntlet-status").textContent = "request failed: " + error;
+    $("gauntlet-status").textContent = t("request_failed") + error;
   } finally {
     button.disabled = false;
   }
 }
 
+$("lang-en").addEventListener("click", () => setLanguage("en"));
+$("lang-zh").addEventListener("click", () => setLanguage("zh"));
 $("run").addEventListener("click", runGauntlet);
 $("refresh").addEventListener("click", loadState);
-loadState().catch(error => { $("stage").textContent = "failed to load state: " + error; });
+applyLanguage();
+loadState();
 </script>
 </body>
 </html>
