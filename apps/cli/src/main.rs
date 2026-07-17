@@ -1,10 +1,12 @@
+mod demo;
+
 use clap::{Parser, Subcommand};
-use sovereign_audit_ledger::{hash_bytes, AppendInput, AuditLedger};
+use sovereign_audit_ledger::AuditLedger;
 use sovereign_capability::{CapabilityIssuer, IssueOptions};
 use sovereign_contracts::{ActionRequest, AutomationLevel, DataClass};
 use sovereign_identity::DeviceIdentity;
 use sovereign_policy::PolicyEngine;
-use sovereign_sandbox::{ExecutionRequest, SandboxExecutor, WasmExecutionRequest};
+use sovereign_sandbox::{SandboxExecutor, WasmExecutionRequest};
 use sovereign_vault::Vault;
 use std::path::PathBuf;
 
@@ -28,8 +30,12 @@ struct Cli {
 enum Commands {
     /// Initialize local device identity, vault, and ledger
     Init,
-    /// Run the secure kernel demo workflow (effectful tools remain simulated)
-    Demo,
+    /// Run the story-driven secure kernel demo (real signatures, real denials)
+    Demo {
+        /// Run straight through without pausing between acts
+        #[arg(long)]
+        fast: bool,
+    },
     /// Run a mechanical check of the import-free Phase A Wasmtime path
     SandboxCheck,
     /// Show vault entry names
@@ -46,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Init => cmd_init()?,
-        Commands::Demo => cmd_demo()?,
+        Commands::Demo { fast } => demo::run(fast, data_dir())?,
         Commands::SandboxCheck => cmd_sandbox_check()?,
         Commands::Status => cmd_status()?,
     }
@@ -141,105 +147,5 @@ fn cmd_status() -> Result<(), Box<dyn std::error::Error>> {
         let ledger = AuditLedger::load(&ledger_path, device.public_key_b64())?;
         println!("audit events: {}", ledger.events().len());
     }
-    Ok(())
-}
-
-fn cmd_demo() -> Result<(), Box<dyn std::error::Error>> {
-    let root = data_dir();
-    std::fs::create_dir_all(&root)?;
-
-    let device_path = root.join("device.json");
-    let device = if device_path.exists() {
-        DeviceIdentity::load(&device_path)?
-    } else {
-        let d = DeviceIdentity::generate();
-        d.save(&device_path)?;
-        d
-    };
-
-    let mut vault = Vault::init(root.join("vault"))?;
-    vault.put(
-        "venture_profile",
-        br#"{"name":"Acme Consulting","stage":"customer_validation"}"#,
-    )?;
-
-    let policy = PolicyEngine::new();
-    let request = ActionRequest {
-        actor_id: "agent_builder".into(),
-        venture_id: "ven_demo".into(),
-        tool: "email".into(),
-        operation: "draft".into(),
-        resource: "customer:acme".into(),
-        data_class: DataClass::Amber,
-        automation_level: AutomationLevel::L1Draft,
-    };
-
-    println!("\n== Policy evaluation ==");
-    let decision = policy.evaluate(request);
-    println!("allowed: {}", decision.allowed);
-    println!("requires_approval: {}", decision.requires_approval);
-    println!("reason: {}", decision.reason);
-
-    let issuer = CapabilityIssuer::new();
-    let token = issuer.issue(&decision, IssueOptions::default(), false)?;
-    println!("\n== Capability token issued ==");
-    println!("token_id: {}", token.token_id);
-    println!("expires_at: {}", token.expires_at);
-
-    let mut sandbox = SandboxExecutor::new(vec!["email.draft".into()], issuer.public_key_b64())?;
-    let result = sandbox.execute_simulated(ExecutionRequest {
-        token: &token,
-        venture_id: "ven_demo",
-        actor_id: "agent_builder",
-        tool: "email",
-        operation: "draft",
-        resource: "customer:acme",
-        input: serde_json::json!({"subject": "Proposal for Acme Ltd."}),
-    })?;
-    println!("\n== Simulated execution (not isolated) ==");
-    println!("{}", serde_json::to_string_pretty(&result.output)?);
-
-    let decision_hash = hash_bytes(&serde_json::to_vec(&decision)?);
-    let ledger_path = root.join("ledger.json");
-    let mut ledger = if ledger_path.exists() {
-        AuditLedger::load(&ledger_path, device.public_key_b64())?
-    } else {
-        AuditLedger::new()
-    };
-
-    let event = ledger.append(
-        AppendInput {
-            venture_id: "ven_demo".into(),
-            actor_id: "agent_builder".into(),
-            action: "execute".into(),
-            resource: "email:draft".into(),
-            capability_id: Some(token.token_id),
-            payload: result.output,
-            policy_decision_hash: Some(decision_hash),
-        },
-        &device,
-    )?;
-    ledger.save(&ledger_path)?;
-
-    println!("\n== Audit event recorded ==");
-    println!("event_id: {}", event.event_id);
-    println!("event_hash: {}", event.event_hash);
-    ledger.verify_chain()?;
-    println!("chain integrity: OK");
-
-    // Demonstrate policy block
-    println!("\n== Adversarial check: red data to cloud ==");
-    let blocked = policy.evaluate(ActionRequest {
-        actor_id: "malicious_agent".into(),
-        venture_id: "ven_demo".into(),
-        tool: "cloud.model".into(),
-        operation: "infer".into(),
-        resource: "customer_database".into(),
-        data_class: DataClass::Red,
-        automation_level: AutomationLevel::L3BoundedAuto,
-    });
-    println!("allowed: {} — {}", blocked.allowed, blocked.reason);
-
-    println!("\nDemo complete. Company data remains local and encrypted.");
     Ok(())
 }

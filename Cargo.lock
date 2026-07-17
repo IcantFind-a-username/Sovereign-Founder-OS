@@ -1387,9 +1387,12 @@ dependencies = [
 name = "sovereign-cli"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
  "dirs",
  "serde_json",
+ "serde_json_canonicalizer",
+ "sovereign-artifact",
  "sovereign-audit-ledger",
  "sovereign-capability",
  "sovereign-contracts",
@@ -1397,6 +1400,8 @@ dependencies = [
  "sovereign-policy",
  "sovereign-sandbox",
  "sovereign-vault",
+ "uuid",
+ "wat",
 ]
 
 [[package]]

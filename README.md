@@ -139,14 +139,22 @@ Run locally:
 cargo test --workspace
 cargo run -p sovereign-cli -- init
 cargo run -p sovereign-cli -- sandbox-check
-cargo run -p sovereign-cli -- demo
+cargo run -p sovereign-cli -- demo          # add --fast to skip the pauses
 ```
+
+`demo` is a story-driven walkthrough of the secure kernel: it creates your
+local trust root, installs a signed plugin through publisher verification and
+local admission, executes it under an exact one-use Capability V2 inside the
+Wasmtime sandbox, records signed audit evidence, and then runs a seven-attack
+gauntlet (supply-chain tampering, token replay, input substitution, greedy
+manifests, infinite loops, red-data exfiltration, approval bypass, and audit
+tampering) — every denial is a real enforcement path, not a mock.
 
 The isolated paths currently permit import-free pure computation only. Environment, filesystem, network, WASI, and every other host import are denied. The Phase B foundation verifies role-separated publisher signatures, owns the exact artifact bytes, canonicalizes and binds security-relevant input and resources, and requires an exact one-use Capability V2 before the verified Wasmtime path starts. Its replay state is process-local, and the current core-Wasm ABI does not deliver canonical input to the guest.
 
 The artifact crate now also provides the local admission transaction: an owner-controlled content-addressed store plus a locally signed admission record (`artifact-admission` COSE role) that promotes a publisher-verified artifact to an `AdmittedArtifact`, with every load re-deriving digests from the stored bytes. The verified executor does not yet require the admitted handle.
 
-This is not a production plugin boundary or a completed Phase B. `sandbox-check` remains a mechanical Phase A check using an ephemeral test issuer—not a production trust anchor. Executor consumption of admitted artifacts, a killable compilation worker and trusted cache, a durable Authority Store, the Component/WIT input ABI, crash-safe evidence, and audited host effects remain unimplemented. The effectful tool step in `demo` therefore remains explicitly labelled as a simulation. See [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
+This is not a production plugin boundary or a completed Phase B. `sandbox-check` remains a mechanical Phase A check using an ephemeral test issuer—not a production trust anchor, and `demo` uses hard-coded demo keys. Executor consumption of admitted artifacts, a killable compilation worker and trusted cache, a durable Authority Store, the Component/WIT input ABI, crash-safe evidence, and audited host effects remain unimplemented. The demo performs no external effects; effectful requests fail closed. See [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 
 See [ROADMAP.md](ROADMAP.md) for the full development plan.
 

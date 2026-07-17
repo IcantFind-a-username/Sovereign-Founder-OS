@@ -12,6 +12,7 @@ name = "sovereign"
 path = "src/main.rs"
 
 [dependencies]
+sovereign-artifact = { workspace = true }
 sovereign-audit-ledger = { workspace = true }
 sovereign-capability = { workspace = true }
 sovereign-contracts = { workspace = true }
@@ -19,6 +20,10 @@ sovereign-identity = { workspace = true }
 sovereign-policy = { workspace = true }
 sovereign-sandbox = { workspace = true }
 sovereign-vault = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 dirs = { workspace = true }
 serde_json = { workspace = true }
+serde_json_canonicalizer = { workspace = true }
+uuid = { workspace = true }
+wat = "1"
