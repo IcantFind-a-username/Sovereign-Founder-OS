@@ -22,7 +22,9 @@ sovereign-sandbox = { workspace = true }
 sovereign-vault = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
+hex = { workspace = true }
 dirs = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

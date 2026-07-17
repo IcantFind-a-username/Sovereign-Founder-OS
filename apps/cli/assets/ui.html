@@ -228,6 +228,7 @@ const STRINGS = {
     ws_submit_send: "Request to send",
     status_draft: "draft", status_pending_approval: "awaiting your approval",
     status_approved_pending_delivery: "approved — delivery deferred (no external effects in Stage 1)",
+    ws_evidence: (e) => "✓ signed approval " + e.evidence_digest.slice(0, 12) + "… · approver key " + e.approver_key_id.slice(0, 12) + "… · sandboxed run exit " + e.guest_exit_code,
     status_rejected: "rejected",
     kind_offer: "Offer", kind_invoice: "Invoice",
     ws_approvals_title: "Approval Center",
@@ -282,6 +283,7 @@ const STRINGS = {
     ws_submit_send: "申请发送",
     status_draft: "草稿", status_pending_approval: "等待你的审批",
     status_approved_pending_delivery: "已批准 — 发送延后(第一阶段无外部副作用)",
+    ws_evidence: (e) => "✓ 签名审批 " + e.evidence_digest.slice(0, 12) + "… · 审批人密钥 " + e.approver_key_id.slice(0, 12) + "… · 沙箱执行返回 " + e.guest_exit_code,
     status_rejected: "已拒绝",
     kind_offer: "报价单", kind_invoice: "发票",
     ws_approvals_title: "审批中心",
@@ -431,6 +433,10 @@ function renderWorkspace() {
         head.appendChild(submit);
       }
       wrap.appendChild(head);
+      const approvalWithEvidence = ws.approvals.find(a => a.document_id === d.id && a.evidence);
+      if (approvalWithEvidence) {
+        wrap.appendChild(el("div", "mono", t("ws_evidence")(approvalWithEvidence.evidence)));
+      }
       const details = el("details");
       details.appendChild(el("summary", null, t("ws_view_content")));
       details.appendChild(el("pre", null, d.body));

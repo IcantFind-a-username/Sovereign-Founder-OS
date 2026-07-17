@@ -1408,6 +1408,8 @@ dependencies = [
  "chrono",
  "clap",
  "dirs",
+ "hex",
+ "rand",
  "serde",
  "serde_json",
  "serde_json_canonicalizer",

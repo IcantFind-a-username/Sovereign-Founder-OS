@@ -14,26 +14,57 @@
 //!   effects, so delivery is explicitly deferred, never simulated;
 //! - the founder can export every byte of their business state at any time.
 //!
-//! Honest labels: documents are template-generated (no model is involved),
-//! the graph schema is a prototype and may change, and approval records here
-//! are workflow evidence in the audit ledger — not yet the signed
-//! `ApprovalEvidenceV2` protocol required before effectful execution.
+//! Honest labels: documents are template-generated (no model is involved)
+//! and the graph schema is a prototype. Approving a send runs the real RFC
+//! 0003 chain — owner-signed approval evidence, a Capability V2 token issued
+//! from it, and a pure-compute delivery-preparation step in the verified
+//! sandbox — but actual delivery is still deferred: Stage 1 performs no
+//! external effects, and owner keys live in the prototype vault.
 
 use std::path::{Path, PathBuf};
 
+use chrono::Duration as ChronoDuration;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sovereign_artifact::{
+    ArtifactStore, ArtifactVerificationIntent, ArtifactVerifier, Digest, OperationSelector,
+    PreparedInvocation, RawResourceGrant, SystemClock as ArtifactClock, MANIFEST_PROTOCOL_VERSION,
+};
 use sovereign_audit_ledger::{hash_bytes, AppendInput, AuditLedger};
+use sovereign_capability::approval::{approve_invocation, ApprovalClaimsV1, ApprovalGrantRequest};
+use sovereign_capability::v2::{
+    CapabilityIssuerV2, CapabilityV2IssueOptions, CapabilityV2IssueRequest, CapabilityValidatorV2,
+    SystemClock as CapabilityClock,
+};
 use sovereign_contracts::{ActionRequest, AutomationLevel, DataClass};
-use sovereign_identity::DeviceIdentity;
-use sovereign_policy::PolicyEngine;
+use sovereign_identity::{
+    AdmissionRole, ApprovalRole, AuthorityRole, DeviceIdentity, KeyValidity, PublisherRole,
+    RoleTrustStore, TypedSigner,
+};
+use sovereign_policy::{AuthenticatedPolicyContextV2, PolicyEngine};
+use sovereign_sandbox::{VerifiedExecutionRequest, VerifiedSandboxExecutor};
 use sovereign_vault::Vault;
 use uuid::Uuid;
+
+use crate::demo::compile_wat;
 
 pub const WORKSPACE_VAULT_ENTRY: &str = "workspace_graph";
 const WORKSPACE_VERSION: u32 = 1;
 const MAX_TEXT_FIELD_BYTES: usize = 4 * 1024;
 const MAX_CUSTOMERS: usize = 500;
 const MAX_DOCUMENTS: usize = 2_000;
+
+// The built-in delivery-preparation tool is authored by the application
+// itself; its publisher key is a build constant, not a secret. Owner keys
+// (approval, authority, admission) are generated per installation and kept
+// in the encrypted vault — prototype key management, honestly labelled.
+const BUILTIN_PUBLISHER_SECRET: [u8; 32] = *b"sovereign-builtin-publisher-01!!";
+const BUILTIN_PUBLISHER_ISSUER: &str = "builtin.sovereign-founder-os";
+const RUNTIME_AUTHORITY_ISSUER: &str = "workspace-runtime.local";
+const OWNER_APPROVAL_ISSUER: &str = "founder-owner.local";
+const OWNER_ADMISSION_ISSUER: &str = "founder-device.workspace";
+const WORKSPACE_AUDIENCE: &str = "sovereign-runtime";
+const APPROVAL_TTL_SECONDS: i64 = 300;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
@@ -107,6 +138,27 @@ pub struct Approval {
     pub status: ApprovalStatus,
     pub requested_at: i64,
     pub decided_at: Option<i64>,
+    /// RFC 0003 evidence recorded when the owner approves. Absent on
+    /// rejections and on approvals from before this protocol existed.
+    #[serde(default)]
+    pub evidence: Option<SignedApprovalRecord>,
+}
+
+/// Portable record of one signed approval and the sandboxed execution it
+/// authorized. The full COSE bytes are kept (hex) so the evidence can be
+/// re-verified independently after export.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedApprovalRecord {
+    pub approval_id: Uuid,
+    pub approver_subject_id: String,
+    pub approver_key_id: String,
+    pub evidence_digest: String,
+    pub signed_approval_hex: String,
+    pub component_digest: String,
+    pub canonical_input_digest: String,
+    pub capability_idempotency: Uuid,
+    pub guest_exit_code: i32,
+    pub fuel_consumed: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -384,6 +436,7 @@ impl Store {
             status: ApprovalStatus::Pending,
             requested_at: now(),
             decided_at: None,
+            evidence: None,
         };
         let resource = format!("document:{document_id}");
         let summary = serde_json::json!({ "approval_id": approval.id });
@@ -393,47 +446,336 @@ impl Store {
         Ok(workspace)
     }
 
-    /// The human owner decides. Stage 1 has no external effects, so an
-    /// approval marks the document approved-pending-delivery; it does not and
-    /// cannot send anything.
+    /// The human owner decides. Approving runs the full RFC 0003 chain: the
+    /// owner's approval key signs evidence bound to one exact
+    /// delivery-preparation invocation, a Capability V2 token is issued from
+    /// that evidence, and the pure-compute preparation step executes in the
+    /// verified Wasmtime sandbox. Actual delivery remains deferred — Stage 1
+    /// performs no external effects — and any failure in the chain leaves the
+    /// approval pending (fail closed).
     pub fn decide(&self, approval_id: Uuid, approve: bool) -> Result<Workspace, WorkspaceError> {
         let mut workspace = self.load()?;
         let approval = workspace
             .approvals
-            .iter_mut()
+            .iter()
             .find(|approval| approval.id == approval_id)
             .ok_or_else(|| WorkspaceError::NotFound("approval".into()))?;
         if approval.status != ApprovalStatus::Pending {
             return Err(WorkspaceError::Invalid("approval already decided".into()));
         }
+        let document_id = approval.document_id;
+        let document = workspace
+            .documents
+            .iter()
+            .find(|document| document.id == document_id)
+            .cloned()
+            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+
+        let evidence = if approve {
+            Some(self.execute_signed_approval(&document)?)
+        } else {
+            None
+        };
+
+        let approval = workspace
+            .approvals
+            .iter_mut()
+            .find(|approval| approval.id == approval_id)
+            .ok_or_else(|| WorkspaceError::NotFound("approval".into()))?;
         approval.status = if approve {
             ApprovalStatus::Approved
         } else {
             ApprovalStatus::Rejected
         };
         approval.decided_at = Some(now());
-        let document_id = approval.document_id;
-        let action = if approve {
-            "approval.granted"
-        } else {
-            "approval.rejected"
-        };
-        let summary = serde_json::json!({ "approval_id": approval_id, "approved": approve });
-
-        let document = workspace
+        approval.evidence = evidence.clone();
+        let document_entry = workspace
             .documents
             .iter_mut()
             .find(|document| document.id == document_id)
             .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
-        document.status = if approve {
+        document_entry.status = if approve {
             DocumentStatus::ApprovedPendingDelivery
         } else {
             DocumentStatus::Rejected
         };
 
         self.save(&workspace)?;
-        self.record(action, &format!("document:{document_id}"), summary)?;
+        let resource = format!("document:{document_id}");
+        match &evidence {
+            Some(record) => {
+                self.record(
+                    "approval.granted",
+                    &resource,
+                    serde_json::json!({
+                        "approval_id": approval_id,
+                        "signed_approval_id": record.approval_id,
+                        "evidence_digest": record.evidence_digest,
+                        "approver_key_id": record.approver_key_id,
+                    }),
+                )?;
+                self.record(
+                    "capability.executed",
+                    &resource,
+                    serde_json::json!({
+                        "tool": "workspace.delivery/prepare",
+                        "component_digest": record.component_digest,
+                        "canonical_input_digest": record.canonical_input_digest,
+                        "idempotency": record.capability_idempotency,
+                        "exit_code": record.guest_exit_code,
+                        "fuel": record.fuel_consumed,
+                    }),
+                )?;
+            }
+            None => {
+                self.record(
+                    "approval.rejected",
+                    &resource,
+                    serde_json::json!({ "approval_id": approval_id, "approved": false }),
+                )?;
+            }
+        }
         Ok(workspace)
+    }
+
+    /// One end-to-end pass of the secure kernel, triggered by the owner's
+    /// click: verify the built-in delivery-preparation plugin, admit it into
+    /// the local store, prepare the exact invocation for this document, get a
+    /// deterministic policy decision (which demands approval), sign RFC 0003
+    /// evidence with the owner's approval key, issue a Capability V2 token
+    /// from that evidence, and execute the pure-compute step in the verified
+    /// sandbox. Every stage fails closed.
+    fn execute_signed_approval(
+        &self,
+        document: &Document,
+    ) -> Result<SignedApprovalRecord, WorkspaceError> {
+        let approval_secret = self.owner_secret("owner_approval_key")?;
+        let authority_secret = self.owner_secret("runtime_authority_key")?;
+        let admission_secret = self.owner_secret("owner_admission_key")?;
+
+        let now_unix = now();
+        let validity = KeyValidity::new(now_unix - 60, now_unix + 3_600).map_err(kernel)?;
+
+        // Built-in delivery-preparation tool: publisher-verified, then
+        // admitted under the owner's admission key (or reloaded and
+        // re-verified from the content-addressed store on later runs).
+        let component =
+            compile_wat(r#"(module (func (export "sovereign_run") (result i32) i32.const 0))"#);
+        let publisher = TypedSigner::<PublisherRole>::from_secret_bytes(
+            BUILTIN_PUBLISHER_ISSUER,
+            BUILTIN_PUBLISHER_SECRET,
+        )
+        .map_err(kernel)?;
+        let manifest = delivery_manifest_json(&publisher, &component);
+        let canonical_manifest = serde_json_canonicalizer::to_vec(&manifest).map_err(kernel)?;
+        let signed_manifest = publisher.sign_cose(&canonical_manifest).map_err(kernel)?;
+        let mut publishers = RoleTrustStore::<PublisherRole>::new();
+        publishers
+            .trust_signer(&publisher, validity)
+            .map_err(kernel)?;
+        let intent = ArtifactVerificationIntent::new(
+            BUILTIN_PUBLISHER_ISSUER,
+            Digest::of_bytes(&signed_manifest),
+            Digest::of_bytes(&component),
+        )
+        .map_err(kernel)?;
+        let artifact = ArtifactVerifier::new(&publishers)
+            .verify(&intent, &signed_manifest, &component)
+            .map_err(kernel)?;
+
+        let admission_signer = TypedSigner::<AdmissionRole>::from_secret_bytes(
+            OWNER_ADMISSION_ISSUER,
+            admission_secret,
+        )
+        .map_err(kernel)?;
+        let mut admission_trust = RoleTrustStore::<AdmissionRole>::new();
+        admission_trust
+            .trust_signer(&admission_signer, validity)
+            .map_err(kernel)?;
+        let store = ArtifactStore::open(self.root.join("artifacts")).map_err(kernel)?;
+        let admitted = match store.admit(&artifact, &admission_signer, &ArtifactClock) {
+            Ok(admitted) => admitted,
+            Err(sovereign_artifact::ArtifactError::AdmissionRecordExists) => store
+                .load(
+                    artifact.component_digest(),
+                    artifact.manifest_digest(),
+                    &admission_trust,
+                    OWNER_ADMISSION_ISSUER,
+                    &ArtifactClock,
+                )
+                .map_err(kernel)?,
+            Err(error) => return Err(kernel(error)),
+        };
+
+        let selector =
+            OperationSelector::new("workspace.delivery", "1.0.0", "prepare").map_err(kernel)?;
+        let resource = format!("document:{}", document.id);
+        let input = serde_json::to_vec(&serde_json::json!({
+            "document_id": document.id.to_string(),
+            "resource": resource,
+        }))
+        .map_err(kernel)?;
+        let invocation = PreparedInvocation::prepare(
+            admitted.artifact(),
+            &selector,
+            &input,
+            vec![RawResourceGrant::new("primary", resource.as_str())],
+        )
+        .map_err(kernel)?;
+
+        let session_id = Uuid::new_v4();
+        let idempotency = Uuid::new_v4();
+        let decision = PolicyEngine::new()
+            .evaluate_prepared(
+                &invocation,
+                AuthenticatedPolicyContextV2::new(
+                    WORKSPACE_AUDIENCE,
+                    "workspace",
+                    "founder",
+                    session_id,
+                    DataClass::Amber,
+                    AutomationLevel::L2ApproveExecute,
+                    idempotency,
+                )
+                .map_err(kernel)?,
+            )
+            .map_err(kernel)?;
+        if !decision.allowed() {
+            return Err(WorkspaceError::PolicyDenied(
+                "delivery preparation denied by policy".into(),
+            ));
+        }
+        if !decision.requires_approval() {
+            // Fail closed: this path exists precisely because policy demands
+            // a human; if it ever stops demanding one, refuse to proceed.
+            return Err(WorkspaceError::PolicyDenied(
+                "expected an approval requirement for delivery".into(),
+            ));
+        }
+
+        let approval_signer =
+            TypedSigner::<ApprovalRole>::from_secret_bytes(OWNER_APPROVAL_ISSUER, approval_secret)
+                .map_err(kernel)?;
+        let signed_approval = approve_invocation(
+            &approval_signer,
+            &CapabilityClock,
+            ApprovalGrantRequest {
+                approver_subject_id: "founder-owner",
+                audience: WORKSPACE_AUDIENCE,
+                venture_id: "workspace",
+                subject_id: "founder",
+                session_id,
+                policy_decision: &decision,
+                prepared_invocation: &invocation,
+                ttl_seconds: APPROVAL_TTL_SECONDS,
+            },
+        )
+        .map_err(kernel)?;
+        let mut approval_trust = RoleTrustStore::<ApprovalRole>::new();
+        approval_trust
+            .trust_signer(&approval_signer, validity)
+            .map_err(kernel)?;
+        // Extract the claims for the audit record by verifying our own
+        // evidence exactly the way the issuer will.
+        let approval_claims: ApprovalClaimsV1 = serde_json::from_slice(
+            approval_trust
+                .verify(signed_approval.as_bytes(), OWNER_APPROVAL_ISSUER, now())
+                .map_err(kernel)?
+                .payload(),
+        )
+        .map_err(kernel)?;
+
+        let authority = TypedSigner::<AuthorityRole>::from_secret_bytes(
+            RUNTIME_AUTHORITY_ISSUER,
+            authority_secret,
+        )
+        .map_err(kernel)?;
+        let mut authority_trust = RoleTrustStore::<AuthorityRole>::new();
+        authority_trust
+            .trust_signer(&authority, validity)
+            .map_err(kernel)?;
+        let mut approval_trust_for_validator = RoleTrustStore::<ApprovalRole>::new();
+        approval_trust_for_validator
+            .trust_signer(&approval_signer, validity)
+            .map_err(kernel)?;
+
+        let issuer = CapabilityIssuerV2::new(authority, WORKSPACE_AUDIENCE, CapabilityClock)
+            .map_err(kernel)?
+            .with_approval_trust(approval_trust, OWNER_APPROVAL_ISSUER)
+            .map_err(kernel)?;
+        let token = issuer
+            .issue_approved(
+                CapabilityV2IssueRequest {
+                    venture_id: "workspace",
+                    subject_id: "founder",
+                    session_id,
+                    policy_decision: &decision,
+                    prepared_invocation: &invocation,
+                    options: CapabilityV2IssueOptions {
+                        ttl: ChronoDuration::seconds(60),
+                        idempotency_key: idempotency,
+                    },
+                },
+                &signed_approval,
+            )
+            .map_err(kernel)?;
+
+        let validator = CapabilityValidatorV2::new(
+            authority_trust,
+            RUNTIME_AUTHORITY_ISSUER,
+            WORKSPACE_AUDIENCE,
+            CapabilityClock,
+        )
+        .map_err(kernel)?
+        .with_approval_trust(approval_trust_for_validator, OWNER_APPROVAL_ISSUER)
+        .map_err(kernel)?;
+        let mut executor =
+            VerifiedSandboxExecutor::new(vec![selector], validator).map_err(kernel)?;
+        let result = executor
+            .execute_approved(
+                VerifiedExecutionRequest {
+                    token: &token,
+                    invocation: &invocation,
+                    venture_id: "workspace",
+                    subject_id: "founder",
+                    session_id,
+                    policy_decision: &decision,
+                },
+                Some(&signed_approval),
+            )
+            .map_err(kernel)?;
+
+        Ok(SignedApprovalRecord {
+            approval_id: approval_claims.approval_id,
+            approver_subject_id: approval_claims.approver_subject_id,
+            approver_key_id: approval_claims.approver_key_id.as_hex(),
+            evidence_digest: hash_bytes(signed_approval.as_bytes()),
+            signed_approval_hex: hex::encode(signed_approval.as_bytes()),
+            component_digest: invocation.artifact().component_digest().as_hex(),
+            canonical_input_digest: invocation.input_digest().as_hex(),
+            capability_idempotency: idempotency,
+            guest_exit_code: result.exit_code,
+            fuel_consumed: result.fuel_consumed,
+        })
+    }
+
+    /// Load or create one of the owner's 32-byte signing secrets, stored in
+    /// the encrypted vault. Prototype key management: the vault key itself is
+    /// a local file in this stage.
+    fn owner_secret(&self, name: &str) -> Result<[u8; 32], WorkspaceError> {
+        let mut vault = Vault::init(self.root.join("vault")).map_err(storage)?;
+        match vault.get(name) {
+            Ok(bytes) => bytes
+                .try_into()
+                .map_err(|_| WorkspaceError::Storage(format!("corrupt key entry `{name}`"))),
+            Err(sovereign_vault::VaultError::NotFound(_)) => {
+                let mut secret = [0u8; 32];
+                rand::rngs::OsRng.fill_bytes(&mut secret);
+                vault.put(name, &secret).map_err(storage)?;
+                Ok(secret)
+            }
+            Err(error) => Err(storage(error)),
+        }
     }
 
     /// Full data export: the founder's right to leave with everything.
@@ -462,6 +804,50 @@ impl Store {
             "audit_events": events,
         }))
     }
+}
+
+fn delivery_manifest_json(
+    publisher: &TypedSigner<PublisherRole>,
+    component: &[u8],
+) -> serde_json::Value {
+    serde_json::json!({
+        "protocol_version": MANIFEST_PROTOCOL_VERSION,
+        "publisher_issuer": BUILTIN_PUBLISHER_ISSUER,
+        "publisher_key_id": Digest::from_bytes(*publisher.key_id()),
+        "component_digest": Digest::of_bytes(component),
+        "backend": "core_wasm",
+        "risk_class": "pure_compute",
+        "abi": "sovereign_core_wasm_v1",
+        "entrypoint": sovereign_artifact::CORE_WASM_ENTRYPOINT,
+        "requested_host_capabilities": [],
+        "operations": [{
+            "selector": {
+                "tool_id": "workspace.delivery",
+                "tool_version": "1.0.0",
+                "operation_id": "prepare"
+            },
+            "input_limits": { "max_bytes": 2048, "max_depth": 4 },
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "document_id": { "type": "string", "max_utf8_bytes": 64 },
+                    "resource": { "type": "string", "max_utf8_bytes": 128 }
+                },
+                "required": ["document_id", "resource"],
+                "max_properties": 2
+            },
+            "resource_bindings": [{
+                "binding_id": "primary",
+                "json_pointer": "/resource",
+                "normalization": "exact_utf8_v1",
+                "primary": true
+            }]
+        }]
+    })
+}
+
+fn kernel(error: impl std::fmt::Display) -> WorkspaceError {
+    WorkspaceError::Storage(format!("kernel chain failed closed: {error}"))
 }
 
 fn render_document(
@@ -622,6 +1008,14 @@ mod tests {
             DocumentStatus::ApprovedPendingDelivery
         );
 
+        // The approval carries real RFC 0003 evidence: signed bytes, the
+        // approver's key id, and the sandboxed execution outcome.
+        let evidence = workspace.approvals[0].evidence.as_ref().unwrap();
+        assert_eq!(evidence.approver_subject_id, "founder-owner");
+        assert_eq!(evidence.guest_exit_code, 0);
+        assert_eq!(evidence.evidence_digest.len(), 64);
+        assert!(!evidence.signed_approval_hex.is_empty());
+
         // Every step left signed evidence and the chain verifies.
         let device = DeviceIdentity::load(&dir.path().join("device.json")).unwrap();
         let ledger =
@@ -635,6 +1029,7 @@ mod tests {
                 "document.draft",
                 "approval.requested",
                 "approval.granted",
+                "capability.executed",
             ]
         );
         ledger.verify_chain().unwrap();
