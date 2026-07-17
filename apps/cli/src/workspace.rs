@@ -200,6 +200,51 @@ pub struct Workspace {
     pub approvals: Vec<Approval>,
 }
 
+/// At-a-glance product view: the founder's whole business plus the security
+/// evidence that backs it, derived purely from stored state. It is read-only
+/// and adds no new claims — it only surfaces what the workspace already proved.
+#[derive(Debug, Clone, Serialize)]
+pub struct CommandCenter {
+    pub venture: Option<Venture>,
+    pub counts: CommandCenterCounts,
+    /// Approvals still waiting on the owner — the only actionable items here.
+    pub pending_decisions: Vec<PendingDecision>,
+    pub evidence: EvidenceRollup,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CommandCenterCounts {
+    pub customers: usize,
+    pub documents: usize,
+    pub drafts: usize,
+    pub pending_approval: usize,
+    pub approved_pending_delivery: usize,
+    pub rejected: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PendingDecision {
+    pub approval_id: Uuid,
+    pub document_id: Uuid,
+    pub document_title: String,
+    pub customer_name: String,
+    pub action: String,
+    pub policy_reason: String,
+    pub requested_at: i64,
+}
+
+/// Counts of the tamper-evident evidence already on disk. These are facts the
+/// owner can re-verify from the export, not aspirational security claims.
+#[derive(Debug, Clone, Serialize)]
+pub struct EvidenceRollup {
+    /// Approvals carrying RFC 0003 signed evidence.
+    pub signed_approvals: usize,
+    /// Approvals whose sandboxed execution wrote a real audited outbox file.
+    pub outbox_effects: usize,
+    /// Relative path of the most recent real host effect, if any.
+    pub last_effect_path: Option<String>,
+}
+
 /// Storage + evidence context for one workspace operation.
 pub struct Store {
     root: PathBuf,
@@ -921,6 +966,85 @@ impl Store {
         }
     }
 
+    /// Aggregate the whole workspace into the Founder Command Center view.
+    /// Pure over stored state: it reads nothing new and writes nothing, so it
+    /// leaves no audit event and makes no security claim of its own.
+    pub fn command_center(&self) -> Result<CommandCenter, WorkspaceError> {
+        let workspace = self.load()?;
+
+        let count_status = |status: DocumentStatus| {
+            workspace
+                .documents
+                .iter()
+                .filter(|document| document.status == status)
+                .count()
+        };
+        let counts = CommandCenterCounts {
+            customers: workspace.customers.len(),
+            documents: workspace.documents.len(),
+            drafts: count_status(DocumentStatus::Draft),
+            pending_approval: count_status(DocumentStatus::PendingApproval),
+            approved_pending_delivery: count_status(DocumentStatus::ApprovedPendingDelivery),
+            rejected: count_status(DocumentStatus::Rejected),
+        };
+
+        let pending_decisions = workspace
+            .approvals
+            .iter()
+            .filter(|approval| approval.status == ApprovalStatus::Pending)
+            .map(|approval| {
+                let document = workspace
+                    .documents
+                    .iter()
+                    .find(|document| document.id == approval.document_id);
+                let customer_name = document
+                    .and_then(|document| {
+                        workspace
+                            .customers
+                            .iter()
+                            .find(|customer| customer.id == document.customer_id)
+                    })
+                    .map(|customer| customer.name.clone())
+                    .unwrap_or_default();
+                PendingDecision {
+                    approval_id: approval.id,
+                    document_id: approval.document_id,
+                    document_title: document
+                        .map(|document| document.title.clone())
+                        .unwrap_or_default(),
+                    customer_name,
+                    action: approval.action.clone(),
+                    policy_reason: approval.policy_reason.clone(),
+                    requested_at: approval.requested_at,
+                }
+            })
+            .collect();
+
+        let signed_approvals = workspace
+            .approvals
+            .iter()
+            .filter(|approval| approval.evidence.is_some())
+            .count();
+        let effects: Vec<&OutboxWrite> = workspace
+            .approvals
+            .iter()
+            .filter_map(|approval| approval.evidence.as_ref())
+            .filter_map(|evidence| evidence.outbox.as_ref())
+            .collect();
+        let evidence = EvidenceRollup {
+            signed_approvals,
+            outbox_effects: effects.len(),
+            last_effect_path: effects.last().map(|effect| effect.relative_path.clone()),
+        };
+
+        Ok(CommandCenter {
+            venture: workspace.venture,
+            counts,
+            pending_decisions,
+            evidence,
+        })
+    }
+
     /// Full data export: the founder's right to leave with everything.
     pub fn export(&self) -> Result<serde_json::Value, WorkspaceError> {
         let workspace = self.load()?;
@@ -1304,5 +1428,59 @@ mod tests {
         let ledger =
             AuditLedger::load(&_dir.path().join("ledger.json"), device.public_key_b64()).unwrap();
         assert_eq!(ledger.events().last().unwrap().action, "model.drafted");
+    }
+
+    #[test]
+    fn command_center_aggregates_state_and_evidence_read_only() {
+        let (_dir, store) = store();
+        store.set_venture("Acme", "Landing pages").unwrap();
+        let workspace = store.add_customer("Dr. Tan", "").unwrap();
+        let customer_id = workspace.customers[0].id;
+        let workspace = store
+            .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+            .unwrap();
+        let document_id = workspace.documents[0].id;
+
+        // A pending decision shows up as actionable, with no evidence yet.
+        let workspace = store.request_send(document_id).unwrap();
+        let approval_id = workspace.approvals[0].id;
+        let cc = store.command_center().unwrap();
+        assert_eq!(cc.venture.as_ref().unwrap().name, "Acme");
+        assert_eq!(cc.counts.customers, 1);
+        assert_eq!(cc.counts.pending_approval, 1);
+        assert_eq!(cc.pending_decisions.len(), 1);
+        assert_eq!(cc.pending_decisions[0].customer_name, "Dr. Tan");
+        assert_eq!(cc.evidence.signed_approvals, 0);
+        assert_eq!(cc.evidence.outbox_effects, 0);
+
+        // After approval the evidence rollup reflects the real signed effect,
+        // and the decision is no longer pending.
+        let ledger_before = {
+            let device = DeviceIdentity::load(&_dir.path().join("device.json")).unwrap();
+            AuditLedger::load(&_dir.path().join("ledger.json"), device.public_key_b64())
+                .unwrap()
+                .events()
+                .len()
+        };
+        store.decide(approval_id, true).unwrap();
+        let cc = store.command_center().unwrap();
+        assert!(cc.pending_decisions.is_empty());
+        assert_eq!(cc.counts.approved_pending_delivery, 1);
+        assert_eq!(cc.evidence.signed_approvals, 1);
+        assert_eq!(cc.evidence.outbox_effects, 1);
+        assert!(cc.evidence.last_effect_path.is_some());
+
+        // The view is genuinely read-only: computing it twice appends no audit
+        // events beyond the ones the approval itself created.
+        let _ = store.command_center().unwrap();
+        let device = DeviceIdentity::load(&_dir.path().join("device.json")).unwrap();
+        let ledger_after =
+            AuditLedger::load(&_dir.path().join("ledger.json"), device.public_key_b64())
+                .unwrap()
+                .events()
+                .len();
+        // Approval added exactly its own events (granted, executed, effect);
+        // the two command_center calls added none.
+        assert_eq!(ledger_after, ledger_before + 3);
     }
 }

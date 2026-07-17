@@ -110,9 +110,40 @@
 </div>
 
 <nav class="tabs">
+  <button id="tab-command" data-i18n="tab_command"></button>
   <button id="tab-workspace" data-i18n="tab_workspace"></button>
   <button id="tab-security" data-i18n="tab_security"></button>
 </nav>
+
+<!-- ══════════════════ COMMAND CENTER VIEW ══════════════════ -->
+<div id="view-command" hidden>
+  <section>
+    <h2 data-i18n="cc_business_title"></h2>
+    <div class="panel pad" id="cc-venture"><span class="empty" data-i18n="cc_no_venture"></span></div>
+    <div class="tiles" style="margin-top:10px">
+      <div class="tile"><div class="label" data-i18n="cc_customers"></div><div class="value" id="cc-customers">–</div><div class="meta" data-i18n="cc_customers_meta"></div></div>
+      <div class="tile"><div class="label" data-i18n="cc_documents"></div><div class="value" id="cc-documents">–</div><div class="meta" id="cc-documents-meta"></div></div>
+      <div class="tile"><div class="label" data-i18n="cc_pending"></div><div class="value" id="cc-pending">–</div><div class="meta" data-i18n="cc_pending_meta"></div></div>
+      <div class="tile"><div class="label" data-i18n="cc_effects"></div><div class="value" id="cc-effects">–</div><div class="meta" id="cc-effects-meta"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 data-i18n="cc_decisions_title"></h2>
+    <div class="panel"><div id="cc-decisions" class="empty" data-i18n="cc_no_decisions"></div></div>
+  </section>
+
+  <section>
+    <h2 data-i18n="cc_evidence_title"></h2>
+    <div class="honest" data-i18n="cc_evidence_note"></div>
+    <div class="tiles" style="margin-top:10px">
+      <div class="tile"><div class="label" data-i18n="cc_chain"></div><div class="value" id="cc-chain">–</div><div class="meta" id="cc-chain-meta"></div></div>
+      <div class="tile"><div class="label" data-i18n="cc_signed"></div><div class="value" id="cc-signed">–</div><div class="meta" data-i18n="cc_signed_meta"></div></div>
+      <div class="tile"><div class="label" data-i18n="cc_disclosures"></div><div class="value" id="cc-disclosures">–</div><div class="meta" data-i18n="cc_disclosures_meta"></div></div>
+      <div class="tile"><div class="label" data-i18n="cc_plugins"></div><div class="value" id="cc-plugins">–</div><div class="meta" data-i18n="cc_plugins_meta"></div></div>
+    </div>
+  </section>
+</div>
 
 <!-- ══════════════════ WORKSPACE VIEW ══════════════════ -->
 <div id="view-workspace" hidden>
@@ -220,7 +251,25 @@ const STRINGS = {
     title: "SOVEREIGN FOUNDER OS",
     stage: "Stage 1 · minimal usable workspace on the secure kernel",
     honest_intro: "Runs entirely on your machine at 127.0.0.1 — no cloud, no account, no telemetry. Your business state lives in a local encrypted vault; every change passes the policy engine and leaves a signed audit event.",
-    tab_workspace: "Workspace", tab_security: "Security Center",
+    tab_command: "Command Center", tab_workspace: "Workspace", tab_security: "Security Center",
+    cc_business_title: "Your business at a glance",
+    cc_no_venture: "No company set yet — open Workspace to name your venture.",
+    cc_venture_line: (v) => v.name + " · " + v.service,
+    cc_customers: "Customers", cc_customers_meta: "in your local vault",
+    cc_documents: "Documents", cc_documents_meta: (c) => c.drafts + " draft · " + c.approved_pending_delivery + " sent",
+    cc_pending: "Awaiting you", cc_pending_meta: "decisions only you can make",
+    cc_effects: "Signed effects", cc_effects_meta: (s) => s.last_effect_path ? "last: outbox/" + s.last_effect_path : "no real effects yet",
+    cc_decisions_title: "Needs your decision",
+    cc_no_decisions: "Nothing is waiting on you. The assistant can draft, but only you approve — nothing leaves without this step.",
+    cc_decision_line: (d) => d.action + " · " + (d.customer_name || "—") + " · " + d.document_title,
+    cc_evidence_title: "Kernel evidence",
+    cc_evidence_note: "Every number below is re-derivable from your export. This view only reports what the kernel already proved — it makes no new claim and writes nothing.",
+    cc_chain: "Audit chain", cc_signed: "Signed approvals", cc_signed_meta: "with RFC 0003 evidence",
+    cc_disclosures: "Model disclosures", cc_disclosures_meta: "times a model was consulted",
+    cc_plugins: "Admitted plugins", cc_plugins_meta: "owner-signed admissions",
+    cc_chain_verified: "verified", cc_chain_broken: "BROKEN", cc_chain_none: "none yet",
+    cc_events: (n) => n + " events",
+    cc_approve: "Approve", cc_reject: "Reject",
     ws_venture_title: "Your company",
     ws_company_name: "Company name", ws_service_desc: "What service do you sell?",
     ws_save: "Save", saved: "saved ✓",
@@ -281,7 +330,25 @@ const STRINGS = {
     title: "SOVEREIGN FOUNDER OS",
     stage: "第一阶段 · 安全内核之上的最小可用工作台",
     honest_intro: "完全运行在你自己的设备上(127.0.0.1)——无云端、无账号、无遥测。你的业务数据保存在本地加密保险库中;每一次变更都先经过策略引擎,并留下签名审计记录。",
-    tab_workspace: "工作台", tab_security: "安全中心",
+    tab_command: "指挥中心", tab_workspace: "工作台", tab_security: "安全中心",
+    cc_business_title: "你的业务一览",
+    cc_no_venture: "尚未设置公司 — 打开工作台为你的业务命名。",
+    cc_venture_line: (v) => v.name + " · " + v.service,
+    cc_customers: "客户", cc_customers_meta: "存于本地加密保险库",
+    cc_documents: "文档", cc_documents_meta: (c) => c.drafts + " 份草稿 · " + c.approved_pending_delivery + " 份已发送",
+    cc_pending: "等你决定", cc_pending_meta: "只有你能做的决定",
+    cc_effects: "已签名副作用", cc_effects_meta: (s) => s.last_effect_path ? "最近:outbox/" + s.last_effect_path : "尚无真实副作用",
+    cc_decisions_title: "需要你的决定",
+    cc_no_decisions: "没有等待你处理的事项。助手可以起草,但只有你能批准 —— 没有这一步,任何东西都不会发出。",
+    cc_decision_line: (d) => d.action + " · " + (d.customer_name || "—") + " · " + d.document_title,
+    cc_evidence_title: "内核证据",
+    cc_evidence_note: "下方每个数字都可从你的导出文件中重新验证。此视图只报告内核已证明的事实 —— 不作任何新声明,也不写入任何内容。",
+    cc_chain: "审计链", cc_signed: "已签名批准", cc_signed_meta: "含 RFC 0003 证据",
+    cc_disclosures: "模型披露", cc_disclosures_meta: "模型被调用的次数",
+    cc_plugins: "已准入插件", cc_plugins_meta: "所有者签名的准入记录",
+    cc_chain_verified: "已验证", cc_chain_broken: "已损坏", cc_chain_none: "暂无",
+    cc_events: (n) => n + " 条事件",
+    cc_approve: "批准", cc_reject: "拒绝",
     ws_venture_title: "你的公司",
     ws_company_name: "公司名称", ws_service_desc: "你提供什么服务?",
     ws_save: "保存", saved: "已保存 ✓",
@@ -351,9 +418,10 @@ const STRINGS = {
 
 let lang = localStorage.getItem("sovereign-ui-lang")
   || (navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en");
-let view = localStorage.getItem("sovereign-ui-view") || "workspace";
+let view = localStorage.getItem("sovereign-ui-view") || "command";
 let lastState = null;
 let lastGauntlet = null;
+let lastCommand = null;
 let ws = null;
 
 const $ = (id) => document.getElementById(id);
@@ -621,6 +689,74 @@ async function runGauntlet() {
   }
 }
 
+/* ─────────────── Command Center ─────────────── */
+
+async function loadCommandCenter() {
+  try {
+    lastCommand = await (await fetch("/api/command-center")).json();
+    renderCommandCenter();
+  } catch (error) { /* leave placeholders; other views still work */ }
+}
+
+function renderCommandCenter() {
+  if (!lastCommand || !lastCommand.ok) return;
+  const s = lastCommand.summary;
+  const k = lastCommand.kernel;
+
+  const vbox = $("cc-venture");
+  if (s.venture) vbox.replaceChildren(el("div", "mono", t("cc_venture_line")(s.venture)));
+  else vbox.replaceChildren(el("span", "empty", t("cc_no_venture")));
+
+  $("cc-customers").textContent = s.counts.customers;
+  $("cc-documents").textContent = s.counts.documents;
+  $("cc-documents-meta").textContent = t("cc_documents_meta")(s.counts);
+  $("cc-pending").textContent = s.pending_decisions.length;
+  $("cc-effects").textContent = s.evidence.outbox_effects;
+  $("cc-effects-meta").textContent = t("cc_effects_meta")(s.evidence);
+
+  const chainEl = $("cc-chain");
+  if (!k.audit_chain_present) { chainEl.textContent = t("cc_chain_none"); chainEl.style.color = ""; }
+  else if (k.audit_chain_ok) { chainEl.textContent = t("cc_chain_verified"); chainEl.style.color = "var(--good)"; }
+  else { chainEl.textContent = t("cc_chain_broken"); chainEl.style.color = "var(--critical)"; }
+  $("cc-chain-meta").textContent = t("cc_events")(k.audit_events);
+  $("cc-signed").textContent = s.evidence.signed_approvals;
+  $("cc-disclosures").textContent = k.model_disclosures;
+  $("cc-plugins").textContent = k.admitted_plugins;
+
+  renderCommandDecisions(s.pending_decisions);
+}
+
+function renderCommandDecisions(decisions) {
+  const box = $("cc-decisions");
+  if (!decisions.length) {
+    box.className = "empty";
+    box.replaceChildren(document.createTextNode(t("cc_no_decisions")));
+    return;
+  }
+  box.className = "";
+  box.replaceChildren(...decisions.map(d => {
+    const row = el("div", "pad");
+    row.appendChild(el("div", null, t("cc_decision_line")(d)));
+    if (d.policy_reason) row.appendChild(el("div", "status-line", d.policy_reason));
+    const bar = el("div", "toolbar");
+    const approve = el("button", "primary small", t("cc_approve"));
+    approve.addEventListener("click", () => commandDecide(d.approval_id, true));
+    const reject = el("button", "ghost small", t("cc_reject"));
+    reject.addEventListener("click", () => commandDecide(d.approval_id, false));
+    bar.appendChild(approve);
+    bar.appendChild(reject);
+    row.appendChild(bar);
+    return row;
+  }));
+}
+
+async function commandDecide(approvalId, approve) {
+  const result = await api("/api/workspace/decide", { approval_id: approvalId, approve });
+  if (result.ok) { ws = result.workspace; renderWorkspace(); }
+  await loadCommandCenter();
+  await loadState();
+}
+
 /* ─────────────── Shell ─────────────── */
 
 function applyLanguage() {
@@ -634,6 +770,7 @@ function applyLanguage() {
   renderState();
   renderGauntlet();
   renderWorkspace();
+  renderCommandCenter();
 }
 
 function setLanguage(next) {
@@ -645,14 +782,18 @@ function setLanguage(next) {
 function setView(next) {
   view = next;
   localStorage.setItem("sovereign-ui-view", next);
+  $("view-command").hidden = next !== "command";
   $("view-workspace").hidden = next !== "workspace";
   $("view-security").hidden = next !== "security";
+  $("tab-command").classList.toggle("active", next === "command");
   $("tab-workspace").classList.toggle("active", next === "workspace");
   $("tab-security").classList.toggle("active", next === "security");
+  if (next === "command") loadCommandCenter();
 }
 
 $("lang-en").addEventListener("click", () => setLanguage("en"));
 $("lang-zh").addEventListener("click", () => setLanguage("zh"));
+$("tab-command").addEventListener("click", () => setView("command"));
 $("tab-workspace").addEventListener("click", () => setView("workspace"));
 $("tab-security").addEventListener("click", () => setView("security"));
 $("v-save").addEventListener("click", saveVenture);
@@ -674,6 +815,7 @@ applyLanguage();
 setView(view);
 loadState();
 loadWorkspace();
+loadCommandCenter();
 </script>
 </body>
 </html>
