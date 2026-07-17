@@ -182,8 +182,14 @@ gauntlet (supply-chain tampering, token replay, input substitution, greedy
 manifests, infinite loops, red-data exfiltration, approval bypass, and audit
 tampering) — every denial is a real enforcement path, not a mock.
 
-`ui` serves the local app on 127.0.0.1 only (English/中文). It has two views:
+`ui` serves the local app on 127.0.0.1 only (English/中文). It has three views:
 
+- **Command Center** — the product face: your business at a glance (company,
+  customers, documents), the decisions waiting only on you (approve or reject in
+  place), and a kernel-evidence panel (audit-chain health, signed approvals,
+  model disclosures, admitted plugins). It is strictly read-only aggregation —
+  every number is re-derivable from your export, and opening the view writes
+  nothing and makes no new claim.
 - **Workspace** — the first usable product slice: create your company profile,
   add customers, generate offer and invoice drafts (local templates, no model),
   ask the local drafting assistant (deterministic, not an LLM, routed through
@@ -192,8 +198,10 @@ tampering) — every denial is a real enforcement path, not a mock.
   disclosure — request to send a document (which always stops in the Approval
   Center for the human owner), and export every byte of your business state as
   one JSON file. State lives in the encrypted vault; every change passes the policy
-  engine and appends a signed audit event. Approving a send only records the
-  decision: Stage 1 performs no external effects.
+  engine and appends a signed audit event. Approving a send authorizes one
+  exact sandboxed execution that writes the document to a local `outbox/` file
+  (a real, audited host effect) and records the signed evidence; Stage 1
+  performs no *network* effects — nothing leaves the device.
 - **Security Center** — device identity, vault entries, admitted plugins
   (verified from the content-addressed store), the signed audit chain, and a
   one-click in-memory run of the attack gauntlet.

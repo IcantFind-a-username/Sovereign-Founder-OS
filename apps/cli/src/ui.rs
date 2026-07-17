@@ -8,8 +8,8 @@
 //!   admission-record claims — never vault plaintext or private keys;
 //! - the gauntlet runs entirely in memory with the hard-coded demo trust
 //!   anchors; it performs no external effects and touches no stored state;
-//! - this page is a Stage 1 preview of the future Founder Command Center, not
-//!   the product UI.
+//! - this page hosts an early Founder Command Center: a read-only, at-a-glance
+//!   view of the business joined with the kernel evidence that backs it.
 
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
@@ -100,6 +100,7 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
     match (request.method().clone(), url.as_str()) {
         (Method::Get, "/") => html_response(UI_HTML),
         (Method::Get, "/api/state") => json_response(&state_json(root)),
+        (Method::Get, "/api/command-center") => json_response(&command_center_json(root)),
         (Method::Get, "/api/workspace") => json_response(&workspace_get(root)),
         (Method::Get, "/api/export") => export_response(root),
         (Method::Post, "/api/gauntlet") => match read_json_body(request) {
@@ -180,6 +181,51 @@ fn workspace_get(root: &Path) -> serde_json::Value {
         Ok(state) => serde_json::json!({ "ok": true, "workspace": state }),
         Err(error) => serde_json::json!({ "ok": false, "error": error.to_string() }),
     }
+}
+
+/// The Founder Command Center: the business at a glance joined with the kernel
+/// evidence that backs it. Read-only; it composes two honest sources — the
+/// workspace aggregation and the on-disk audit signals — and invents nothing.
+fn command_center_json(root: &Path) -> serde_json::Value {
+    let result = workspace::Store::open(root).and_then(|store| store.command_center());
+    match result {
+        Ok(summary) => serde_json::json!({
+            "ok": true,
+            "summary": summary,
+            "kernel": kernel_evidence_json(root),
+        }),
+        Err(error) => serde_json::json!({ "ok": false, "error": error.to_string() }),
+    }
+}
+
+/// Compact, verifiable kernel signals for the Command Center header: the audit
+/// chain's health, how many model disclosures happened, and how many plugins
+/// were admitted. Every number here is re-derivable from the export.
+fn kernel_evidence_json(root: &Path) -> serde_json::Value {
+    let device = DeviceIdentity::load(&root.join("device.json")).ok();
+    let ledger_path = root.join("ledger.json");
+    let (present, chain_ok, count, model_disclosures) = match (&device, ledger_path.exists()) {
+        (Some(device), true) => match AuditLedger::load(&ledger_path, device.public_key_b64()) {
+            Ok(ledger) => {
+                let disclosures = ledger
+                    .events()
+                    .iter()
+                    .filter(|event| event.action == "model.drafted")
+                    .count();
+                let chain_ok = ledger.verify_chain().is_ok();
+                (true, chain_ok, ledger.events().len(), disclosures)
+            }
+            Err(_) => (true, false, 0, 0),
+        },
+        _ => (false, true, 0, 0),
+    };
+    serde_json::json!({
+        "audit_chain_present": present,
+        "audit_chain_ok": chain_ok,
+        "audit_events": count,
+        "model_disclosures": model_disclosures,
+        "admitted_plugins": admitted_plugins_json(root).len(),
+    })
 }
 
 fn workspace_post(path: &str, body: &serde_json::Value, root: &Path) -> serde_json::Value {
@@ -347,7 +393,7 @@ fn state_json(root: &Path) -> serde_json::Value {
         "vault_entries": vault_entries,
         "ledger": ledger,
         "plugins": admitted_plugins_json(root),
-        "stage": "Stage 1 · Secure Kernel (preview UI, not the Founder Command Center)",
+        "stage": "Stage 1 · Secure Kernel · Founder Command Center (early)",
     })
 }
 
