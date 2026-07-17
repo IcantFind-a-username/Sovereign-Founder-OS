@@ -129,6 +129,12 @@
   </section>
 
   <section>
+    <h2 data-i18n="cc_guidance_title"></h2>
+    <div class="honest" data-i18n="cc_guidance_note"></div>
+    <div class="panel" style="margin-top:10px"><div id="cc-guidance" class="empty" data-i18n="loading"></div></div>
+  </section>
+
+  <section>
     <h2 data-i18n="cc_decisions_title"></h2>
     <div class="panel"><div id="cc-decisions" class="empty" data-i18n="cc_no_decisions"></div></div>
   </section>
@@ -270,6 +276,19 @@ const STRINGS = {
     cc_documents: "Documents", cc_documents_meta: (c) => c.drafts + " draft · " + c.approved_pending_delivery + " sent",
     cc_pending: "Awaiting you", cc_pending_meta: "decisions only you can make",
     cc_effects: "Signed effects", cc_effects_meta: (s) => s.last_effect_path ? "last: outbox/" + s.last_effect_path : "no real effects yet",
+    cc_guidance_title: "Suggested next steps",
+    cc_guidance_note: "Read from your current state — not predictions, and no model is involved. The same state always yields the same list.",
+    cc_no_guidance: "Nothing to suggest yet.",
+    cc_step_word: "step", cc_risk_word: "risk",
+    cc_guidance: (g) => ({
+      set_venture: "Name your venture — everything else builds on it.",
+      add_customer: "Add your first customer.",
+      draft_for: "Draft an offer or invoice for " + g.subject + ".",
+      send_drafts: g.count === 1 ? "You have 1 draft ready to send." : "You have " + g.count + " drafts ready to send.",
+      decide_pending: g.count === 1 ? "1 send is waiting for your approval." : g.count + " sends are waiting for your approval.",
+      add_email: "Add an email for " + g.subject + " — sends currently use a placeholder address.",
+      all_clear: "You're all caught up. Nothing is waiting on you.",
+    }[g.kind] || g.kind),
     cc_decisions_title: "Needs your decision",
     cc_no_decisions: "Nothing is waiting on you. The assistant can draft, but only you approve — nothing leaves without this step.",
     cc_decision_line: (d) => d.action + " · " + (d.customer_name || "—") + " · " + d.document_title,
@@ -361,6 +380,19 @@ const STRINGS = {
     cc_documents: "文档", cc_documents_meta: (c) => c.drafts + " 份草稿 · " + c.approved_pending_delivery + " 份已发送",
     cc_pending: "等你决定", cc_pending_meta: "只有你能做的决定",
     cc_effects: "已签名副作用", cc_effects_meta: (s) => s.last_effect_path ? "最近:outbox/" + s.last_effect_path : "尚无真实副作用",
+    cc_guidance_title: "建议的下一步",
+    cc_guidance_note: "根据你当前的状态得出 —— 不是预测,也不涉及任何模型。相同的状态始终给出相同的清单。",
+    cc_no_guidance: "暂无建议。",
+    cc_step_word: "步骤", cc_risk_word: "风险",
+    cc_guidance: (g) => ({
+      set_venture: "为你的业务命名 —— 其他一切都以此为基础。",
+      add_customer: "添加你的第一位客户。",
+      draft_for: "为 " + g.subject + " 起草一份报价或发票。",
+      send_drafts: "你有 " + g.count + " 份草稿可以发送。",
+      decide_pending: "有 " + g.count + " 项发送正在等待你的批准。",
+      add_email: "为 " + g.subject + " 添加邮箱 —— 目前发送使用的是占位地址。",
+      all_clear: "一切就绪,没有等待你处理的事项。",
+    }[g.kind] || g.kind),
     cc_decisions_title: "需要你的决定",
     cc_no_decisions: "没有等待你处理的事项。助手可以起草,但只有你能批准 —— 没有这一步,任何东西都不会发出。",
     cc_decision_line: (d) => d.action + " · " + (d.customer_name || "—") + " · " + d.document_title,
@@ -813,7 +845,27 @@ function renderCommandCenter() {
   $("cc-disclosures").textContent = k.model_disclosures;
   $("cc-plugins").textContent = k.admitted_plugins;
 
+  renderCommandGuidance(s.guidance);
   renderCommandDecisions(s.pending_decisions);
+}
+
+function renderCommandGuidance(items) {
+  const box = $("cc-guidance");
+  if (!items || !items.length) {
+    box.className = "empty";
+    box.replaceChildren(document.createTextNode(t("cc_no_guidance")));
+    return;
+  }
+  box.className = "";
+  box.replaceChildren(...items.map(g => {
+    const row = el("div", "pad");
+    const bar = el("div", "toolbar");
+    const risk = g.kind_class === "risk";
+    bar.appendChild(badge(risk ? "warn" : "neutral", risk ? t("cc_risk_word") : t("cc_step_word")));
+    bar.appendChild(el("span", null, t("cc_guidance")(g)));
+    row.appendChild(bar);
+    return row;
+  }));
 }
 
 function renderCommandDecisions(decisions) {
