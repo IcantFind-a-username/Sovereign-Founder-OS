@@ -25,5 +25,6 @@ clap = { workspace = true }
 dirs = { workspace = true }
 serde_json = { workspace = true }
 serde_json_canonicalizer = { workspace = true }
+tiny_http = "0.12"
 uuid = { workspace = true }
 wat = "1"

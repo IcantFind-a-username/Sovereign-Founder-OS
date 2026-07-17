@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sovereign · Local Security Center</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --surface: #1a1a19;
+    --panel: #232322;
+    --panel-edge: #33332f;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #8a897f;
+    --good: #0ca30c;
+    --critical: #d03b3b;
+    --accent: #3987e5;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--surface);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 28px clamp(16px, 4vw, 48px) 64px;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+  header h1 { font-size: 20px; font-weight: 650; letter-spacing: .2px; }
+  header .sub { color: var(--ink-2); margin-top: 4px; }
+  header .honest { color: var(--ink-3); font-size: 13px; margin-top: 10px; max-width: 70ch; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 26px 0; }
+  .tile {
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .tile .label { color: var(--ink-3); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+  .tile .value { font-size: 26px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .meta { color: var(--ink-2); font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
+  section { margin-top: 30px; }
+  section > h2 { font-size: 15px; font-weight: 650; color: var(--ink-2); margin-bottom: 10px; }
+  .panel { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 14px; border-top: 1px solid var(--panel-edge); }
+  thead th { border-top: none; color: var(--ink-3); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+  td.mono, .mono { font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
+  .empty { padding: 16px; color: var(--ink-3); }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 600; border-radius: 999px; padding: 2px 10px;
+  }
+  .badge.good { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+  .badge.bad { color: var(--critical); background: color-mix(in srgb, var(--critical) 14%, transparent); }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    font: 600 14px/1 system-ui; padding: 10px 18px; cursor: pointer;
+  }
+  button:disabled { opacity: .55; cursor: wait; }
+  button.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--panel-edge); }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .gauntlet-row { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 6px 16px; padding: 11px 14px; border-top: 1px solid var(--panel-edge); align-items: start; }
+  .gauntlet-row:first-child { border-top: none; }
+  .gauntlet-row .name { font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+  .gauntlet-row .name .badge { flex-shrink: 0; }
+  .gauntlet-row .detail { color: var(--ink-2); font-size: 14px; }
+  @media (max-width: 720px) { .gauntlet-row { grid-template-columns: 1fr; } }
+  footer { margin-top: 40px; color: var(--ink-3); font-size: 13px; max-width: 78ch; }
+  footer p { margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SOVEREIGN FOUNDER OS · Local Security Center</h1>
+  <div class="sub" id="stage">Stage 1 · Secure Kernel</div>
+  <div class="honest">
+    Served from your own machine on 127.0.0.1 — no cloud, no account, no telemetry.
+    Everything shown is read from your real local kernel state; the gauntlet runs
+    real enforcement paths in memory. This is a Stage 1 preview, not the Founder
+    Command Center.
+  </div>
+</header>
+
+<div class="tiles">
+  <div class="tile"><div class="label">Device identity</div><div class="value" id="t-device">–</div><div class="meta" id="t-device-meta"></div></div>
+  <div class="tile"><div class="label">Audit events</div><div class="value" id="t-events">–</div><div class="meta" id="t-chain"></div></div>
+  <div class="tile"><div class="label">Vault entries</div><div class="value" id="t-vault">–</div><div class="meta">encrypted at rest (AES-256-GCM)</div></div>
+  <div class="tile"><div class="label">Admitted plugins</div><div class="value" id="t-plugins">–</div><div class="meta">owner-signed admission records</div></div>
+</div>
+
+<section>
+  <h2>Admitted plugins — content-addressed store</h2>
+  <div class="panel"><div id="plugins" class="empty">loading…</div></div>
+</section>
+
+<section>
+  <h2>Audit trail — signed hash chain (latest 25)</h2>
+  <div class="panel"><div id="ledger" class="empty">loading…</div></div>
+</section>
+
+<section>
+  <h2>Security gauntlet — real attacks, run now, in memory</h2>
+  <div class="toolbar">
+    <button id="run">Run the gauntlet</button>
+    <button id="refresh" class="ghost">Refresh state</button>
+    <span class="mono" id="gauntlet-status"></span>
+  </div>
+  <div class="panel"><div id="gauntlet" class="empty">
+    Seven attacks against the running kernel: token replay, input substitution,
+    a manifest demanding host capabilities, an infinite-loop plugin, red-zone
+    data exfiltration, approval bypass, and audit tampering. Nothing is mocked.
+  </div></div>
+</section>
+
+<footer>
+  <p><strong>Honest limits of this stage:</strong> replay defense is process-local;
+  the guest does not yet receive input bytes; no external effects exist — effectful
+  requests fail closed; the gauntlet and admission listing use hard-coded demo
+  trust anchors, not production key management.</p>
+  <p>Run <span class="mono">sovereign demo</span> first if the panels are empty.</p>
+</footer>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function badge(good, label) {
+  return el("span", "badge " + (good ? "good" : "bad"), (good ? "✓ " : "✗ ") + label);
+}
+
+function table(headers, rows) {
+  const t = el("table");
+  const thead = el("thead"); const hr = el("tr");
+  headers.forEach(h => hr.appendChild(el("th", null, h)));
+  thead.appendChild(hr); t.appendChild(thead);
+  const tbody = el("tbody");
+  rows.forEach(cells => {
+    const tr = el("tr");
+    cells.forEach(cell => {
+      if (cell instanceof Node) { const td = el("td"); td.appendChild(cell); tr.appendChild(td); }
+      else { tr.appendChild(el("td", cell && cell.mono ? "mono" : null, cell && cell.mono ? cell.mono : cell)); }
+    });
+    tbody.appendChild(tr);
+  });
+  t.appendChild(tbody);
+  return t;
+}
+
+async function loadState() {
+  const state = await (await fetch("/api/state")).json();
+  $("stage").textContent = state.stage;
+  $("t-device").textContent = state.device_id ? "ready" : "none";
+  $("t-device-meta").textContent = state.device_id || "run `sovereign demo` to create one";
+  $("t-events").textContent = state.ledger.count;
+  $("t-chain").replaceChildren(
+    state.ledger.present
+      ? badge(state.ledger.chain_ok, state.ledger.chain_ok ? "chain verified" : "CHAIN BROKEN")
+      : el("span", null, "no ledger yet"));
+  $("t-vault").textContent = state.vault_entries.length;
+  $("t-plugins").textContent = state.plugins.length;
+
+  const plugins = $("plugins");
+  if (!state.plugins.length) {
+    plugins.replaceChildren(el("div", "empty", "No plugins admitted yet — run `sovereign demo`."));
+  } else {
+    plugins.replaceChildren(table(
+      ["Status", "Component", "Manifest", "Risk", "Backend", "Admitted by"],
+      state.plugins.map(p => p.verified
+        ? [badge(true, "verified"), {mono: p.component_digest + "…"}, {mono: p.manifest_digest + "…"},
+           String(p.risk_class), String(p.backend), p.issuer]
+        : [badge(false, "unverified"), {mono: p.manifest_digest + "…"}, "", "", "", p.error])));
+  }
+
+  const ledger = $("ledger");
+  if (!state.ledger.present) {
+    ledger.replaceChildren(el("div", "empty", "No ledger yet — run `sovereign demo`."));
+  } else if (!state.ledger.chain_ok) {
+    const wrap = el("div", "empty");
+    wrap.appendChild(badge(false, "chain verification failed"));
+    wrap.appendChild(el("div", "mono", state.ledger.error || ""));
+    ledger.replaceChildren(wrap);
+  } else {
+    ledger.replaceChildren(table(
+      ["Time", "Actor", "Action", "Resource", "Event hash"],
+      state.ledger.events.map(e =>
+        [new Date(e.timestamp).toLocaleString(), e.actor, e.action, e.resource, {mono: e.hash + "…"}])));
+  }
+}
+
+async function runGauntlet() {
+  const button = $("run");
+  button.disabled = true;
+  $("gauntlet-status").textContent = "running real attacks…";
+  try {
+    const data = await (await fetch("/api/gauntlet", { method: "POST" })).json();
+    const box = $("gauntlet");
+    if (!data.ok) {
+      box.replaceChildren(el("div", "empty", "gauntlet error: " + data.error));
+    } else {
+      box.replaceChildren(...data.results.map(r => {
+        const row = el("div", "gauntlet-row");
+        const name = el("div", "name"); name.appendChild(badge(r.pass, r.pass ? "held" : "FAILED"));
+        name.appendChild(document.createTextNode(" " + r.name));
+        row.appendChild(name);
+        row.appendChild(el("div", "detail", r.detail));
+        return row;
+      }));
+      const failed = data.results.filter(r => !r.pass).length;
+      $("gauntlet-status").textContent = failed
+        ? failed + " EXPECTATION(S) VIOLATED — this is a bug, please report it"
+        : "all " + data.results.length + " boundaries held";
+    }
+  } catch (error) {
+    $("gauntlet-status").textContent = "request failed: " + error;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("run").addEventListener("click", runGauntlet);
+$("refresh").addEventListener("click", loadState);
+loadState().catch(error => { $("stage").textContent = "failed to load state: " + error; });
+</script>
+</body>
+</html>

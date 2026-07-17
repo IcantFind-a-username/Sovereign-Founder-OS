@@ -36,18 +36,18 @@ use uuid::Uuid;
 // Hard-coded demo signing keys. These are deliberately public and constant so
 // the demo is deterministic and re-runnable; they are NOT production trust
 // anchors and grant nothing outside this demo's ephemeral trust stores.
-const DEMO_PUBLISHER_SECRET: [u8; 32] = *b"sovereign-demo-publisher-key-01!";
-const DEMO_AUTHORITY_SECRET: [u8; 32] = *b"sovereign-demo-authority-key-01!";
-const DEMO_ADMISSION_SECRET: [u8; 32] = *b"sovereign-demo-admission-key-01!";
+pub(crate) const DEMO_PUBLISHER_SECRET: [u8; 32] = *b"sovereign-demo-publisher-key-01!";
+pub(crate) const DEMO_AUTHORITY_SECRET: [u8; 32] = *b"sovereign-demo-authority-key-01!";
+pub(crate) const DEMO_ADMISSION_SECRET: [u8; 32] = *b"sovereign-demo-admission-key-01!";
 
-const PUBLISHER_ISSUER: &str = "plugin-studio.example";
-const AUTHORITY_ISSUER: &str = "sovereign-runtime.local";
-const ADMISSION_ISSUER: &str = "founder-device.local";
-const AUDIENCE: &str = "sovereign-runtime";
-const VENTURE: &str = "ven_acme_consulting";
-const SUBJECT: &str = "founder";
+pub(crate) const PUBLISHER_ISSUER: &str = "plugin-studio.example";
+pub(crate) const AUTHORITY_ISSUER: &str = "sovereign-runtime.local";
+pub(crate) const ADMISSION_ISSUER: &str = "founder-device.local";
+pub(crate) const AUDIENCE: &str = "sovereign-runtime";
+pub(crate) const VENTURE: &str = "ven_acme_consulting";
+pub(crate) const SUBJECT: &str = "founder";
 
-const INVOICE_RESOURCE: &str = "invoice:acme-2026-001";
+pub(crate) const INVOICE_RESOURCE: &str = "invoice:acme-2026-001";
 
 struct Demo {
     fast: bool,
@@ -599,7 +599,7 @@ impl Demo {
     }
 }
 
-fn invoice_manifest_json(
+pub(crate) fn invoice_manifest_json(
     publisher: &TypedSigner<PublisherRole>,
     component: &[u8],
 ) -> serde_json::Value {
@@ -640,7 +640,7 @@ fn invoice_manifest_json(
     })
 }
 
-fn stress_manifest_json(
+pub(crate) fn stress_manifest_json(
     publisher: &TypedSigner<PublisherRole>,
     component: &[u8],
 ) -> serde_json::Value {
@@ -679,7 +679,7 @@ fn stress_manifest_json(
     })
 }
 
-fn compile_wat(source: &str) -> Vec<u8> {
+pub(crate) fn compile_wat(source: &str) -> Vec<u8> {
     wat::parse_str(source).expect("demo Wasm fixtures are valid WAT")
 }
 
