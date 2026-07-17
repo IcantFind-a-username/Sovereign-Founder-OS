@@ -218,6 +218,46 @@ pub struct CommandCenter {
     /// Approvals still waiting on the owner — the only actionable items here.
     pub pending_decisions: Vec<PendingDecision>,
     pub evidence: EvidenceRollup,
+    /// Deterministic next steps and risks read straight from state — ordered
+    /// most-important first. These are observations, not predictions: no model
+    /// is involved, and the same state always yields the same list.
+    pub guidance: Vec<Guidance>,
+}
+
+/// One suggested next step or surfaced risk. `kind` is a stable machine code
+/// the UI localizes; `count`/`subject` fill in its parameters.
+#[derive(Debug, Clone, Serialize)]
+pub struct Guidance {
+    pub kind: String,
+    /// "action" (something to do) or "risk" (something to be aware of).
+    pub kind_class: String,
+    pub count: usize,
+    pub subject: String,
+}
+
+impl Guidance {
+    fn action(kind: &str) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            kind_class: "action".to_owned(),
+            count: 0,
+            subject: String::new(),
+        }
+    }
+    fn with_count(mut self, count: usize) -> Self {
+        self.count = count;
+        self
+    }
+    fn with_subject(mut self, subject: impl Into<String>) -> Self {
+        self.subject = subject.into();
+        self
+    }
+    fn risk(kind: &str) -> Self {
+        Self {
+            kind_class: "risk".to_owned(),
+            ..Self::action(kind)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1034,7 +1074,7 @@ impl Store {
             rejected: count_status(DocumentStatus::Rejected),
         };
 
-        let pending_decisions = workspace
+        let pending_decisions: Vec<PendingDecision> = workspace
             .approvals
             .iter()
             .filter(|approval| approval.status == ApprovalStatus::Pending)
@@ -1083,11 +1123,14 @@ impl Store {
             last_effect_path: effects.last().map(|effect| effect.relative_path.clone()),
         };
 
+        let guidance = derive_guidance(&workspace, &counts, pending_decisions.len());
+
         Ok(CommandCenter {
             venture: workspace.venture,
             counts,
             pending_decisions,
             evidence,
+            guidance,
         })
     }
 
@@ -1408,6 +1451,63 @@ fn clean_optional_text(field: &str, value: &str) -> Result<String, WorkspaceErro
         )));
     }
     Ok(value.to_owned())
+}
+
+/// Derive the Command Center's next-steps and risks from state alone. Ordered
+/// most-important first and capped, so the founder sees a short, actionable
+/// list. Deterministic: the same workspace always produces the same guidance,
+/// and no model is consulted — these are observations, not predictions.
+fn derive_guidance(
+    workspace: &Workspace,
+    counts: &CommandCenterCounts,
+    pending: usize,
+) -> Vec<Guidance> {
+    // Before a venture exists nothing else is meaningful — name it first.
+    if workspace.venture.is_none() {
+        return vec![Guidance::action("set_venture")];
+    }
+
+    let mut out = Vec::new();
+
+    // The founder is the bottleneck for pending decisions: surface them first.
+    if pending > 0 {
+        out.push(Guidance::action("decide_pending").with_count(pending));
+    }
+    if workspace.customers.is_empty() {
+        out.push(Guidance::action("add_customer"));
+    }
+    if counts.drafts > 0 {
+        out.push(Guidance::action("send_drafts").with_count(counts.drafts));
+    }
+
+    // Risk: a customer who already has documents but no email — a send would be
+    // addressed to a placeholder the founder must fix before delivering.
+    if let Some(customer) = workspace.customers.iter().find(|customer| {
+        customer.email.trim().is_empty()
+            && workspace
+                .documents
+                .iter()
+                .any(|document| document.customer_id == customer.id)
+    }) {
+        out.push(Guidance::risk("add_email").with_subject(customer.name.clone()));
+    }
+
+    // A customer with no documents yet — an obvious next draft.
+    if let Some(customer) = workspace.customers.iter().find(|customer| {
+        !workspace
+            .documents
+            .iter()
+            .any(|document| document.customer_id == customer.id)
+    }) {
+        out.push(Guidance::action("draft_for").with_subject(customer.name.clone()));
+    }
+
+    if out.is_empty() {
+        out.push(Guidance::action("all_clear"));
+    }
+
+    out.truncate(5);
+    out
 }
 
 /// Compose a well-formed RFC 5322 message for an approved document. The result
@@ -1770,6 +1870,92 @@ mod tests {
         let ledger =
             AuditLedger::load(&_dir.path().join("ledger.json"), device.public_key_b64()).unwrap();
         assert_eq!(ledger.events().last().unwrap().action, "model.drafted");
+    }
+
+    #[test]
+    fn command_center_guidance_tracks_state_deterministically() {
+        let kinds = |store: &Store| -> Vec<String> {
+            store
+                .command_center()
+                .unwrap()
+                .guidance
+                .into_iter()
+                .map(|item| item.kind)
+                .collect()
+        };
+
+        let (_dir, store) = store();
+        // Empty: the only meaningful step is naming the venture.
+        assert_eq!(kinds(&store), vec!["set_venture"]);
+
+        // Venture but no customers.
+        store.set_venture("Acme", "Landing pages").unwrap();
+        assert_eq!(kinds(&store), vec!["add_customer"]);
+
+        // A customer with no documents → draft_for that customer.
+        let workspace = store.add_customer("Dr. Tan", "", "").unwrap();
+        let customer_id = workspace.customers[0].id;
+        assert_eq!(kinds(&store), vec!["draft_for"]);
+
+        // A document exists but the customer has no email → add_email risk
+        // surfaces, and there is now a draft to send.
+        store
+            .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+            .unwrap();
+        let guidance = store.command_center().unwrap().guidance;
+        let kinds_now: Vec<&str> = guidance.iter().map(|item| item.kind.as_str()).collect();
+        assert!(kinds_now.contains(&"send_drafts"));
+        assert!(kinds_now.contains(&"add_email"));
+        let email_item = guidance
+            .iter()
+            .find(|item| item.kind == "add_email")
+            .unwrap();
+        assert_eq!(email_item.kind_class, "risk");
+        assert_eq!(email_item.subject, "Dr. Tan");
+        let send_item = guidance
+            .iter()
+            .find(|item| item.kind == "send_drafts")
+            .unwrap();
+        assert_eq!(send_item.count, 1);
+
+        // Determinism: recomputing yields the identical list.
+        assert_eq!(
+            serde_json::to_value(&guidance).unwrap(),
+            serde_json::to_value(&store.command_center().unwrap().guidance).unwrap()
+        );
+    }
+
+    #[test]
+    fn command_center_guidance_reports_pending_and_all_clear() {
+        let (_dir, store) = store();
+        store.set_venture("Acme", "Landing pages").unwrap();
+        let workspace = store
+            .add_customer("Dr. Tan", "dr.tan@example.com", "")
+            .unwrap();
+        let customer_id = workspace.customers[0].id;
+        let workspace = store
+            .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+            .unwrap();
+        let document_id = workspace.documents[0].id;
+
+        // A pending decision is the top action.
+        let workspace = store.request_send(document_id).unwrap();
+        let approval_id = workspace.approvals[0].id;
+        let guidance = store.command_center().unwrap().guidance;
+        assert_eq!(guidance[0].kind, "decide_pending");
+        assert_eq!(guidance[0].count, 1);
+
+        // Once decided, with an emailed customer and no drafts left, the founder
+        // is caught up.
+        store.decide(approval_id, true).unwrap();
+        let kinds: Vec<String> = store
+            .command_center()
+            .unwrap()
+            .guidance
+            .into_iter()
+            .map(|item| item.kind)
+            .collect();
+        assert_eq!(kinds, vec!["all_clear"]);
     }
 
     #[test]
