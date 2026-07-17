@@ -15,6 +15,8 @@ serde_json_canonicalizer = { workspace = true }
 sha2 = { workspace = true }
 sovereign-identity = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+tempfile = "3"

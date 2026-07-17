@@ -52,7 +52,8 @@ Sovereign Runtime secure kernel
     - [x] Role-separated COSE/JCS publisher manifest verification
     - [x] Immutable artifact snapshot, strict schema/resource binding, and `PreparedInvocation`
     - [x] Exact-bound Capability V2 and verified pure-compute Core Wasm path (process-local)
-    - [ ] Locally signed admission record and content-addressed artifact store
+    - [x] Locally signed admission record and content-addressed artifact store
+    - [ ] Verified executor requires a locally admitted artifact handle
     - [ ] Killable compilation worker and trusted compiled cache
     - [ ] Component/WIT input ABI
   - [ ] Phase C: durable authorization and crash-safe evidence
@@ -60,6 +61,7 @@ Sovereign Runtime secure kernel
 - [ ] Adversarial integration tests
   - [x] Phase A: malicious Wasm import, loop, memory, table, ABI, and state tests
   - [x] Phase B foundation: manifest/artifact/input substitution, strict fields, trust state, V1/V2 separation, same-process replay, and backend downgrade tests
+  - [x] Admission store: on-disk substitution, record forgery/cross-role, revoked-key, poisoned-entry, orphan-temp, and symlink tests
   - [ ] Full Stage 1 authorization, replay, audit, and backend downgrade suite
 
 **Exit criteria:** A malicious agent cannot read files or execute external actions without authorization.

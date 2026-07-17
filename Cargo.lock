@@ -1346,7 +1346,9 @@ dependencies = [
  "serde_json_canonicalizer",
  "sha2",
  "sovereign-identity",
+ "tempfile",
  "thiserror 2.0.18",
+ "uuid",
 ]
 
 [[package]]

@@ -120,7 +120,7 @@ COSE signature verification uses the standard `Signature1` structure and a non-e
 content-type                                           external AAD                              status
 application/sovereign.plugin-manifest+json;v=1         sovereign:plugin-manifest:v1              implemented
 application/sovereign.capability+json;v=2              sovereign:capability:v2                   implemented
-application/sovereign.artifact-admission+json;v=1      sovereign:artifact-admission:v1           target
+application/sovereign.artifact-admission+json;v=1      sovereign:artifact-admission:v1           implemented
 application/sovereign.audit-event+json;v=1             sovereign:audit-event:v1                  primitive only; ledger migration pending
 application/sovereign.compiled-cache-record+json;v=1  sovereign:compiled-cache-record:v1        target
 ```
@@ -159,7 +159,7 @@ Admission operates on owned immutable bytes, not on a caller-controlled path tha
 
 If any step fails, no trusted registry entry is published. An existing content-addressed entry is reused only after its bytes are rehashed and matched; its filename is never evidence of its contents. Orphan temporary files or cache entries are untrusted and may be collected, but must never become executable through recovery or fallback logic.
 
-The current foundation implements the in-memory portions of steps 1–5 and returns `VerifiedArtifact`: it enforces ceilings, snapshots owned bytes, verifies publisher COSE and trust state with an internal trusted clock, compares the component digest, and validates the Core Wasm manifest, operations, strict schemas, bindings, risk, and empty host-capability set. Steps 6–8—the content-addressed store, local admission signature/record, and `AdmittedArtifact` transition—are not implemented.
+The current foundation implements the in-memory portions of steps 1–5 and returns `VerifiedArtifact`: it enforces ceilings, snapshots owned bytes, verifies publisher COSE and trust state with an internal trusted clock, compares the component digest, and validates the Core Wasm manifest, operations, strict schemas, bindings, risk, and empty host-capability set. Steps 6–8 are implemented by `ArtifactStore` for pure-compute artifacts: verified bytes and the canonical manifest payload are written to an owner-controlled content-addressed store via exclusive temporary creation, flush, atomic rename, and directory flush; existing entries are reused only after rehashing; and a record signed under the `artifact-admission` role binds the component digest, manifest digest, risk class, backend, ABI, empty effective host capabilities, and installation state into an `AdmittedArtifact`. Loading re-verifies the record against a role-specific trust store and re-derives every digest from the stored bytes. The execution path does not yet require the admitted handle, and concurrent multi-process admission is not serialized.
 
 ## Exact Invocation Binding
 
@@ -362,7 +362,7 @@ Completion requires genuine malicious fixtures covering:
 - trap and timeout evidence;
 - V1-to-V2, worker-to-in-process, component-to-core, and high-risk-to-Wasm backend downgrade attempts.
 
-Current tests cover the Phase A Wasm ceilings plus the implemented foundation's role separation, trust state, publisher envelope, strict/duplicate fields, artifact/manifest/input/resource substitution, immutable snapshots, canonical key-order equivalence, Capability V1/V2 separation, exact allowlists, same-process replay/idempotency, approval fail-closed behavior, Core-Wasm downgrade rejection, and guest-failure consumption. Cache poisoning, restart/cross-process replay, durable audit-intent ordering, local admission-record recovery, Component/WIT behavior, and effectful host interfaces remain completion-gate work.
+Current tests cover the Phase A Wasm ceilings plus the implemented foundation's role separation, trust state, publisher envelope, strict/duplicate fields, artifact/manifest/input/resource substitution, immutable snapshots, canonical key-order equivalence, Capability V1/V2 separation, exact allowlists, same-process replay/idempotency, approval fail-closed behavior, Core-Wasm downgrade rejection, and guest-failure consumption. Admission-store tests cover on-disk component and manifest substitution, record tampering and cross-role signature reuse, untrusted/revoked/expired admission keys, trusted-key forged-field claims, poisoned content-addressed entries, duplicate admission, orphan temporary files, and symlinked entries. Executor consumption of admitted artifacts, cache poisoning, restart/cross-process replay, durable audit-intent ordering, Component/WIT behavior, and effectful host interfaces remain completion-gate work.
 
 ## Implementation Phases
 
