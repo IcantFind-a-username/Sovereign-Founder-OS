@@ -173,6 +173,7 @@ cargo run -p sovereign-cli -- ui            # local app at http://127.0.0.1:7787
 cargo run -p sovereign-cli -- model-check   # model failover + Red-data guard
 cargo run -p sovereign-cli -- workflow-demo # crash-safe workflow resume
 cargo run -p sovereign-cli -- verify-export backup.json  # offline backup verification
+cargo run -p sovereign-cli -- integrity     # self-audit: state vs. the signed chain
 ```
 
 `demo` is a story-driven walkthrough of the secure kernel: it creates your
@@ -210,10 +211,18 @@ tampering) — every denial is a real enforcement path, not a mock.
   Stage 1 performs no *network* effects — nothing leaves the device. The effect
   is genuinely revocable: revoking an approved send deletes the `.eml` and
   records a signed `effect.revoked` event, while the approval evidence is kept
-  as history.
+  as history. The lifecycle closes honestly: an approved send is either revoked
+  or marked delivered — the latter your own attestation that you sent the
+  composed `.eml`, recorded as a signed `delivery.confirmed` event, since
+  Stage 1 sends nothing over the network and never claims to.
 - **Security Center** — device identity, vault entries, admitted plugins
-  (verified from the content-addressed store), the signed audit chain, and a
-  one-click in-memory run of the attack gauntlet.
+  (verified from the content-addressed store), the signed audit chain, a
+  state-integrity self-audit that reconciles your authoritative state against
+  that chain (proving every approved, revoked, or delivered document — and every
+  customer — has the signed event that should back it, and failing closed if the
+  chain does not verify), a data-disclosure log of every time a model provider
+  was shown customer data (which provider, whether the data stayed local, what
+  was skipped), and a one-click in-memory run of the attack gauntlet.
 
 The server binds loopback only, rejects foreign `Host` headers
 (DNS-rebinding defense), and requires `application/json` bodies on mutations
@@ -223,7 +232,7 @@ The isolated paths currently permit import-free pure computation only. Environme
 
 The artifact crate now also provides the local admission transaction: an owner-controlled content-addressed store plus a locally signed admission record (`artifact-admission` COSE role) that promotes a publisher-verified artifact to an `AdmittedArtifact`, with every load re-deriving digests from the stored bytes. The verified executor does not yet require the admitted handle.
 
-This is not a production plugin boundary or a completed Phase B. `sandbox-check` remains a mechanical Phase A check using an ephemeral test issuer—not a production trust anchor, and `demo` uses hard-coded demo keys. Executor consumption of admitted artifacts, a killable compilation worker and trusted cache, a durable Authority Store, the Component/WIT input ABI, crash-safe evidence, and audited host effects remain unimplemented. The demo performs no external effects; effectful requests fail closed. See [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
+This is not a production plugin boundary or a completed Phase B. `sandbox-check` remains a mechanical Phase A check using an ephemeral test issuer—not a production trust anchor, and `demo` uses hard-coded demo keys. Executor consumption of admitted artifacts, a killable compilation worker and trusted cache, the Component/WIT input ABI, and crash-safe evidence inside the verified sandbox path remain unimplemented. The demo performs no external effects; effectful requests fail closed. See [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 
 See [ROADMAP.md](ROADMAP.md) for the full development plan.
 
