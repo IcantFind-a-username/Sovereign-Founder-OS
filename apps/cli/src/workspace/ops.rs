@@ -1,4 +1,5 @@
 use super::compose::{compose_email, draft_outreach_note, render_document};
+use super::store::AuditEntry;
 use super::util::{clean_email, clean_optional_text, clean_text, kernel, now};
 use super::*;
 
@@ -27,11 +28,13 @@ impl Store {
             service,
             updated_at: now(),
         });
-        self.save(&workspace)?;
-        self.record(
-            "venture.update",
-            "venture:profile",
-            serde_json::json!({ "name": name }),
+        self.commit(
+            &workspace,
+            vec![AuditEntry {
+                action: "venture.update".into(),
+                resource: "venture:profile".into(),
+                payload: serde_json::json!({ "name": name }),
+            }],
         )?;
         Ok(workspace)
     }
@@ -68,11 +71,13 @@ impl Store {
         };
         let resource = format!("customer:{}", customer.id);
         workspace.customers.push(customer);
-        self.save(&workspace)?;
-        self.record(
-            "customer.create",
-            &resource,
-            serde_json::json!({ "name": name }),
+        self.commit(
+            &workspace,
+            vec![AuditEntry {
+                action: "customer.create".into(),
+                resource,
+                payload: serde_json::json!({ "name": name }),
+            }],
         )?;
         Ok(workspace)
     }
@@ -144,20 +149,22 @@ impl Store {
         };
         let mut persisted = self.load()?;
         persisted.disclosures.push(entry);
-        self.save(&persisted)?;
 
         // Record only the disclosure — never the suggestion — as evidence.
-        self.record(
-            "model.drafted",
-            &format!("customer:{customer_id}"),
-            serde_json::json!({
-                "task": disclosure.task,
-                "provider": disclosure.provider_id,
-                "provider_trust": provider_trust,
-                "data_class": "amber",
-                "output_chars": disclosure.output_chars,
-                "failover_from": failover_from,
-            }),
+        self.commit(
+            &persisted,
+            vec![AuditEntry {
+                action: "model.drafted".into(),
+                resource: format!("customer:{customer_id}"),
+                payload: serde_json::json!({
+                    "task": disclosure.task,
+                    "provider": disclosure.provider_id,
+                    "provider_trust": provider_trust,
+                    "data_class": "amber",
+                    "output_chars": disclosure.output_chars,
+                    "failover_from": failover_from,
+                }),
+            }],
         )?;
 
         Ok(DraftSuggestion {
@@ -213,8 +220,14 @@ impl Store {
             "amount_cents": amount_cents,
         });
         workspace.documents.push(document);
-        self.save(&workspace)?;
-        self.record("document.draft", &resource, summary)?;
+        self.commit(
+            &workspace,
+            vec![AuditEntry {
+                action: "document.draft".into(),
+                resource,
+                payload: summary,
+            }],
+        )?;
         Ok(workspace)
     }
 
@@ -262,8 +275,14 @@ impl Store {
         let resource = format!("document:{document_id}");
         let summary = serde_json::json!({ "approval_id": approval.id });
         workspace.approvals.push(approval);
-        self.save(&workspace)?;
-        self.record("approval.requested", &resource, summary)?;
+        self.commit(
+            &workspace,
+            vec![AuditEntry {
+                action: "approval.requested".into(),
+                resource,
+                payload: summary,
+            }],
+        )?;
         Ok(workspace)
     }
 
@@ -309,24 +328,26 @@ impl Store {
             DocumentStatus::Rejected
         };
 
-        self.save(&workspace)?;
+        // Every event of this decision lands on the chain in one durable
+        // write, then the state commits — audit-first, no partial record.
         let resource = format!("document:{document_id}");
+        let mut events = Vec::new();
         match &evidence {
             Some(record) => {
-                self.record(
-                    "approval.granted",
-                    &resource,
-                    serde_json::json!({
+                events.push(AuditEntry {
+                    action: "approval.granted".into(),
+                    resource: resource.clone(),
+                    payload: serde_json::json!({
                         "approval_id": approval_id,
                         "signed_approval_id": record.approval_id,
                         "evidence_digest": record.evidence_digest,
                         "approver_key_id": record.approver_key_id,
                     }),
-                )?;
-                self.record(
-                    "capability.executed",
-                    &resource,
-                    serde_json::json!({
+                });
+                events.push(AuditEntry {
+                    action: "capability.executed".into(),
+                    resource: resource.clone(),
+                    payload: serde_json::json!({
                         "tool": "workspace.delivery/prepare",
                         "component_digest": record.component_digest,
                         "canonical_input_digest": record.canonical_input_digest,
@@ -334,27 +355,28 @@ impl Store {
                         "exit_code": record.guest_exit_code,
                         "fuel": record.fuel_consumed,
                     }),
-                )?;
+                });
                 if let Some(outbox) = &record.outbox {
-                    self.record(
-                        "effect.file_written",
-                        &resource,
-                        serde_json::json!({
+                    events.push(AuditEntry {
+                        action: "effect.file_written".into(),
+                        resource: resource.clone(),
+                        payload: serde_json::json!({
                             "outbox_path": outbox.relative_path,
                             "content_sha256": outbox.content_sha256,
                             "bytes": outbox.bytes,
                         }),
-                    )?;
+                    });
                 }
             }
             None => {
-                self.record(
-                    "approval.rejected",
-                    &resource,
-                    serde_json::json!({ "approval_id": approval_id, "approved": false }),
-                )?;
+                events.push(AuditEntry {
+                    action: "approval.rejected".into(),
+                    resource: resource.clone(),
+                    payload: serde_json::json!({ "approval_id": approval_id, "approved": false }),
+                });
             }
         }
+        self.commit(&workspace, events)?;
         Ok(workspace)
     }
 
@@ -395,15 +417,16 @@ impl Store {
 
         let document_entry = workspace.document_mut(document_id)?;
         document_entry.status = DocumentStatus::Revoked;
-        self.save(&workspace)?;
-
-        self.record(
-            "effect.revoked",
-            &format!("document:{document_id}"),
-            serde_json::json!({
-                "outbox_path": outbox.relative_path,
-                "content_sha256": outbox.content_sha256,
-            }),
+        self.commit(
+            &workspace,
+            vec![AuditEntry {
+                action: "effect.revoked".into(),
+                resource: format!("document:{document_id}"),
+                payload: serde_json::json!({
+                    "outbox_path": outbox.relative_path,
+                    "content_sha256": outbox.content_sha256,
+                }),
+            }],
         )?;
         Ok(workspace)
     }
@@ -423,11 +446,13 @@ impl Store {
             ));
         }
         document.status = DocumentStatus::Delivered;
-        self.save(&workspace)?;
-        self.record(
-            "delivery.confirmed",
-            &format!("document:{document_id}"),
-            serde_json::json!({ "attested_by": "founder", "system_sent": false }),
+        self.commit(
+            &workspace,
+            vec![AuditEntry {
+                action: "delivery.confirmed".into(),
+                resource: format!("document:{document_id}"),
+                payload: serde_json::json!({ "attested_by": "founder", "system_sent": false }),
+            }],
         )?;
         Ok(workspace)
     }

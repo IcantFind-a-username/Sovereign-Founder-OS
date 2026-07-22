@@ -297,6 +297,80 @@ fn draft_assistant_records_a_persistent_data_disclosure() {
 }
 
 #[test]
+fn interrupted_operation_is_a_warning_and_retry_heals_it() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Landing pages").unwrap();
+    store.add_customer("Dr. Tan", "", "").unwrap();
+
+    // Simulate a crash in the commit window: commits are audit-first, so the
+    // chain already carries customer.create while the state write never
+    // landed. Rewind the state to just before the customer.
+    let mut behind = store.load().unwrap();
+    behind.customers.clear();
+    store.save(&behind).unwrap();
+
+    let report = store.integrity_check().unwrap();
+    assert!(
+        report.ok,
+        "an interrupted operation must not read as tampering"
+    );
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.severity == "warning" && finding.detail.contains("interrupted")),
+        "expected an interrupted-operation warning, got {:?}",
+        report.findings
+    );
+
+    // Retrying the operation heals the audit: the new tail matches state.
+    store.add_customer("Dr. Tan", "", "").unwrap();
+    let healed = store.integrity_check().unwrap();
+    assert!(
+        healed.ok && healed.findings.is_empty(),
+        "{:?}",
+        healed.findings
+    );
+}
+
+#[test]
+fn torn_decision_is_a_warning_until_state_lands() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Landing pages").unwrap();
+    let workspace = store
+        .add_customer("Dr. Tan", "dr.tan@example.com", "")
+        .unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+        .unwrap();
+    let document_id = workspace.documents[0].id;
+    let workspace = store.request_send(document_id).unwrap();
+    let approval_id = workspace.approvals[0].id;
+    store.decide(approval_id, true).unwrap();
+
+    // Tear the decision: the chain holds approval.granted /
+    // capability.executed / effect.file_written, but roll the state back to
+    // pending as if the vault write never completed.
+    let mut behind = store.load().unwrap();
+    behind.approvals[0].status = ApprovalStatus::Pending;
+    behind.approvals[0].evidence = None;
+    behind.documents[0].status = DocumentStatus::PendingApproval;
+    store.save(&behind).unwrap();
+
+    let report = store.integrity_check().unwrap();
+    assert!(report.ok, "a torn decision is interrupted, not tampering");
+    assert!(
+        report
+            .findings
+            .iter()
+            .any(|finding| finding.severity == "warning"),
+        "expected a warning for the torn decision, got {:?}",
+        report.findings
+    );
+}
+
+#[test]
 fn compose_email_is_wellformed_and_injection_safe() {
     let venture = Venture {
         name: "Acme".into(),

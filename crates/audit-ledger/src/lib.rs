@@ -161,9 +161,12 @@ impl AuditLedger {
         Ok(())
     }
 
+    /// Durably persist the chain. Crash-safe: the whole file is written to a
+    /// sibling temp path, fsynced, then renamed over the target, so a crash
+    /// mid-save leaves the previous complete chain — never a truncated one.
     pub fn save(&self, path: &std::path::Path) -> Result<(), LedgerError> {
         let json = serde_json::to_vec_pretty(&self.events)?;
-        std::fs::write(path, json)?;
+        write_atomic(path, &json)?;
         Ok(())
     }
 
@@ -175,6 +178,32 @@ impl AuditLedger {
         let events: Vec<AuditEvent> = serde_json::from_slice(&bytes)?;
         Self::from_events(events, trusted_device_public_key_b64)
     }
+}
+
+/// Crash-safe replacement write: temp file + fsync + rename + directory
+/// flush. A crash at any point leaves either the old content or the new,
+/// never a truncated chain. Mirrors the admission store's write pattern; on
+/// non-Unix the directory flush is skipped because std cannot express it,
+/// and the rename itself is atomic.
+fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let temp_path = path.with_extension("tmp");
+    let result = (|| {
+        let mut file = std::fs::File::create(&temp_path)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp_path, path)?;
+        #[cfg(unix)]
+        if let Some(directory) = path.parent() {
+            std::fs::File::open(directory)?.sync_all()?;
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp_path);
+    }
+    result
 }
 
 pub fn hash_bytes(data: &[u8]) -> String {
@@ -190,6 +219,36 @@ pub fn hash_event_body(body: &AuditEventBody) -> String {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn save_replaces_atomically_and_leaves_no_temp_file() {
+        let device = DeviceIdentity::generate();
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("ledger.json");
+        let mut ledger = AuditLedger::new();
+        for i in 0..2 {
+            ledger
+                .append(
+                    AppendInput {
+                        venture_id: "v".into(),
+                        actor_id: "a".into(),
+                        action: format!("act{i}"),
+                        resource: "r".into(),
+                        capability_id: None,
+                        payload: serde_json::json!({}),
+                        policy_decision_hash: None,
+                    },
+                    &device,
+                )
+                .unwrap();
+            // Each save fully replaces the previous file via temp+rename.
+            ledger.save(&path).unwrap();
+        }
+        assert!(!path.with_extension("tmp").exists());
+        let reloaded = AuditLedger::load(&path, device.public_key_b64()).unwrap();
+        assert_eq!(reloaded.events().len(), 2);
+        reloaded.verify_chain().unwrap();
+    }
 
     #[test]
     fn append_and_verify_chain() {

@@ -288,7 +288,9 @@ pub struct IntegrityReport {
     pub chain_verified: bool,
     /// Events on the verified chain.
     pub events: usize,
-    /// True when `chain_verified` holds and there are no findings.
+    /// True when `chain_verified` holds and there are no **critical**
+    /// findings. Warnings (interrupted operations: the chain ahead of the
+    /// state, healed by retrying) are reported but do not fail the audit.
     pub ok: bool,
     /// Each divergence between state and the signed chain, never hidden.
     pub findings: Vec<IntegrityFinding>,

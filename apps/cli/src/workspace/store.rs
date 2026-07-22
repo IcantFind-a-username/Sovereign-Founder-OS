@@ -1,5 +1,13 @@
 use super::util::storage;
 use super::*;
+
+/// One audit event of a state-changing operation: the action, the resource it
+/// touched, and a human-meaningful summary payload (hashed onto the chain).
+pub(super) struct AuditEntry {
+    pub action: String,
+    pub resource: String,
+    pub payload: serde_json::Value,
+}
 use std::path::Path;
 
 use sovereign_audit_ledger::{hash_bytes, AppendInput, AuditLedger};
@@ -72,36 +80,66 @@ impl Store {
         )
     }
 
+    /// Commit one logical operation **audit-first**: every event of the
+    /// operation is appended to the signed chain in a single durable ledger
+    /// write, and only then is the state written. A crash between the two
+    /// leaves the chain ahead of the state — an interrupted operation the
+    /// integrity self-audit reports as a warning and a retry heals — and
+    /// never committed state without its signed evidence.
+    pub(super) fn commit(
+        &self,
+        workspace: &Workspace,
+        events: Vec<AuditEntry>,
+    ) -> Result<(), WorkspaceError> {
+        self.append_events(events)?;
+        self.save(workspace)
+    }
+
+    /// Append audit events without a state change (exports, disclosures of
+    /// read-only actions). State-changing operations go through [`commit`].
     pub(super) fn record(
         &self,
         action: &str,
         resource: &str,
         payload: serde_json::Value,
     ) -> Result<(), WorkspaceError> {
+        self.append_events(vec![AuditEntry {
+            action: action.into(),
+            resource: resource.into(),
+            payload,
+        }])
+    }
+
+    /// Append every event to the signed hash chain and persist the chain in
+    /// one atomic write, so a multi-event operation can never leave a
+    /// half-recorded ledger behind.
+    fn append_events(&self, events: Vec<AuditEntry>) -> Result<(), WorkspaceError> {
         let ledger_path = self.root.join("ledger.json");
         let mut ledger = if ledger_path.exists() {
             AuditLedger::load(&ledger_path, self.device.public_key_b64()).map_err(storage)?
         } else {
             AuditLedger::new()
         };
-        let payload_digest = hash_bytes(&serde_json::to_vec(&payload).map_err(storage)?);
-        ledger
-            .append(
-                AppendInput {
-                    venture_id: "workspace".into(),
-                    actor_id: "founder".into(),
-                    action: action.into(),
-                    resource: resource.into(),
-                    capability_id: None,
-                    payload: serde_json::json!({
-                        "summary": payload,
-                        "payload_digest": payload_digest,
-                    }),
-                    policy_decision_hash: None,
-                },
-                &self.device,
-            )
-            .map_err(storage)?;
+        for event in events {
+            let payload_digest = hash_bytes(&serde_json::to_vec(&event.payload).map_err(storage)?);
+            ledger
+                .append(
+                    AppendInput {
+                        venture_id: "workspace".into(),
+                        actor_id: "founder".into(),
+                        action: event.action,
+                        resource: event.resource,
+                        capability_id: None,
+                        payload: serde_json::json!({
+                            "summary": event.payload,
+                            "payload_digest": payload_digest,
+                        }),
+                        policy_decision_hash: None,
+                    },
+                    &self.device,
+                )
+                .map_err(storage)?;
+        }
         ledger.save(&ledger_path).map_err(storage)?;
         Ok(())
     }
