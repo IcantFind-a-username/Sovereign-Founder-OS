@@ -70,7 +70,45 @@ fn wasm_trapping() -> Vec<u8> {
     wat::parse_str(r#"(module (func (export "sovereign_run") (result i32) unreachable))"#).unwrap()
 }
 
+/// A v2 guest: reads `len` input bytes at `ptr` from its own memory and
+/// returns their sum modulo 256 — a value that can only be right if the host
+/// delivered exactly the authenticated canonical input into guest memory.
+fn wasm_v2_input_checksum() -> Vec<u8> {
+    wat::parse_str(
+        r#"(module
+            (memory (export "memory") 1)
+            (func (export "sovereign_run") (param $ptr i32) (param $len i32) (result i32)
+                (local $i i32) (local $sum i32)
+                (block $done
+                    (loop $loop
+                        (br_if $done (i32.ge_u (local.get $i) (local.get $len)))
+                        (local.set $sum
+                            (i32.add (local.get $sum)
+                                (i32.load8_u (i32.add (local.get $ptr) (local.get $i)))))
+                        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                        (br $loop)))
+                (i32.and (local.get $sum) (i32.const 255))))"#,
+    )
+    .unwrap()
+}
+
+/// A v2 guest that declares no memory export: input cannot be delivered.
+fn wasm_v2_no_memory() -> Vec<u8> {
+    wat::parse_str(
+        r#"(module (func (export "sovereign_run") (param i32 i32) (result i32) i32.const 0))"#,
+    )
+    .unwrap()
+}
+
 fn admit_and_prepare(component: &[u8], content: &str) -> (PreparedInvocation, AdmittedArtifact) {
+    admit_and_prepare_with_abi(component, content, "sovereign_core_wasm_v1")
+}
+
+fn admit_and_prepare_with_abi(
+    component: &[u8],
+    content: &str,
+    abi: &str,
+) -> (PreparedInvocation, AdmittedArtifact) {
     let publisher =
         TypedSigner::<PublisherRole>::from_secret_bytes(PUBLISHER_ISSUER, PUBLISHER_SECRET)
             .unwrap();
@@ -81,7 +119,7 @@ fn admit_and_prepare(component: &[u8], content: &str) -> (PreparedInvocation, Ad
         "component_digest": Digest::of_bytes(component),
         "backend": "core_wasm",
         "risk_class": "pure_compute",
-        "abi": "sovereign_core_wasm_v1",
+        "abi": abi,
         "entrypoint": CORE_WASM_ENTRYPOINT,
         "requested_host_capabilities": [],
         "operations": [{
@@ -267,6 +305,63 @@ fn executor_refuses_a_mismatched_admitted_handle_without_consuming_the_token() {
         ))
         .unwrap();
     assert_eq!(result.exit_code, 17);
+}
+
+#[test]
+fn v2_abi_delivers_the_authenticated_canonical_input_into_the_guest() {
+    let (invocation, admitted) =
+        admit_and_prepare_with_abi(&wasm_v2_input_checksum(), "hello", "sovereign_core_wasm_v2");
+    // The guest returns the checksum of exactly the bytes the host must have
+    // written; compute the same over the authenticated canonical input.
+    let expected = (invocation
+        .canonical_input()
+        .iter()
+        .map(|b| *b as u32)
+        .sum::<u32>()
+        & 0xff) as i32;
+    assert!(expected > 0);
+
+    let policy_decision = decision(&invocation);
+    let session_id = Uuid::new_v4();
+    let (issuer, validator) = authority();
+    let token = issue(&issuer, &invocation, &policy_decision, session_id);
+    let mut executor = VerifiedSandboxExecutor::new(vec![selector()], validator).unwrap();
+
+    let result = executor
+        .execute(request(
+            &token,
+            &invocation,
+            &admitted,
+            &policy_decision,
+            session_id,
+        ))
+        .unwrap();
+    assert_eq!(
+        result.exit_code, expected,
+        "the guest's checksum proves the exact canonical input was delivered"
+    );
+}
+
+#[test]
+fn v2_abi_fails_closed_when_the_guest_exports_no_memory() {
+    let (invocation, admitted) =
+        admit_and_prepare_with_abi(&wasm_v2_no_memory(), "hello", "sovereign_core_wasm_v2");
+    let policy_decision = decision(&invocation);
+    let session_id = Uuid::new_v4();
+    let (issuer, validator) = authority();
+    let token = issue(&issuer, &invocation, &policy_decision, session_id);
+    let mut executor = VerifiedSandboxExecutor::new(vec![selector()], validator).unwrap();
+
+    assert!(matches!(
+        executor.execute(request(
+            &token,
+            &invocation,
+            &admitted,
+            &policy_decision,
+            session_id
+        )),
+        Err(SandboxError::GuestInputRejected(_))
+    ));
 }
 
 #[test]

@@ -56,7 +56,7 @@ Sovereign Runtime secure kernel
     - [x] Signed human approval evidence bound into Capability V2 (RFC 0003, process-local one-use)
     - [x] Verified executor requires a locally admitted artifact handle (digest-bound, refused before any token is consumed)
     - [x] Killable, resource-limited compilation worker and trusted signed compiled cache (COSE cache record; poisoned entries quarantined before deserialize)
-    - [ ] Component/WIT input ABI
+    - [ ] Component/WIT input ABI (a `sovereign_core_wasm_v2` ABI now delivers authenticated canonical input into guest memory; the full Component/WIT ABI remains)
   - [ ] Phase C: durable authorization and crash-safe evidence
     - [x] Durable Authority Store: atomic cross-process one-use consumption of tokens, approvals, and idempotency keys
     - [x] Crash-safe execution journal: durable intent before consume, terminal result after, Indeterminate recovery

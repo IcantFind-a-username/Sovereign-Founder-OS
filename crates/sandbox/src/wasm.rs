@@ -10,7 +10,7 @@ use sovereign_artifact::PreparedInvocation;
 use crate::compile_worker::CompileWorker;
 use crate::compiled_cache::CompiledCache;
 use crate::{ExecutionRuntime, SandboxError};
-use sovereign_artifact::Digest;
+use sovereign_artifact::{ArtifactAbi, Digest};
 
 pub const DEFAULT_ENTRYPOINT: &str = "sovereign_run";
 
@@ -39,6 +39,8 @@ pub(crate) fn compile_engine_config() -> Config {
 }
 const WASM_PAGE_BYTES: u128 = 64 * 1024;
 const MAX_DEADLINE_TICKS: u64 = 10_000;
+/// Host ceiling on delivered guest input, independent of any manifest limit.
+const MAX_GUEST_INPUT_BYTES: usize = 64 * 1024;
 
 /// Host-enforced ceilings. Guest code can request less, never more.
 #[derive(Debug, Clone)]
@@ -230,14 +232,22 @@ impl WasmSandbox {
 
     /// Crate-private V2 path: the executable can only be sourced from the
     /// immutable artifact owned by a publisher-verified prepared invocation.
+    /// Under the `sovereign_core_wasm_v2` ABI the authenticated canonical
+    /// input is delivered into guest memory and `sovereign_run(ptr, len)` is
+    /// called; under v1 the guest receives no input (`sovereign_run()`).
     pub(crate) fn execute_verified(
         &self,
         invocation: &PreparedInvocation,
     ) -> Result<WasmExecutionResult, SandboxError> {
+        let input = match invocation.artifact().manifest().abi() {
+            ArtifactAbi::SovereignCoreWasmV2 => Some(invocation.canonical_input()),
+            _ => None,
+        };
         self.execute_entrypoint_with_runtime(
             invocation.artifact().bytes(),
             DEFAULT_ENTRYPOINT,
             ExecutionRuntime::WasmtimeVerifiedPureComputeV2,
+            input,
         )
     }
 
@@ -250,6 +260,7 @@ impl WasmSandbox {
             module_bytes,
             entrypoint,
             ExecutionRuntime::WasmtimeCorePhaseA,
+            None,
         )
     }
 
@@ -258,6 +269,7 @@ impl WasmSandbox {
         module_bytes: &[u8],
         entrypoint: &str,
         runtime: ExecutionRuntime,
+        input: Option<&[u8]>,
     ) -> Result<WasmExecutionResult, SandboxError> {
         if self
             .epoch_worker
@@ -341,16 +353,42 @@ impl WasmSandbox {
                 return Err(map_instantiation_error(error));
             }
         };
-        let run = instance
+        let entry = instance
             .get_func(&mut store, entrypoint)
-            .ok_or_else(|| SandboxError::MissingEntrypoint(entrypoint.to_string()))?
-            .typed::<(), i32>(&store)
-            .map_err(|error| SandboxError::InvalidEntrypoint {
-                entrypoint: entrypoint.to_string(),
-                detail: error.to_string(),
-            })?;
+            .ok_or_else(|| SandboxError::MissingEntrypoint(entrypoint.to_string()))?;
 
-        let exit_code = match run.call(&mut store, ()) {
+        let call_result = match input {
+            // v2: deliver the authenticated canonical input into guest memory,
+            // then call `sovereign_run(ptr, len)`.
+            Some(bytes) => {
+                if bytes.len() > MAX_GUEST_INPUT_BYTES {
+                    return Err(SandboxError::GuestInputRejected(format!(
+                        "input of {} bytes exceeds the {MAX_GUEST_INPUT_BYTES}-byte host limit",
+                        bytes.len()
+                    )));
+                }
+                self.deliver_input(&mut store, &instance, bytes)?;
+                let run = entry.typed::<(i32, i32), i32>(&store).map_err(|error| {
+                    SandboxError::InvalidEntrypoint {
+                        entrypoint: entrypoint.to_string(),
+                        detail: error.to_string(),
+                    }
+                })?;
+                run.call(&mut store, (0, bytes.len() as i32))
+            }
+            // v1: no input.
+            None => {
+                let run = entry.typed::<(), i32>(&store).map_err(|error| {
+                    SandboxError::InvalidEntrypoint {
+                        entrypoint: entrypoint.to_string(),
+                        detail: error.to_string(),
+                    }
+                })?;
+                run.call(&mut store, ())
+            }
+        };
+
+        let exit_code = match call_result {
             Ok(exit_code) => exit_code,
             Err(error) => {
                 if let Some(resource) = store.data().limit_hit {
@@ -368,6 +406,36 @@ impl WasmSandbox {
             fuel_consumed: self.limits.fuel.saturating_sub(remaining_fuel),
             runtime,
         })
+    }
+
+    /// Write the authenticated canonical input into the guest's exported
+    /// linear memory at offset 0 (v2 ABI). The guest must export a `memory`;
+    /// the write is bounds-checked and grows memory only within the store's
+    /// resource limiter, so it can never write outside the guest's sandbox.
+    fn deliver_input(
+        &self,
+        store: &mut Store<StoreState>,
+        instance: &Instance,
+        input: &[u8],
+    ) -> Result<(), SandboxError> {
+        let memory = instance
+            .get_memory(&mut *store, "memory")
+            .ok_or_else(|| SandboxError::GuestInputRejected("guest exports no memory".into()))?;
+        let have = memory.data_size(&*store);
+        if have < input.len() {
+            let page = WASM_PAGE_BYTES as usize;
+            let extra_pages = (input.len() - have).div_ceil(page) as u64;
+            memory.grow(&mut *store, extra_pages).map_err(|_| {
+                if let Some(resource) = store.data().limit_hit {
+                    SandboxError::ResourceLimitExceeded(resource.to_string())
+                } else {
+                    SandboxError::GuestInputRejected("guest memory too small for input".into())
+                }
+            })?;
+        }
+        memory
+            .write(&mut *store, 0, input)
+            .map_err(|error| SandboxError::GuestInputRejected(error.to_string()))
     }
 
     fn deadline_ticks(&self) -> u64 {

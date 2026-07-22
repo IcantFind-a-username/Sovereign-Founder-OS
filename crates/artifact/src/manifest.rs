@@ -41,6 +41,9 @@ pub enum RiskClass {
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactAbi {
     SovereignCoreWasmV1,
+    /// Like v1 but the host delivers the authenticated canonical input into
+    /// guest linear memory and calls `sovereign_run(ptr, len) -> i32`.
+    SovereignCoreWasmV2,
     SovereignComponentV1,
     #[serde(other)]
     Unsupported,
@@ -231,7 +234,11 @@ impl PluginManifest {
         if self.backend != ArtifactBackend::CoreWasm {
             return Err(ArtifactError::UnsupportedBackend);
         }
-        if self.abi != ArtifactAbi::SovereignCoreWasmV1 || self.entrypoint != CORE_WASM_ENTRYPOINT {
+        if !matches!(
+            self.abi,
+            ArtifactAbi::SovereignCoreWasmV1 | ArtifactAbi::SovereignCoreWasmV2
+        ) || self.entrypoint != CORE_WASM_ENTRYPOINT
+        {
             return Err(ArtifactError::UnsupportedAbi);
         }
         if !self.requested_host_capabilities.is_empty() {
