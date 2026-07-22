@@ -40,6 +40,8 @@ pub enum SandboxError {
     CompiledCacheUnavailable(String),
     #[error("a compiled cache entry failed verification and was quarantined: {0}")]
     CompiledCachePoisoned(String),
+    #[error("the guest rejected or could not receive its input: {0}")]
+    GuestInputRejected(String),
     #[error("verified operation is not present in the exact structured allowlist")]
     VerifiedOperationNotAllowed { selector: OperationSelector },
     #[error("execution failed: {0}")]
@@ -200,10 +202,10 @@ pub struct VerifiedExecutionRequest<'a> {
 /// Wasmtime sees the artifact, so a guest compile, instantiation, or runtime
 /// failure still spends the one-use capability.
 ///
-/// The current core Wasm ABI is `() -> i32`. Canonical input is authenticated
-/// by the capability, but this foundation does not claim to deliver that input
-/// into guest memory. It also exposes no host functions or external effects,
-/// and never falls back to the V1 or simulated executors.
+/// The core Wasm ABI is `() -> i32` (v1) or `(i32 ptr, i32 len) -> i32` (v2);
+/// under v2 the capability-authenticated canonical input is delivered into
+/// guest memory before the call. It exposes no host functions or external
+/// effects, and never falls back to the V1 or simulated executors.
 #[derive(Debug)]
 pub struct VerifiedSandboxExecutor<C: CapabilityV2Clock> {
     validator: CapabilityValidatorV2<C>,
