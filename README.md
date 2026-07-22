@@ -214,7 +214,15 @@ tampering) — every denial is a real enforcement path, not a mock.
   as history. The lifecycle closes honestly: an approved send is either revoked
   or marked delivered — the latter your own attestation that you sent the
   composed `.eml`, recorded as a signed `delivery.confirmed` event, since
-  Stage 1 sends nothing over the network and never claims to.
+  Stage 1 sends nothing over the network and never claims to. The whole
+  approval runs as a durable, checkpointed workflow with crash-consistent
+  persistence underneath: state and chain files are replaced atomically,
+  every operation commits audit-first (its events land on the chain in one
+  durable write before the state), and a crash at any point — mid-execution,
+  between effect and commit, or mid-commit — resumes on the next attempt
+  without losing or double-running the effect; the integrity self-audit
+  reports an interrupted tail operation as a retryable warning, distinct
+  from tampering.
 - **Security Center** — device identity, vault entries, admitted plugins
   (verified from the content-addressed store), the signed audit chain, a
   state-integrity self-audit that reconciles your authoritative state against
