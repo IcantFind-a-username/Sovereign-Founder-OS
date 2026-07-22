@@ -97,12 +97,7 @@ impl Store {
             .venture
             .clone()
             .ok_or_else(|| WorkspaceError::Invalid("create the venture profile first".into()))?;
-        let customer = workspace
-            .customers
-            .iter()
-            .find(|customer| customer.id == customer_id)
-            .cloned()
-            .ok_or_else(|| WorkspaceError::NotFound("customer".into()))?;
+        let customer = workspace.customer(customer_id)?.clone();
 
         let note = draft_outreach_note(&venture, &customer, lang.starts_with("zh"));
         let gateway = ModelGateway::new(vec![
@@ -185,12 +180,7 @@ impl Store {
             .venture
             .clone()
             .ok_or_else(|| WorkspaceError::Invalid("create the venture profile first".into()))?;
-        let customer = workspace
-            .customers
-            .iter()
-            .find(|customer| customer.id == customer_id)
-            .cloned()
-            .ok_or_else(|| WorkspaceError::NotFound("customer".into()))?;
+        let customer = workspace.customer(customer_id)?.clone();
         if workspace.documents.len() >= MAX_DOCUMENTS {
             return Err(WorkspaceError::Invalid("document limit reached".into()));
         }
@@ -233,11 +223,7 @@ impl Store {
     /// for the human owner and records that request as evidence.
     pub fn request_send(&self, document_id: Uuid) -> Result<Workspace, WorkspaceError> {
         let mut workspace = self.load()?;
-        let document = workspace
-            .documents
-            .iter_mut()
-            .find(|document| document.id == document_id)
-            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+        let document = workspace.document_mut(document_id)?;
         if document.status != DocumentStatus::Draft {
             return Err(WorkspaceError::Invalid(
                 "only drafts can be submitted".into(),
@@ -290,21 +276,12 @@ impl Store {
     /// closed); delivery to the customer stays the founder's own action.
     pub fn decide(&self, approval_id: Uuid, approve: bool) -> Result<Workspace, WorkspaceError> {
         let mut workspace = self.load()?;
-        let approval = workspace
-            .approvals
-            .iter()
-            .find(|approval| approval.id == approval_id)
-            .ok_or_else(|| WorkspaceError::NotFound("approval".into()))?;
+        let approval = workspace.approval(approval_id)?;
         if approval.status != ApprovalStatus::Pending {
             return Err(WorkspaceError::Invalid("approval already decided".into()));
         }
         let document_id = approval.document_id;
-        let document = workspace
-            .documents
-            .iter()
-            .find(|document| document.id == document_id)
-            .cloned()
-            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+        let document = workspace.document(document_id)?.clone();
 
         let evidence = if approve {
             let customer = workspace
@@ -317,11 +294,7 @@ impl Store {
             None
         };
 
-        let approval = workspace
-            .approvals
-            .iter_mut()
-            .find(|approval| approval.id == approval_id)
-            .ok_or_else(|| WorkspaceError::NotFound("approval".into()))?;
+        let approval = workspace.approval_mut(approval_id)?;
         approval.status = if approve {
             ApprovalStatus::Approved
         } else {
@@ -329,11 +302,7 @@ impl Store {
         };
         approval.decided_at = Some(now());
         approval.evidence = evidence.clone();
-        let document_entry = workspace
-            .documents
-            .iter_mut()
-            .find(|document| document.id == document_id)
-            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+        let document_entry = workspace.document_mut(document_id)?;
         document_entry.status = if approve {
             DocumentStatus::ApprovedPendingDelivery
         } else {
@@ -397,11 +366,7 @@ impl Store {
     /// owner approved. Fails closed if the document is not awaiting delivery.
     pub fn revoke_delivery(&self, document_id: Uuid) -> Result<Workspace, WorkspaceError> {
         let mut workspace = self.load()?;
-        let document = workspace
-            .documents
-            .iter()
-            .find(|document| document.id == document_id)
-            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+        let document = workspace.document(document_id)?;
         if document.status != DocumentStatus::ApprovedPendingDelivery {
             return Err(WorkspaceError::Invalid(
                 "only an approved, undelivered document can be revoked".into(),
@@ -428,11 +393,7 @@ impl Store {
             Err(error) => return Err(kernel(error)),
         }
 
-        let document_entry = workspace
-            .documents
-            .iter_mut()
-            .find(|document| document.id == document_id)
-            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+        let document_entry = workspace.document_mut(document_id)?;
         document_entry.status = DocumentStatus::Revoked;
         self.save(&workspace)?;
 
@@ -455,11 +416,7 @@ impl Store {
     /// document is approved and awaiting delivery.
     pub fn confirm_delivery(&self, document_id: Uuid) -> Result<Workspace, WorkspaceError> {
         let mut workspace = self.load()?;
-        let document = workspace
-            .documents
-            .iter_mut()
-            .find(|document| document.id == document_id)
-            .ok_or_else(|| WorkspaceError::NotFound("document".into()))?;
+        let document = workspace.document_mut(document_id)?;
         if document.status != DocumentStatus::ApprovedPendingDelivery {
             return Err(WorkspaceError::Invalid(
                 "only an approved, undelivered document can be confirmed delivered".into(),

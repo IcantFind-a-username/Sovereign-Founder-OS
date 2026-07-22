@@ -17,6 +17,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: File-size guardrail (no god files)
+        run: ./scripts/check-file-size.sh
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run Clippy

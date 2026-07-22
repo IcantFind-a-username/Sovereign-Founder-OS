@@ -302,6 +302,45 @@ pub struct IntegrityFinding {
     pub detail: String,
 }
 
+/// Focused id lookups so call sites read as intent instead of iterator
+/// plumbing. All fail closed with `NotFound`; callers propagate.
+impl Workspace {
+    pub(super) fn document(&self, id: Uuid) -> Result<&Document, WorkspaceError> {
+        self.documents
+            .iter()
+            .find(|document| document.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("document".into()))
+    }
+
+    pub(super) fn document_mut(&mut self, id: Uuid) -> Result<&mut Document, WorkspaceError> {
+        self.documents
+            .iter_mut()
+            .find(|document| document.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("document".into()))
+    }
+
+    pub(super) fn customer(&self, id: Uuid) -> Result<&Customer, WorkspaceError> {
+        self.customers
+            .iter()
+            .find(|customer| customer.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("customer".into()))
+    }
+
+    pub(super) fn approval(&self, id: Uuid) -> Result<&Approval, WorkspaceError> {
+        self.approvals
+            .iter()
+            .find(|approval| approval.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("approval".into()))
+    }
+
+    pub(super) fn approval_mut(&mut self, id: Uuid) -> Result<&mut Approval, WorkspaceError> {
+        self.approvals
+            .iter_mut()
+            .find(|approval| approval.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("approval".into()))
+    }
+}
+
 /// Short human label for a document status, for honest finding text.
 pub(super) fn document_status_label(status: DocumentStatus) -> &'static str {
     match status {
