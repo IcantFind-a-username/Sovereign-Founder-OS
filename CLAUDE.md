@@ -17,6 +17,7 @@
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace
+./scripts/check-file-size.sh   # no god files: split modules before they grow past the limit
 ```
 
 ## Source of truth
