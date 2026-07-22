@@ -1,6 +1,7 @@
 use super::types::document_status_label;
 use super::util::{now, storage};
 use super::*;
+use uuid::Uuid;
 
 use sovereign_audit_ledger::AuditLedger;
 
@@ -219,10 +220,67 @@ impl Store {
             }
         }
 
+        // The reverse direction: signed events whose state never landed.
+        // Commits are audit-first — every event of an operation in one chain
+        // write, then the state write — so only the *tail* of the chain can
+        // be torn by a crash. Check just the trailing events of the most
+        // recent operation (same resource); a mismatch there is an
+        // interrupted operation that retrying heals, reported as a warning —
+        // deliberately distinct from the critical findings above (state
+        // without evidence), which audit-first ordering makes impossible
+        // short of tampering. Older unmatched events are history (an
+        // interruption later retried under a fresh id) and are not flagged
+        // forever.
+        if let Some(last) = events.last() {
+            let tail_torn = events
+                .iter()
+                .rev()
+                .take_while(|event| event.resource == last.resource)
+                .any(|event| {
+                    let subject_id = event
+                        .resource
+                        .split_once(':')
+                        .and_then(|(_, id)| Uuid::parse_str(id).ok());
+                    let document_status = subject_id
+                        .and_then(|id| workspace.document(id).ok().map(|document| document.status));
+                    match event.action.as_str() {
+                        "customer.create" => {
+                            subject_id.is_some_and(|id| workspace.customer(id).is_err())
+                        }
+                        "approval.granted" => !matches!(
+                            document_status,
+                            Some(
+                                DocumentStatus::ApprovedPendingDelivery
+                                    | DocumentStatus::Revoked
+                                    | DocumentStatus::Delivered
+                            )
+                        ),
+                        "effect.revoked" => document_status != Some(DocumentStatus::Revoked),
+                        "delivery.confirmed" => document_status != Some(DocumentStatus::Delivered),
+                        _ => false,
+                    }
+                });
+            if tail_torn {
+                findings.push(IntegrityFinding {
+                    severity: "warning",
+                    resource: last.resource.clone(),
+                    detail: format!(
+                        "the most recent operation ({}) is signed on the chain but its \
+                         state write did not complete — an interrupted operation; retry it",
+                        last.action
+                    ),
+                });
+            }
+        }
+
         Ok(IntegrityReport {
             chain_verified,
             events: events.len(),
-            ok: findings.is_empty(),
+            // Warnings (interrupted operations) do not fail the audit; state
+            // that lacks its signed evidence does.
+            ok: !findings
+                .iter()
+                .any(|finding| finding.severity == "critical"),
             findings,
         })
     }

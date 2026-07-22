@@ -97,12 +97,18 @@ fn cmd_integrity() -> Result<(), Box<dyn std::error::Error>> {
         check(report.chain_verified),
         report.events
     );
+    let critical = report
+        .findings
+        .iter()
+        .filter(|finding| finding.severity == "critical")
+        .count();
+    let warnings = report.findings.len() - critical;
     if report.findings.is_empty() {
         println!("  state vs. evidence  PASS");
     } else {
         println!(
-            "  state vs. evidence  FAIL  ({} findings)",
-            report.findings.len()
+            "  state vs. evidence  {}  ({critical} critical, {warnings} warnings)",
+            if critical == 0 { "PASS" } else { "FAIL" }
         );
         for finding in &report.findings {
             println!(

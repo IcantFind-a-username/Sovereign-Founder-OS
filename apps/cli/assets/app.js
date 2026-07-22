@@ -314,7 +314,7 @@ function renderState() {
     if (ir.error) wrap.appendChild(el("div", "mono", ir.error));
     (ir.findings || []).forEach(f => {
       const row = el("div", "gauntlet-row");
-      row.appendChild(badge("bad", f.severity));
+      row.appendChild(badge(f.severity === "critical" ? "bad" : "warn", f.severity));
       row.appendChild(el("div", "detail", f.resource + " — " + f.detail));
       wrap.appendChild(row);
     });

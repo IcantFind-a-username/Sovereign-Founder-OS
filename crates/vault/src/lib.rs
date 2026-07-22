@@ -79,7 +79,7 @@ impl Vault {
         let blob = encrypt(&self.key, plaintext)?;
         let path = self.root.join(format!("{name}.enc"));
         let json = serde_json::to_vec_pretty(&blob)?;
-        std::fs::write(path, json)?;
+        write_atomic(&path, &json)?;
         if !self.manifest.entries.contains(&name.to_string()) {
             self.manifest.entries.push(name.to_string());
             self.save_manifest()?;
@@ -105,9 +105,35 @@ impl Vault {
     fn save_manifest(&self) -> Result<(), VaultError> {
         let path = self.root.join("manifest.json");
         let json = serde_json::to_vec_pretty(&self.manifest)?;
-        std::fs::write(path, json)?;
+        write_atomic(&path, &json)?;
         Ok(())
     }
+}
+
+/// Durable, crash-safe replacement write: write to a sibling temp file, fsync
+/// it, rename over the target, then fsync the directory. A crash at any point
+/// leaves either the old content or the new — never a truncated file. Mirrors
+/// the admission store's write pattern; on non-Unix the directory flush is
+/// skipped because std cannot express it, and the rename itself is atomic.
+fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let temp_path = path.with_extension("tmp");
+    let result = (|| {
+        let mut file = std::fs::File::create(&temp_path)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp_path, path)?;
+        #[cfg(unix)]
+        if let Some(directory) = path.parent() {
+            std::fs::File::open(directory)?.sync_all()?;
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp_path);
+    }
+    result
 }
 
 fn validate_entry_name(name: &str) -> Result<(), VaultError> {
@@ -132,7 +158,7 @@ fn generate_key() -> [u8; 32] {
 }
 
 fn save_key(path: &std::path::Path, key: &[u8; 32]) -> Result<(), VaultError> {
-    std::fs::write(path, STANDARD.encode(key))?;
+    write_atomic(path, STANDARD.encode(key).as_bytes())?;
     Ok(())
 }
 
@@ -188,6 +214,24 @@ mod tests {
         vault.put("company_profile", b"stealth startup").unwrap();
         let data = vault.get("company_profile").unwrap();
         assert_eq!(data, b"stealth startup");
+    }
+
+    #[test]
+    fn writes_replace_atomically_and_leave_no_temp_files() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("entry", b"one").unwrap();
+        vault.put("entry", b"two").unwrap();
+        assert_eq!(vault.get("entry").unwrap(), b"two");
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "tmp"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "temp files left behind: {leftovers:?}"
+        );
     }
 
     #[test]
