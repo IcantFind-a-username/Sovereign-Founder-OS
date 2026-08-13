@@ -42,7 +42,7 @@ The loopback-only local web app has three real surfaces:
 
 | Surface | Current capability | Important limit |
 | --- | --- | --- |
-| **Command Center** | Read-only business counts, pending decisions, deterministic next actions/risks, evidence rollups | No real company-stage, finance, project, or analytics model |
+| **Command Center** | Business-state read-only counts, pending decisions, deterministic next actions/risks, evidence rollups | It does not mutate business objects, but a first/open GET may initialize the current co-located device/Vault key files; it is not yet an authenticated, side-effect-free read. No real company-stage, finance, project, or analytics model |
 | **Workspace** | One company profile; append customers; fixed non-editable Offer/Invoice drafts; deterministic unsaved outreach suggestion; approve/reject; local `.eml`; revoke; unauthenticated manual-delivery marker; plaintext export | No real LLM, editing, CRM, projects, contracts, expenses, restore, or network send |
 | **Security Center** | Identity/vault/audit/plugin/disclosure facts, state reconciliation, live attack gauntlet | Reconciliation checks selected event presence, not every workspace value |
 
@@ -79,26 +79,35 @@ prove independently authenticated human intent or exact effect authorization.
 | Area | Maturity and honest boundary |
 | --- | --- |
 | **Identity, policy, capability** | Current cryptographic/deterministic primitives; owner ceremony, final effect binding, key lifecycle, and hardware/OS storage remain targets. |
-| **Vault and audit** | Experimental AES-GCM entries and a replaceable-file, device-signed hash chain that proves internal consistency; the vault key sits beside the data, rollback anchoring, restore, and state-value commitments remain. |
+| **Vault and audit** | Current prototype: AES-GCM entries and a replaceable-file, device-signed hash chain that proves internal consistency. This remains Experimental as a product boundary: the raw vault key sits beside the data, and rollback anchoring, restore, and state-value commitments are absent. |
 | **Authority and execution** | Experimental filesystem claims plus crash journal. A known approval-expiry retention gap prevents a durable one-use approval claim; claims are not transactional, revocation is absent, and process-level coverage remains. |
 | **Artifacts and Wasm** | Current verification/admission and tested import-free V2 pure computation; worker/cache are optional, cache bindings are partial, and Component/WIT/high-risk isolation remain. |
-| **Model Gateway** | Experimental deterministic routing simulator. Caller classification and provider self-reported trust can authorize unsafe Amber/Green cloud routing; [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) must remove it before real egress. |
+| **Model Gateway** | Current prototype: an Experimental deterministic routing simulator, not a real model or local-model sandbox. Caller classification and provider self-reported trust can authorize unsafe Amber/Green cloud routing; [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) must remove it before real egress. |
 | **Workflow and releases** | Same-directory checkpoint resume and `v*` release automation exist; no lease, replication, real node failover, or tagged preview exists. |
+
+### Data-sovereignty scope by maturity
+
+| Maturity | Commitment |
+| --- | --- |
+| **Current** | The Vault prototype encrypts individual entries while storing its raw master key beside the ciphertext. The ordinary plaintext export supports inspection and limited offline verification; it is not an encrypted backup, trust-continuity package, or restore path. Model routes are deterministic stand-ins, not real AI or a sandboxed local model. |
+| **Target** | [RFC 0005](rfcs/0005-dual-root-vault-and-recovery.md) uses a pinned SQLCipher transactional business store with a random database key, independently wrapped by device and recovery unlock domains. Program 1A builds the non-product engine/importer; 1C0 adds owner authentication and one-use approval; 1B0 proves backup mechanics; 1C1 hands off role keys; 1D freezes the final legacy generation and rebuilds an equivalent `PendingV2` candidate; and 1B1 must clean-restore that candidate before `ActiveV2` closes legacy writers. Device identity, privacy authority, audit signing, and freshness state remain separate trust domains. A real local model runs with no ambient network, filesystem, environment, or unapproved IPC access, with authenticated IPC, model-digest binding, and resource limits. |
+| **Research** | Owned Mesh and multi-device E2EE require a measured founder need, a separate accepted protocol RFC, implementation, adversarial review, recovery design, and audit evidence. Until then the product exposes no selectable Owned Mesh preset, configured-state claim, setup CTA, or simulated secure node. |
 
 ## Milestone map and dependencies
 
-Versions are integration labels, not a strict work sequence. Product discovery,
-recovery design, domain-source work, and protocol research may proceed in
-parallel; a release claim must still pass its own gates.
+Versions are ordered release gates, while their development work is not a
+single-file queue. Product discovery, recovery design, domain-source work, and
+protocol research may proceed in parallel; each release claim must still pass
+all earlier applicable gates.
 
 | Milestone | New founder outcome | Principal gate |
 | --- | --- | --- |
-| **v0.1** | Run the narrow local workflow honestly | Exact local-effect grant, owner authentication, fault tests, tagged preview |
-| **v0.2** | Use a useful real local model without granting authority | RFC 0004 boundary, validated tasks, zero egress in `Local Only` |
+| **v0.1** | Run the narrow local workflow honestly | Owner authenticator/session 1C0, exact local-effect grant, Vault 1A engine evidence, explicit legacy warning, fault tests, tagged preview |
+| **v0.2** | Use a useful real local model without granting authority | Vault 1B/1C/1D activation, RFC 0004 boundary, validated tasks, zero egress in `Local Only` |
 | **v0.3** | Complete one consultant lead-to-invoice/follow-up loop | Minimal Enterprise Graph and resumable structured workflow |
-| **v0.4** | Dispatch one reviewed email safely | Minimum restore first; at-most-once automatic dispatch; explicit uncertainty |
-| **v0.5** | Use the consultant workflow repeatedly as an Alpha | Usability evidence, migrations, encrypted backup/restore |
-| **v0.6** | Recover, rotate, and move sovereign state | Clean-machine restore, rollback rejection, device revocation |
+| **v0.4** | Dispatch one reviewed email safely | Minimum restore first; one approved dispatch; `Indeterminate` never auto-retries |
+| **v0.5** | Use the consultant workflow repeatedly as an Alpha | Integrated restore requalification, stable migrations, usability evidence |
+| **v0.6** | Recover, rotate, and move sovereign state | Recovery UX, rollback rejection, device revocation |
 | **v0.7** | Receive evidence-based priorities and bounded Crew help | Stable task/graph contracts, evaluations, no standing AI authority |
 | **v0.8** | Install one constrained third-party extension | Stable Component/WIT boundary and adversarial conformance |
 | **v0.9** | Use one reviewed Singapore domain pack | Versioned sources, uncertainty, escalation, professional review |
@@ -106,15 +115,58 @@ parallel; a release claim must still pass its own gates.
 
 Hard dependencies:
 
+- RFC 0005 advances through explicit gates. Program 1A builds the SQLCipher format,
+  dual-wrapper key-custody engine, and a closed legacy importer, but exposes no
+  product enrollment or workspace migration. Program 1B0 proves filtered
+  backup/restore mechanics and the loss matrix over staging fixtures only.
+  Program 1C0 establishes the one independently admitted owner authenticator,
+  session, and one-use approval issuer used by v0.1 Exact Effect and later Vault
+  ceremonies; Program 1C1 hands legacy approval, admission, authority,
+  identity, and audit keys into separate trust domains. Program 1D may then
+  freeze the final legacy generation and prove an equivalent real candidate
+  before `PendingV2`; Program 1B1 must clean-restore
+  it and return a bound `RecoveryQualification` before `ActiveV2` can select it
+  for new product writes without split-brain writers. Until ActiveV2,
+  the co-located-key path remains an isolated Experimental residual and receives
+  none of the v2/backup/recovery claims.
+- Persistent privacy-authority, freshness, private-queue, and real-provider
+  secrets wait for 1A custody, 1B1 recovery qualification, 1C0/1C1 authority,
+  and Program 1D `ActiveV2` gates.
+- A real local-model worker may be developed and tested against synthetic
+  fixtures earlier, but it receives protected founder/workspace values only
+  after Program 1D closes the complete persistence inventory. Consequently the
+  v0.2 release gate includes 1B1, 1C1, and 1D `ActiveV2` (with 1C0 already required by
+  v0.1), even though their implementation may proceed in parallel with model
+  confinement work.
 - RFC 0004 precedes any real public-model claim.
 - Persona/task validation begins in v0.1 and defines “useful” model work in
   v0.2.
 - Exact durable effect authority and a minimum tested recovery package precede
-  any irreversible network effect.
+  any irreversible network effect. Product storage activation either depends
+  on the exact-bound local-outbox slice or disables outbox in v2 mode.
+- Every real provider credential is a non-disclosable value owned by a closed
+  Credential Broker: owner-authorized enrollment, provider/account/audience/
+  scope binding, rotation/revocation, and device-loss reauthorization precede
+  v0.4. Credentials never enter model input, the business Vault, or ordinary
+  backup/export; effects receive only operation-scoped opaque handles.
 - Stable task/graph contracts precede reusable Crews or domain automation.
 - Clean-machine restore precedes broader bounded autonomy.
 - Stable extension and pack schemas precede an SDK/registry or `Verified` pack.
 - Replication, leases, and fencing begin only for an accepted multi-node need.
+
+### Product balance gate
+
+Trust work may block an unsafe release, but it does not count as Founder OS
+progress by itself. Every milestone must therefore:
+
+1. demonstrate one named founder task or workflow outcome before protocol detail;
+2. let a non-specialist complete that path without Security Center terminology,
+   while keeping professional evidence and narrower controls available on demand;
+3. tie each Trust/Data item to that outcome or a named release-blocking risk, and
+   leave unrelated infrastructure as Research; and
+4. include product usability evidence alongside boundary, migration, and attack
+   evidence. An infrastructure-only release needs a documented dependency,
+   scope cap, and next founder-visible checkpoint.
 
 ## Version milestones
 
@@ -128,10 +180,13 @@ signed audit chain offline.
 
 **Remaining work:** correct stale UI/docs claims; validate the consultant
 persona and first private-AI tasks; mandate isolated compilation/cache on the
-product path; authenticate owner presence; bind recipient/content/policy/expiry
+product path; deliver 1C0's admitted owner authenticator, expiry-bound session,
+and single one-use approval issuer; bind recipient/content/policy/expiry
 into an opaque effect grant; make authorization claims transactional and
 revocable; retain approval claims through approval expiry; upgrade audit/effect
-ordering and rollback anchoring; protect local keys; add process-kill,
+ordering and rollback anchoring; implement RFC 0005 Program 1A as a non-product
+SQLCipher/key-custody engine with a closed legacy importer while keeping legacy
+workspaces isolated and honestly labelled; add process-kill,
 concurrency, and filesystem-fault tests; publish preview binaries.
 
 **Exit criteria:**
@@ -139,10 +194,20 @@ concurrency, and filesystem-fault tests; publish preview binaries.
 1. A clean install completes the local founder flow without source knowledge.
 2. No outbox effect exists without independently authenticated approval bound
    to the exact grant; replay, substitution, rejection, and interruption fail
-   closed under concurrent process and fault-injection tests.
-3. Export/integrity checks bind supported workspace values and document every
+   closed under concurrent process and fault-injection tests. This approval is
+   issued by 1C0; the application, Vault, and effect layer cannot create a
+   parallel owner signer or infer owner presence from the OS account.
+3. On each enabled platform, Program 1A proves the pinned SQLCipher profile,
+   independent device/recovery wrappers, fail-closed protector behavior, and a
+   side-by-side legacy importer without partial state or algorithm fallback.
+   The importer accepts only closed business-entry kinds, blocks legacy role
+   private keys pending 1C handoff, and is not reachable from product UI or
+   ordinary workspace open. Existing v0.1 workspaces still use the explicitly
+   labelled co-located-key format; v2 product enrollment, backup, recovery, and
+   migration remain unavailable until their later gates pass.
+4. Export/integrity checks bind supported workspace values and document every
    excluded item.
-4. CI builds one tagged, signed/checksummed Developer Preview with no
+5. CI builds one tagged, signed/checksummed Developer Preview with no
    production claim.
 
 ### v0.2 — Useful private AI
@@ -154,21 +219,29 @@ reasoning, and drafting without giving it authority or requiring a cloud
 account.
 
 **Work:** implement RFC 0004's local-only raw request and compiler-owned public
-projection boundary; add `Auto Protect`, `Local Only`, and `My Devices &
-Company Nodes`; expose value-free visibility records; add deterministic
-placement/queue/`ComputeUnavailable`; integrate one replaceable local backend;
-retain deterministic fallbacks; run privacy-canary and attack reviews. Owned
-node execution remains disabled until a separate Secure Mesh protocol exists.
+projection boundary; add `Auto Protect` and `Local Only`; expose value-free
+visibility records; add deterministic placement/queue/`ComputeUnavailable`;
+complete RFC 0005 Programs 1B0/1B1, 1C1, and 1D `ActiveV2` (building on 1C0) so protected workspace values have a
+single authenticated persistence boundary;
+integrate one replaceable real local backend behind a capability-constrained
+process boundary with authenticated IPC, model-digest binding, and resource
+limits; retain deterministic fallbacks; run privacy-canary and attack reviews.
+Owned Mesh stays Research and has no product preset or setup CTA.
 
 **Exit criteria:**
 
-1. One real local backend completes three persona-validated tasks as
-   suggestions only, with zero authoritative mutations.
-2. `Local Only` produces zero public/owned-node broker observations; local
+1. One provenance-bound real local backend completes three persona-validated
+   tasks as suggestions only, with zero authoritative mutations; tests deny its
+   ambient network, filesystem, environment, and unapproved IPC access.
+2. Before any protected founder value reaches that backend, clean restore,
+   owner/role-key handoff, whole-workspace plaintext closure, and one-authority
+   Vault v2 activation have passed on the platform. Synthetic/public fixtures
+   cannot qualify this product outcome.
+3. `Local Only` produces zero public/owned-node broker observations; local
    compute failure queues or explains alternatives, never cloud-falls-back.
-3. No dynamic caller value can reach a public adapter through the supported
+4. No dynamic caller value can reach a public adapter through the supported
    Rust API; the legacy Amber/Green route is gone.
-4. Every model use has an understandable visibility record and no known
+5. Every model use has an understandable visibility record and no known
    Critical/High finding inside the declared API threat model.
 
 ### v0.3 — First real founder workflow
@@ -181,6 +254,13 @@ node execution remains disabled until a separate Secure Mesh protocol exists.
 lead → discovery context → proposal draft → founder review
      → delivery preparation → invoice draft → follow-up
 ```
+
+**Reference scenario:** an independent consultant records Acme's discovery
+notes, budget range, contact, and delivery constraints; uses the local-only
+path to draft a fixed-scope proposal; edits and approves it for one named
+recipient; records delivery; prepares an invoice draft; and schedules a
+follow-up. Customer details remain structured protected state. The model sees
+no `NonDisclosableSecret` and cannot mutate, invoice, or send on its own.
 
 **Work:** validate the workflow with founders; build only the required
 `Founder`, `Company`, `Offer`, `Customer`, `Project`, `Task`, `Document`,
@@ -204,7 +284,8 @@ at most one automatic dispatch while understanding provider uncertainty.
 
 **Work:** accept an email-effect RFC; bind recipient, headers, body,
 attachments, account, approval, policy, and idempotency; broker OAuth as a
-handle; persist intent before dispatch; defend against substitution, injection,
+closed operation-scoped handle from a separate OS/hardware-protected credential
+domain; persist intent before dispatch; defend against substitution, injection,
 exfiltration, crashes, replay, and timeout-after-success; retain local `.eml`.
 
 **Exit criteria:**
@@ -216,6 +297,9 @@ exfiltration, crashes, replay, and timeout-after-success; retain local `.eml`.
    `Indeterminate`; recipient delivery is never inferred from acceptance.
 4. A minimum encrypted restore drill passes before credentials/network are
    enabled, and the full attack matrix passes against a test account.
+5. OAuth enrollment, refresh, scope/audience/account binding, rotation,
+   revocation, provider disconnect, and device-loss reauthorization pass; no
+   credential byte enters a model, business Vault, log, export, or backup.
 
 ### v0.5 — Founder Operations Alpha
 
@@ -235,10 +319,15 @@ accessibility, stable migrations, and advanced Trust views on demand.
    or kernel knowledge.
 2. State remains exportable and covered by documented integrity/migration
    checks.
-3. A clean install restores the encrypted Alpha package before pilots entrust
-   multi-week records to it.
+3. Program 1B1 restore qualification is rerun against the final v0.5 schema, persistence
+   inventory, and migration set before pilots entrust multi-week records to it;
+   earlier engine/fixture drills are not stale qualification. Each migration or
+   default-write transition remains an independently authenticated owner action.
 4. Telemetry, if added, is opt-in and cannot collect protected content by
    default.
+5. Before a pilot stores multi-week records, the owner-authenticated activation
+   completes without leaving both legacy and v2 paths writable; legacy remains
+   readable only for bounded rollback/migration support.
 
 ### v0.6 — Recovery and sovereign data
 
@@ -247,17 +336,32 @@ accessibility, stable migrations, and advanced Trust views on demand.
 **Founder outcome:** Lose or replace an installation and restore verified
 business state without an official server.
 
-**Work:** encrypted backup destinations/packages, recovery codes, key rotation,
-device revocation, versioned migrations/rollback, recovery UX, and restore
-drills. Multi-node work waits for a measured need.
+**Work:** build on Program 1B1 and owner-authenticated `ActiveV2` to make
+recovery a complete founder-facing product. Improve the separately encrypted
+business backup and public trust-continuity handling; add progressive recovery
+onboarding, key rotation, device revocation, versioned migrations/rollback,
+explicit loss handling, and repeated restore drills. Multi-node work waits for
+a measured need.
 
 **Exit criteria:**
 
-1. A fresh machine restores identity/history and resumes without duplicate
-   effects.
+1. A fresh machine restores and verifies business history, creates new device
+   identity and transport state, and resumes without duplicate effects.
+   Authority continuity is claimed only when a separately admitted surviving
+   authority signs the transition; otherwise the result is data rescue under a
+   new identity.
 2. Revoked devices cannot decrypt newly rotated state.
-3. Corrupt, stale, rolled-back, or incomplete backups fail visibly.
-4. Recovery succeeds without official infrastructure.
+3. Corrupt or incomplete backups fail visibly. Relative to separately retained
+   and verified trust-continuity/freshness material, stale or rolled-back
+   backups also fail; without that surviving anchor, whole-device rollback
+   detection is not claimed.
+4. The recovery loss matrix is tested and shown to the founder: age identity +
+   passphrase + admitted trust continuity can attempt verified restore; the two
+   recovery inputs without trust continuity permit at most data rescue under a
+   new trust identity; loss of either age identity or passphrase makes that
+   backup unable to restore business data; trust continuity alone restores no
+   data.
+5. Recovery succeeds without official infrastructure.
 
 ### v0.7 — Founder intelligence
 
@@ -332,8 +436,9 @@ A non-technical founder can:
 3. use a fully local AI path and switch between two independently implemented
    model backends without corrupting state;
 4. approve exact external actions and understand data visibility and evidence;
-5. export, clean-machine restore, and offline-verify all state needed to resume
-   without an official service;
+5. use ordinary export for supported inspection/portability and, separately,
+   clean-machine restore and offline-verify all state needed to resume without
+   an official service;
 6. recover from covered process/device failure without silent duplicates or
    hidden `Indeterminate` outcomes;
 7. pass automated, adversarial, migration, recovery, and appropriate fuzz/

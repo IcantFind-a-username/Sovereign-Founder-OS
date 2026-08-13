@@ -64,8 +64,10 @@ sovereign-cli
 sovereign-adversarial-tests
 ```
 
-The local app already exposes a minimal Workspace, read-only Founder Command
-Center, and Security Center. It stores a company profile, customers, fixed
+The local app already exposes a minimal Workspace, business-state read-only
+Founder Command Center, and Security Center. First/open GET paths may initialize
+the current co-located device/Vault key files, so “read-only” does not yet mean
+an authenticated, side-effect-free runtime boundary. It stores a company profile, customers, fixed
 Offer/Invoice drafts, approvals, local outbox lifecycle, disclosures, and audit
 history. This is not yet the target Sovereign Enterprise Graph.
 

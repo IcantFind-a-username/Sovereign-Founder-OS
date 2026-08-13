@@ -156,8 +156,10 @@ Founder OS and not a production security boundary.
 
 The loopback web app (`sovereign ui`, English/中文) currently provides:
 
-- a read-only **Command Center** with business counts, pending decisions,
-  deterministic guidance, and evidence summaries;
+- a business-state read-only **Command Center** with business counts, pending
+  decisions, deterministic guidance, and evidence summaries. Current first/open
+  GET paths may initialize the co-located device/Vault key files, so this is not
+  yet an authenticated, side-effect-free read boundary;
 - a **Workspace** for one company profile, append-only customers, fixed local
   Offer/Invoice templates, a deterministic drafting stand-in, approval or
   rejection, local RFC 5322 `.eml` composition, revocation of that local file,
