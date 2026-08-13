@@ -60,15 +60,16 @@ trybuild = "=1.0.116"
 # Task 2 normal dependencies. Move, do not duplicate, the exact serde and sha2
 # entries above from dev-dependencies to dependencies.
 chacha20poly1305 = { version = "=0.11.0", default-features = false,
-  features = ["alloc", "zeroize"] }
+  features = ["zeroize"] }
 argon2 = { version = "=0.5.3", default-features = false,
-  features = ["alloc", "zeroize"] }
+  features = ["zeroize"] }
 keyring = { version = "=4.1.5", default-features = false, features = ["v1"] }
 getrandom = { version = "=0.4.3", default-features = false }
 serde_json = { version = "=1.0.150", default-features = false,
   features = ["std"] }
 serde_json_canonicalizer = "=0.3.2"
 base64 = { version = "=0.22.1", default-features = false, features = ["alloc"] }
+subtle = { version = "=2.6.1", default-features = false }
 
 # Task 4
 cap-std = "=4.0.2"
@@ -133,8 +134,12 @@ The child starts from `env -i` and receives only fresh `HOME`/`TMPDIR`, the
 reviewed Cargo/rustup homes, `LANG`/`LC_ALL`, fixed `SOURCE_DATE_EPOCH`, exact
 absolute Cargo/rustc/rustdoc/C compiler/archiver/ranlib paths, the exact
 `CARGO_BUILD_TARGET`, `CARGO_NET_OFFLINE=true`, and a PATH assembled only from
-the reviewed Perl/make/linker directories. Repository and Cargo source-config
-replacement is rejected. Cargo-created build-script variables such as
+the reviewed Perl/make/linker directories. Qualification rejects every Cargo
+config file that Cargo would discover in the repository/ancestors or selected
+`CARGO_HOME`, not only source replacement, and rejects caller `--config`.
+Program 1A has no approved Cargo-config extension surface; this closes
+`target.*.rustflags` routes that could replace the default `getrandom` backend
+or otherwise mutate code generation. Cargo-created build-script variables such as
 `HOST`, `TARGET`, `OUT_DIR`, and `CARGO_MAKEFLAGS` are allowed only inside the
 child and are recorded where relevant; they are not accepted from the caller.
 
@@ -165,6 +170,14 @@ parses only the bounded closed sidecar type with duplicate/unknown-field denial,
 then requires byte-for-byte equality with RFC 8785 serialization before any
 KDF or unwrap. Base64 is the exact unpadded URL-safe alphabet; SHA-256 is used
 only for the RFC-defined domain-separated recovery-slot commitment.
+
+The engine build rejects every `getrandom 0.4.3` opt-in backend cfg named by
+that release (`custom`, `linux_getrandom`, `linux_raw`, `rdrand`, `rndr`,
+`efi_rng`, `windows_legacy`, `unsupported`, and `extern_impl`). Wrapper tests
+inject each backend through a temporary Cargo config and require refusal before
+dependency compilation. The frozen feature tree must contain neither
+`getrandom/wasm_js` nor `getrandom/sys_rng`, and must contain neither
+`argon2/alloc` nor `argon2/password-hash`.
 
 Task 4's pinned AES-GCM dependency is legacy-reader-only. It may authenticate
 and decrypt the exact current 12-byte-nonce/full-tag record into a zeroizing
@@ -234,10 +247,22 @@ source gate separately allowlists this one test-only negative control.
 - Argon profile tag 1 is exactly v=19, m=65,536 KiB, t=3, p=4, 16-byte random
   salt, 32-byte output. Unknown/free-form cost input fails before KDF.
 - `Secret32`, password, PWK, KEK, DBK, and raw-key token buffers are non-clone,
-  non-formatting, non-serializing, zeroizing holders.
+  non-formatting, non-serializing, zeroizing holders. Secret holders do not
+  implement `PartialEq`; every 32-byte secret comparison uses the one audited
+  `subtle::ConstantTimeEq::ct_eq` path.
 - `DeviceStoreUnavailable` consistently means native service absent, locked,
   unsupported, or unreachable. `DeviceKeyMissing` means the exact admitted
-  record is absent from an otherwise usable service. Neither enters recovery.
+  record is absent from an otherwise usable service. `DeviceRecordInvalid`
+  means its fixed binary prefix/length is malformed. `DeviceRecordAmbiguous`
+  means the native store returned multiple matching records. None enters
+  recovery or preserves upstream error/source bytes.
+- `DeviceProviderRecordInvalid` means the provider returned undecodable
+  credential bytes/source before the fixed application record parser; attached
+  bytes are wiped and its source is discarded unformatted. It is terminal and
+  never enters recovery.
+- `DeviceStoreConfigurationInvalid` is a separate terminal internal error for
+  rejection of the adapter's fixed service/username attributes; it does not
+  assert that a stored credential exists.
 - Generic tests use only an internal injected store. Real native-store behavior
   is tested in separate mandatory jobs with isolated namespaces and cleanup.
 - All normal SQL is static. There are no caller identifiers/SQL, extensions,
@@ -572,14 +597,18 @@ Push, fetch, and verify the exact remote branch contains the commit.
 - Modify: `crates/vault-v2-engine/src/engine/mod.rs`
 - Create: `crates/vault-v2-engine/src/engine/wrappers.rs`
 - Create: `crates/vault-v2-engine/src/engine/key_slots.rs`
+- Create: `crates/vault-v2-engine/src/engine/entropy.rs`
 - Create: `crates/vault-v2-engine/src/engine/platform.rs`
 - Create: `crates/vault-v2-engine/src/engine/recovery.rs`
 - Modify: `crates/vault-v2-engine/tests/public.rs`
+- Modify: `crates/vault-v2-engine/tests/ui.rs`
 - Add: `crates/vault-v2-engine/tests/ui/recovery_read_only.rs`
+- Add: `crates/vault-v2-engine/tests/ui/recovery_read_only.stderr`
 
 **Internal interfaces:** `DeviceDbkAad`, `PwkRecoveryKekAad`,
 `RecoveryDbkAad`, `NativeDeviceStore`, internal `TestOnlyDeviceStore`, fixed
-`RecoveryRecord`, and `RecoverySession<ReadOnly>`.
+`RecoveryRecord`, `PreparedInitialSlots`, `PreparedWrapperRotation`, and
+`RecoverySession<ReadOnly>`.
 
 - [ ] **Step 1: Write wrapper, root-independence, and typestate RED tests**
 
@@ -601,19 +630,84 @@ Tests must prove:
 - `RecoverySession<ReadOnly>` cannot compile a write, transaction, migration,
   wrapper rotation, device enrollment, effect, or raw SQL call.
 
+The downstream compile-fail suite proves only that the protocol-only library
+does not expose these binary-private types or operations. Binary unit tests and
+an AST/sealed-trait gate separately prove the real `RecoverySession<ReadOnly>`
+has no mutation transition; do not claim that an external test can name a
+private process type. Behavior tests read back
+`sqlite3_db_readonly(main) == 1` and `query_only == 1`, prove the authorizer
+rejects `query_only=OFF`, writes, and dangerous PRAGMAs, and temporarily remove
+each SQL-enforced layer so the corresponding test fails. The read-only open flag
+is not SQL-mutable; the factory verifies it independently with
+`sqlite3_db_readonly`.
+
+The outer `tests/ui.rs` harness MUST define exactly one named
+`#[test] fn recovery_read_only()` that invokes only
+`tests/ui/recovery_read_only.rs`. The focused gate first lists tests and rejects
+zero matches. The fixture first successfully references the public
+`ENGINE_PROTOCOL_VERSION`, proving the dependency crate resolved, and then must
+fail because the library target deliberately contains no `engine` item. The
+reviewed diagnostic is therefore E0432/E0433 for an absent item, not E0603; only
+an unresolved crate/package or a failure before the public sentinel is rejected.
+This proves the process engine is not linked into the protocol library, not the
+private recovery typestate's behavior. Binary unit/AST tests above prove the
+real private typestate has no mutation transition. Its checked-in
+`recovery_read_only.stderr` is generated and manually reviewed under Rust 1.97
+and contains the successful-crate/absent-engine diagnostic.
+
 Add strict `vault-v2/vault.slots` tests for RFC 0005's exact JCS shape: duplicate or
 unknown field, non-canonical JSON/Base64url/decimal, wrong ID/nonce/salt/tagged
 ciphertext length, wrong fixed version/epoch, trailing bytes, and the 256 KiB
 ceiling all fail before KDF/unwrap counters increment.
 
+The admission order is fixed and observable through private counters: bound
+bytes; parse directly into the closed typed record; reject duplicate/unknown
+fields and non-canonical JSON/Base64url/decimal/lengths; verify the external
+workspace/database binding; recompute the recovery-slot commitment from the
+parsed recovery subrecord; compare the stored and recomputed commitments; only
+then access keyring, allocate Argon2 memory, run the KDF, or unwrap. Tests must
+cover both a recovery-subrecord-only mutation and a coordinated mutation of the
+subrecord plus stored commitment.
+
 Add tests that delete, corrupt, or substitute the recovery subrecord and prove
 device unwrap fails because `DeviceDbkAad` binds the recomputed
 `recovery_slot_commitment`. A valid slot from another workspace/database must
-also fail. Password/RecoveryKEK rotation must atomically update recovery record,
-commitment, and device DBK wrapper and verify both routes. Injection of device
-store unavailability must leave the old complete sidecar and refuse rotation.
-A complete older valid sidecar may still open and is asserted as the documented
-rollback boundary, not misclassified as tamper detection.
+also fail. Password/RecoveryKEK rotation must create one in-memory,
+non-serializable `PreparedWrapperRotation` that contains the complete candidate
+record only after its canonical bytes reparse, both routes independently unwrap
+the same expected DBK, and that DBK opens the existing database. Injection of device
+store unavailability must return no prepared value and leave all durable state
+untouched. Task 2 has no sidecar write/rename/fsync/publish API; Task 4 is the
+only consumer that may publish a prepared rotation. A complete older valid
+sidecar may still open and is asserted as the documented rollback boundary,
+not misclassified as tamper detection.
+
+Internal fixture enrollment similarly returns a non-serializable
+`PreparedInitialSlots` only after both routes verify in the injected test store.
+It has no durable method and cannot be converted into a rotation. Real native
+enrollment remains blocked as specified below.
+
+Each prepared value carries a private `PreparedVerificationSecrets` only for
+the synchronous Task 4 handoff: zeroizing 32-byte PWK, expected RecoveryKEK,
+and expected DBK holders plus the sealed device-store access needed for the one
+bound credential tuple. It is `!Clone`, `!Debug`, `!Display`, `!Serialize`,
+`!Send`, `!Sync`, and `ZeroizeOnDrop`; neither secrets nor a derivative enter a
+journal. Task 4 consumes it to verify the bytes actually published and then
+immediately drops it. This lifetime is distinct from a returned read-only
+recovery session, which retains none of these Rust holders.
+
+Every Task 2 equality check between an unwrapped 32-byte DBK and the expected
+DBK uses only `subtle::ConstantTimeEq::ct_eq`; Task 4 uses the same path after
+publication. Secret holders implement no `PartialEq`, and a source/AST gate
+rejects ordinary `==`, iterator comparisons, or hand-written early-return byte
+loops over DBK material in either task.
+
+The prepared CAS state is exact rather than digest-based:
+`ExpectedSidecar::Absent` for initial publication, or the bounded canonical old
+sidecar bytes for a rotation, plus the bounded canonical new bytes. Task 4 must
+hold the writer lock, reread the current file, and require byte-for-byte equality
+with the expected absent/old state before replacement. No new generation hash is
+introduced.
 
 - [ ] **Step 2: Capture focused RED**
 
@@ -621,7 +715,8 @@ rollback boundary, not misclassified as tamper detection.
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::wrappers::tests --frozen -- --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::key_slots::tests --frozen -- --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::recovery::tests --frozen -- --nocapture
-./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui recovery_read_only --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui --frozen -- --list | rg -q '^recovery_read_only: test$'
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui recovery_read_only --frozen -- --exact --nocapture
 ```
 
 - [ ] **Step 3: Implement the minimal roots**
@@ -632,20 +727,87 @@ stand in for the three types. PWK wraps only RecoveryKEK. Each KEK wraps only a
 DBK record. Use zeroizing fixed buffers and externally coarsen password/tag
 failures to `RecoveryFailed`.
 
+Do not enable `argon2/alloc` or call its allocating convenience API. A private
+`ArgonWorkspace(Zeroizing<Vec<argon2::Block>>)` newtype owns the exact 65,536
+KiB work area. It starts empty, uses `try_reserve_exact(65_536)`, then resizes
+with zero blocks only after reserve succeeds. It derives no `Clone`, `Copy`,
+`Debug`, `Display`, `Serialize`, or `Deserialize`, and exposes only the narrow
+mutable-slice access required by Argon2. Static assertions pin those negative
+traits. Never convert it to a boxed slice, grow, shrink, clone, or otherwise
+trigger a second allocation after reservation. Construct Argon2id v0x13 with fixed
+`Params::new(65_536, 3, 4, Some(32))`, and call only
+`hash_password_into_with_memory`. Reject the fixed input/profile bounds before
+allocation; require the resulting length equals `Params::block_count()` before
+the call. `try_reserve_exact` failure is terminal and value-free. Unit tests
+inspect the exact production call path and prove the workspace and 32-byte PWK
+are zeroized on success and every error path.
+
+Use XChaCha20-Poly1305 detached in place over fixed-size zeroizing arrays through
+the non-deprecated `AeadInOut::encrypt_inout_detached` and
+`AeadInOut::decrypt_inout_detached` APIs. Do not enable the AEAD `alloc`
+convenience surface, call the deprecated `AeadInPlace` detached methods, or
+serialize secret-bearing success values. A source/AST gate pins the exact
+non-deprecated calls. Check in literal upstream and independently recomputed vectors
+for `DeviceDbkAad=206`, `PwkRecoveryKekAad=190`, and
+`RecoveryDbkAad=177` bytes and their ciphertexts. Program 1A accepts only
+`database_role=1`; role `2` is a reserved negative until Program 1B0 defines
+and reviews its version-2 AAD. The bounded wire records may serialize for the
+sidecar but implement neither `Debug` nor `Display`.
+
 Compute `recovery_slot_commitment` as the RFC's domain/version-prefixed SHA-256
 over the exact canonical recovery subrecord. Device open recomputes it before
 unwrap. Recovery record changes require an available DeviceKEK to create the
-new device wrapper; Program 1A's read-only recovery session exposes no rotation
-or enrollment shortcut. Do not add a reciprocal device commitment to recovery
-AAD.
+new device wrapper and return a verified `PreparedWrapperRotation`; Task 2 does
+not publish it. The stored commitment is never trusted: admission follows the
+fixed parse/recompute/compare order from Step 1 before keyring or KDF work.
+Program 1A's read-only recovery session exposes no rotation or enrollment
+shortcut. Do not add a reciprocal device commitment to recovery AAD.
 
-Use only `keyring::v1::Entry`, service
+One engine process invocation binds exactly one expected
+`(workspace_id, protector_id)` credential tuple. Use only
+`keyring::v1::Entry`, service
 `com.sovereign-founder-os.vault`, username
 `device-kek:<base64url-workspace-id>:<base64url-protector-id>`, and versioned
-secret `sfo-device-kek-v1:<base64url>`. Keep native adapter and test store
+binary secret `b"sfo-device-kek-v1\0" || DeviceKEK[32]` (exactly 50 bytes).
+Use only `set_secret`/`get_secret`, never password/string methods. Parse the
+returned `Vec<u8>` inside `Zeroizing`, require the exact prefix and length, and
+map upstream failures to value-free `DeviceStoreUnavailable`,
+`DeviceKeyMissing`, `DeviceRecordInvalid`, `DeviceProviderRecordInvalid`,
+`DeviceRecordAmbiguous`, or `DeviceStoreConfigurationInvalid` without retaining
+an upstream source. Map
+`NoEntry` to `DeviceKeyMissing`; only retrieved application fixed-prefix/length
+failures to `DeviceRecordInvalid`; `BadEncoding(Vec<u8>)` and
+`BadDataFormat(Vec<u8>, PlatformError)` to the distinct
+`DeviceProviderRecordInvalid`; `Ambiguous` to
+`DeviceRecordAmbiguous`; `TooLong` and
+`Invalid` to `DeviceStoreConfigurationInvalid`; and `PlatformFailure`,
+`NoStorageAccess`, `BadStoreFormat`, `NoDefaultStore`,
+`NotSupportedByStore`, plus unknown future variants to
+`DeviceStoreUnavailable`. Destructure and zeroize every owned
+`BadStoreFormat(reason)`, `TooLong(name, _)`, `Invalid(name, reason)`, and
+`NotSupportedByStore(reason)` `String`, plus every `BadEncoding(bytes)` byte
+vector, before mapping. For `BadDataFormat(mut bytes, source)`, zeroize `bytes`
+and drop `source` without formatting or retention before mapping. Entries and
+other boxed platform errors receive the same no-format/no-retain treatment.
+Exact injected-variant tests cover both `BadEncoding` and `BadDataFormat` and
+assert that their attached bytes are zeroized, the latter source is never
+formatted or retained, and the resulting error's `Debug`/source chain contains
+no canary. The
+dedicated engine thread initializes keyring v1
+once and creates exactly one `Entry` for its bound tuple; first initialization
+failure terminates the process and is never retried in-process. A different
+workspace/protector uses a fresh process; A/B tests use separate subprocesses or
+the injected store. `NativeDeviceStore` is private and `!Send + !Sync`. Keep the test store
 crate-private. Do not call sample-store or CLI provider selection helpers.
 Before adding any transitive provider feature, inspect Cargo metadata and amend
-the reviewed dependency profile.
+the reviewed dependency profile. Program 1A platform qualification exercises
+real native `set_secret`/`get_secret`/`delete_credential` only in an isolated
+namespace with cleanup; it does
+not publish a product enrollment. Cross-store native enrollment remains blocked
+until Program 1C0/1D defines the one-use owner-authorized journal/resume/cleanup
+protocol, so Task 2 must not call a native `set_secret` on a product path.
+The normal release dispatcher exposes only `get_secret`; set/delete entry points
+compile only into the isolated platform qualifier.
 
 Recovery opens the database read-only, applies `query_only=ON`, installs the
 fixed read authorizer, and exposes typed reads/integrity checks only to internal
@@ -653,14 +815,25 @@ tests and verification. It has no product presentation, arbitrary plaintext
 export, file write, or broker call. A separately authenticated,
 capability-bounded Program 1B1/1C0 broker owns any future owner-visible recovery
 presentation/export. Program 1A intentionally does not implement the
-owner-authorized transition to device enrollment.
+owner-authorized transition to device enrollment. Before returning the session,
+drop/zeroize the password, Argon workspace, PWK, RecoveryKEK, and recovered DBK;
+the Rust session retains no raw recovery/DBK holder or export path. SQLCipher
+necessarily retains its private internal key schedule until connection close;
+that residual process-memory boundary is stated rather than called erasure.
 
 - [ ] **Step 4: GREEN, negative mutation, and release-surface checks**
 
 Run focused tests. Temporarily reuse an AAD type, omit database role, expose a
-write method, and map missing record to unavailable; each intended test must
-fail. Build a release binary and inspect strings/symbols for test-store
-selection, task-secret environment names, raw keys, and file-key writers.
+write method, map missing record to unavailable, trust the stored commitment,
+enable an Argon2 allocating convenience path, retain one recovery secret in the
+returned read-only session, drop prepared verification secrets before Task 4,
+allow a second credential tuple in one process, or add a Task 2 sidecar writer;
+each intended test must fail. Until Task 4 supplies the only production
+consumer, apply a narrow `#[expect(dead_code, reason = "consumed by Program 1A Task 4")]`
+only to the private prepared production constructor/type; Task 4 must remove it.
+Never make the type public to silence the lint. Build a
+release binary and inspect strings/symbols for test-store selection, task-secret
+environment names, raw keys, and file-key writers.
 
 - [ ] **Step 5: Full gate, review, commit, push**
 
@@ -794,6 +967,26 @@ Add missing-key no-regeneration, missing manifest with ciphertext, duplicate,
 unlisted/missing file, symlink/hardlink, traversal, unknown field/name, oversize,
 wrong nonce/key/tag, and v2-failure-never-opens-v1 tests.
 
+Add two exactly named durable wrapper-publication tests here, not in Task 2:
+`engine::storage::tests::initial_publish_is_absent_or_new` and
+`engine::storage::tests::rotation_publish_is_expected_old_or_new`. The only
+publisher consumes a sealed `PreparedInitialSlots` or
+`PreparedWrapperRotation` under the retained capability directory and
+cooperating-writer lock, writes a new fixed-name sibling, fsyncs
+the file, atomically replaces `vault.slots`, fsyncs the directory, then reopens
+and verifies both device and recovery routes. For initial publication,
+failpoints before/after every write, sync, replace, directory sync, and reopen
+must yield exactly absent or the preverified new complete record. For rotation,
+they must yield exactly the byte-for-byte expected old or preverified new
+complete record. No arbitrary old record, partial record, unverified candidate,
+or replayed prepared value may become live. Initial publication requires the
+exact target to be absent; rotation rereads and byte-compares the current
+bounded canonical sidecar against the exact old bytes carried by the prepared
+value. A mismatch
+fails before writing; no generation digest substitutes for this CAS.
+Cross-directory/identity substitution and a second consumption of either
+prepared value must fail.
+
 Add the closed role mapping:
 
 ```text
@@ -825,6 +1018,10 @@ database binding must make every case terminal rather than invoke legacy.
 - [ ] **Step 2: Capture genuine RED on current code**
 
 ```bash
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine --frozen -- --list | rg -q '^engine::storage::tests::initial_publish_is_absent_or_new: test$'
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine --frozen -- --list | rg -q '^engine::storage::tests::rotation_publish_is_expected_old_or_new: test$'
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::storage::tests::initial_publish_is_absent_or_new --frozen -- --exact --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::storage::tests::rotation_publish_is_expected_old_or_new --frozen -- --exact --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::legacy::tests::missing_key_never_regenerates --frozen -- --exact --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::migration::tests::role_keys_block_activation --frozen -- --exact --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-adversarial-tests --test security_invariants vault_v2_failure_never_falls_back --frozen -- --exact --nocapture
@@ -846,6 +1043,20 @@ descriptor-relative. A malicious concurrent same-user process able to rename
 the private directory remains inside the trusted OS/process boundary; a custom
 VFS is out of scope because it would enlarge the unsafe pager TCB. Never
 relocate the current v1 root into a fictional `vault-v1/` directory.
+
+Implement the sole durable consumer of Task 2's sealed
+`PreparedInitialSlots`/`PreparedWrapperRotation` values in `storage.rs`. It performs the exact
+write-new/file-fsync/atomic-replace/directory-fsync/reopen-and-verify protocol
+above and returns only after both roots reopen the unchanged DBK. The prepared
+value is consuming, non-cloneable, non-serializable, and tied to the expected
+absent/old sidecar state, so it cannot be published twice or against a changed
+record. After publishing and reparsing the exact new bytes, the consumer uses
+the transient PWK/expected RecoveryKEK/expected DBK to verify the PWK wrapper
+and recovery DBK wrapper, obtains DeviceKEK only through the one bound store to
+verify the device DBK wrapper, constant-time compares both results with expected
+DBK through the exact direct `subtle = 2.6.1` dependency, opens the database,
+then immediately drops all prepared secrets. Nothing
+secret is journaled. No other module writes `vault.slots`.
 
 Internal test/verification fixtures provision both wrappers and create a new
 private sibling `workspace/vault-v2.staging-<opaque-random-id>/` containing only
