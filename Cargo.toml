@@ -53,7 +53,7 @@ aes-gcm = "0.10"
 base64 = "0.22"
 dirs = "5"
 clap = { version = "4", features = ["derive"] }
-wasmtime = { version = "=46.0.1", default-features = false, features = ["cranelift", "runtime", "std"] }
+wasmtime = { version = "=46.0.2", default-features = false, features = ["cranelift", "runtime", "std"] }
 coset = "=0.4.2"
 serde_json_canonicalizer = "=0.3.2"
 
