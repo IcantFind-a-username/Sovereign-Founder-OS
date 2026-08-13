@@ -1,6 +1,12 @@
 # 设计文档 04：GUI 设计 —— Founder Command Center 与可验证控制面板
 
-> **状态：** 产品设计草案。界面尚未实现，欢迎通过 issue 和 PR 参与讨论。
+> **状态：** Target 产品设计草案，不是当前功能清单或产品截图。当前只有窄范围的
+> loopback Command Center、Workspace 与 Security Center；真实本地模型、公共模型
+> 出站、加密备份/恢复、Owned Mesh 与多节点故障切换均未实现。
+
+本文统一使用：**Current**（仓库中已有且在限定边界内验证）、**Target**（已规划但
+未交付）、**Research**（尚待需求和协议验证）。未单独标注成熟度的完整页面线框均为
+Target。界面不得把 Target/Research 数据渲染成已经成功、已同步、已验证或安全。
 
 > 界面设计 · 2026-07
 >
@@ -19,7 +25,7 @@
 - AI 正在做什么
 - 哪些事情需要自己批准
 - 当前有哪些风险
-- 系统是否安全
+- 当前有哪些安全限制需要处理
 
 Crew Orchestrator 在内部自动完成组队，高级用户再进入开发者模式查看。
 
@@ -33,9 +39,11 @@ Crew Orchestrator 在内部自动完成组队，高级用户再进入开发者�
 
 增加：Agent 执行计划、模型选择、数据披露范围、工作流、自动化规则、权限配置、成本与质量指标。
 
-#### Security Mode —— 面向安全研究人员和管理员
+#### Security Mode —— 面向安全研究人员和管理员（Target）
 
-显示：节点状态、Capability Token、审计事件、密钥状态、数据复制、故障切换、Prompt Injection 告警、插件权限、网络活动。
+显示：Capability Token、审计事件、密钥状态、插件权限与网络活动；节点、数据复制和
+故障切换只在相应能力成为 Current 后出现。Owned Mesh 在此之前仅可显示为
+`Research / 本版本不可配置`，不能提供设置入口。
 
 **三种模式使用同一套数据，只是展示层级不同。**
 
@@ -63,7 +71,7 @@ Security
 
 ```text
 ┌──────────────────────────────────────────────────────┐
-│ Good morning, Founder                 System: Healthy │
+│ Good morning, Founder          Workspace: Review needed│
 │ Your business has 3 priorities today                 │
 ├───────────────────────────┬──────────────────────────┤
 │ Today                     │ Needs your approval      │
@@ -226,26 +234,31 @@ Annual filing due in 42 days.
 
 ## 七、Security：安全状态中心
 
-对普通用户必须足够直观：
+对普通用户必须足够直观。下面是 Target 信息架构，不是当前安全结论：
 
 ```text
-Security Score: 87 / 100
-Status: Protected
+Security posture: Action required
+Vault: Experimental legacy format (key stored beside data)
+Encrypted backup: Not available in this version
+Owned nodes: Research — not configurable
 ```
 
-下方只显示几类信息：数据是否已加密、是否完成备份、是否存在异常登录、是否有插件越权、模型是否尝试访问敏感数据、是否有节点失效、最近是否成功完成恢复测试。
+下方只显示几类信息：当前加密边界、备份是否可用、是否存在异常登录、是否有插件越权、
+模型是否尝试访问敏感数据、节点能力是否可用、最近是否真正完成恢复测试。每一项都从
+当前证据派生；尚未交付时显示 `Unavailable / Target / Research`，不能显示绿色成功态。
 
-例如：
+例如，只有当 Target broker/evidence 路径能够证明结论时才显示：
 
 ```text
-Blocked threat
+Blocked attempt [Target example]
 
 A document attempted to instruct the AI to upload your
 customer database to an external website.
 
-Result: Blocked
-Data exposed: None
-Action required: No
+Result: Rejected before broker dispatch
+Broker observations: 0
+Evidence scope: Supported runtime path only
+Action required: Review source document
 ```
 
 高级模式再展示完整事件链和策略决策。
@@ -282,17 +295,24 @@ Permission expires in 5 minutes.
 
 ## 九、全局隐私指示器
 
-每个 AI 任务旁边显示数据使用情况：
+每个 AI 任务旁边显示数据使用情况。Current 确定性演示必须写成：
 
 ```text
-Privacy: Local only
+Privacy: Local deterministic demo [Current]
+No external model contacted; not real AI
+```
+
+Target 真实本地模型或外部 projection 则分别显示其成熟度：
+
+```text
+Privacy: Local only [Target real model]
 ```
 
 或：
 
 ```text
-Privacy: Cloud-assisted
-2 anonymized fields will be shared
+Privacy: External projection proposed [Target]
+The exact approved values listed below would be shared
 ```
 
 用户点击后可以看到：发送给谁、发送什么、为什么、是否保存、使用哪个模型、是否能够切换为本地运行。
@@ -301,41 +321,45 @@ Privacy: Cloud-assisted
 
 ---
 
-## 十、节点和故障切换界面
+## 十、节点和故障切换界面（Target / Research）
 
-普通用户只需要看到：
+Current 没有真实 provider 自动故障切换、恢复节点、加密备份恢复或 Secure Mesh。
+以下状态只有对应测试、协议和恢复证据通过后才能启用；不能用模拟数据冒充设备状态。
+
+普通用户未来只需要看到：
 
 ```text
 System resilience
 
-Primary model       Healthy
-Backup model        Ready
-Local model         Ready
-Main device         Online
-Recovery node       Synced 2 minutes ago
-Encrypted backup    Verified today
+Primary model       Target — not configured
+Backup model        Target — not configured
+Local model         Current demo / Target real model unavailable
+Local installation  Current prototype — no authenticated owner/device session
+Recovery node       Research — unavailable
+Encrypted backup    Target — unavailable
 ```
 
-故障发生时：
+Target provider broker交付并能证明实际路由结果后，故障文案可以是：
 
 ```text
 Primary AI provider is unavailable.
 
-Your work has automatically continued using Backup Provider B.
-No data was lost.
-Expected quality: Normal
+The approved projection was not sent to Provider A.
+Provider B is eligible under the same policy; review the exact route before retry.
+Protected local context remains on this device.
 ```
 
-进入高级界面后，再展示完整 Mesh：
+完整 Mesh 仍是 Research，不提供配置入口：
 
 ```text
-Desktop Node
+[Research] Desktop Node
     ↕
-Encrypted NAS Replica
+[Research] Encrypted NAS Replica
     ↕
-Blind Cloud Backup
+[Research] Blind storage relay
 
-Model A → Model B → Local Model
+[Target] Model A → Model B
+[Target] Verified local model
 ```
 
 ---
@@ -361,10 +385,13 @@ Model A → Model B → Local Model
 ### Step 3：隐私偏好
 
 ```text
-Maximum privacy —— Mostly local, slower
-Balanced —— Local data protection with approved cloud models
-Performance —— Use stronger cloud models when needed
+Local Only [Target] —— 本任务的数据不离开当前设备；算力不足则等待或缩小任务
+Auto Protect [Target] —— 优先本地；仅在逐值预览批准后使用外部 projection
+Professional [Target] —— 在同一安全基线上进一步收窄用途、接收方和保留约束
 ```
+
+Owned Mesh 是 Research，不出现在可选预设中。任何外部 projection 都显示精确接收方、
+精确批准值、用途和失败行为；不能用“匿名化”作为通用安全承诺。
 
 ### Step 4：连接工具（全部可跳过）
 
@@ -431,15 +458,19 @@ Tauri 比 Electron 更适合这个定位：安装包较小、与 Rust 安全内�
 
 ### Playground Profile
 
-使用虚拟公司、固定示例工作流、展示模型切换、展示恶意插件阻断、展示节点恢复、不连接真实资产。
+**Target 演示：** 使用虚拟公司、固定示例工作流和明确标注的模拟事件；模型切换、恶意
+插件阻断或恢复演练必须显示 `Simulation`，不能作为真实节点、备份或安全状态证据。
 
 ### Community Profile
 
-真实本地数据、本地 Vault、多模型、本地模型、MCP、基础 Founder OS、完整数据导出。
+**Current / Target 混合：** Current 仅指仓库已验证的本地工作区、legacy Vault 原型和
+数据导出；多模型、真实本地模型、MCP 写操作、Vault v2 与可恢复备份分别等待各自
+Target gate。
 
 ### High-Assurance Profile
 
-增加：多节点、多人审批、HSM、SIEM、企业身份、高级审计。
+**Research：** 多节点、多人审批、HSM、SIEM、企业身份与高级审计。需求、协议和部署
+证据通过前不显示为可购买、可配置或已保护状态。
 
 所有 Profile 使用相同组件和设计语言。
 
@@ -454,7 +485,7 @@ Tauri 比 Electron 更适合这个定位：安装包较小、与 Rust 安全内�
 3. **Work Detail**
 4. **Approval Center**
 5. **Security Center**
-6. **Settings / Models / Backup**
+6. **Settings / Models / Backup**（Target；Current 只显示诚实状态，不提供未实现动作）
 
 客户、财务、法务等复杂页面可以先以卡片和任务形式进入 Work Detail。
 
@@ -465,8 +496,8 @@ Tauri 比 Electron 更适合这个定位：安装包较小、与 Rust 安全内�
 → 输入经营目标
 → AI 生成工作计划
 → 查看 Crew 执行
-→ 模型发生故障并切换
-→ 恶意操作被阻止
+→ [Simulation] 模型发生故障并切换
+→ [Simulation] 恶意操作被阻止
 → 用户审批安全动作
 → 查看审计记录
 ```

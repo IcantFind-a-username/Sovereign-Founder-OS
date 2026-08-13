@@ -52,9 +52,9 @@ Sandbox escape vulnerabilities in the chosen engine remain possible. Process iso
 
 ## Execution Classes
 
-| Risk class | Current Stage 1 foundation | Target backend |
+| Risk class | Current developer-preview foundation | Target backend |
 | --- | --- | --- |
-| Pure local computation | Publisher-verified import-free Core Wasm using `sovereign_core_wasm_v1`; exact V2 binding; no guest-input delivery or host effects | Wasmtime Component with reviewed WIT world |
+| Pure local computation | Publisher-verified and locally admitted import-free Core Wasm; exact V2 binding; authenticated input through `sovereign_core_wasm_v2`; no guest host effects | Wasmtime Component with reviewed WIT world |
 | Low-risk constrained plugin | Denied | Wasmtime Component plus explicit capability host interfaces |
 | High-risk/native tool | Denied | Ephemeral container or micro-VM |
 | Unknown or undeclared | Denied | None |
@@ -70,7 +70,7 @@ publisher_key_id
 component_digest
 backend = core_wasm
 risk_class = pure_compute
-abi = sovereign_core_wasm_v1
+abi = sovereign_core_wasm_v1 | sovereign_core_wasm_v2
 entrypoint = sovereign_run
 requested_host_capabilities = []
 operations[]
@@ -120,9 +120,10 @@ COSE signature verification uses the standard `Signature1` structure and a non-e
 content-type                                           external AAD                              status
 application/sovereign.plugin-manifest+json;v=1         sovereign:plugin-manifest:v1              implemented
 application/sovereign.capability+json;v=2              sovereign:capability:v2                   implemented
+application/sovereign.approval+json;v=1                sovereign:approval:v1                     implemented primitive; owner ceremony absent
 application/sovereign.artifact-admission+json;v=1      sovereign:artifact-admission:v1           implemented
 application/sovereign.audit-event+json;v=1             sovereign:audit-event:v1                  primitive only; ledger migration pending
-application/sovereign.compiled-cache-record+json;v=1  sovereign:compiled-cache-record:v1        target
+application/sovereign.compiled-cache-record+json;v=1  sovereign:compiled-cache-record:v1        partial primitive
 ```
 
 The strings above are exact UTF-8 byte sequences, with no trailing NUL or newline. A signature valid for one role must be invalid for every other role even if the JSON fields happen to be identical. COSE protected headers use deterministic CBOR encoding. Raw `serde_json` field order, pretty-printed JSON, or a signature over a digest without its role domain is not a protocol encoding.
@@ -131,7 +132,7 @@ Component identity remains the ordinary SHA-256 digest of the owned component by
 
 ## Key Roles and Trust Resolution
 
-Key trust is resolved by `(role, kid)`, never by `kid` alone and never by a public key carried in an untrusted object. The initial roles are publisher signing, local artifact admission, capability issuance, device audit, and compiled-cache attestation. Trusting a key for one role grants no trust in another role. Production deployments should use distinct keys for these roles; key reuse must not create implicit cross-role authority.
+Key trust is resolved by `(role, kid)`, never by `kid` alone and never by a public key carried in an untrusted object. The initial roles are publisher signing, local artifact admission, capability issuance, approval authorization (RFC 0003), device audit, and compiled-cache attestation. Trusting a key for one role grants no trust in another role. Production deployments should use distinct keys for these roles; key reuse must not create implicit cross-role authority.
 
 For the first protocol version, `kid` is the full 32-byte SHA-256 result over a versioned key-ID domain, the signing role, the Ed25519 algorithm identifier, and the canonical public-key bytes. It is never truncated. COSE carries the raw 32 bytes; JSON claims repeat it as exactly 64 lowercase hexadecimal digits. The current in-memory trust record contains issuer, status, activation/expiry, and the verifying key. Tool/venture scope, durable revocation metadata, and persistence remain target fields. Resolution is fail-closed and proceeds as follows:
 
@@ -219,9 +220,35 @@ target architecture and operating-system ABI
 WIT world or core ABI identifier
 ```
 
-The cache record additionally binds the compiled-blob digest and is signed under the compiled-cache role. Before any unsafe engine deserialization, the runtime verifies the cache-record COSE envelope, role, engine/configuration identity, target identity, and compiled bytes. A missing, mutable, unsigned, mismatched, symlinked, or poisoned cache entry is rejected and quarantined. It is never trusted because it resides under a digest-shaped filename. This is implemented by `CompiledCache`.
+The target cache record additionally binds the compiled-blob digest and is
+signed under the compiled-cache role. Before unsafe engine deserialization,
+the target verifier checks the cache-record envelope, role, exact engine and
+configuration, target/ABI, and compiled bytes. A missing, mutable, unsigned,
+mismatched, symlinked, or poisoned entry is rejected and quarantined. It is
+never trusted because it resides under a digest-shaped filename.
 
-The current branch now has a trusted compiled cache (opt-in per executor): each entry is the serialized module plus a COSE record signed under the compiled-cache role binding the engine identity, the source component digest, and the compiled-blob digest; on lookup the record is verified against the owner's cache trust store, every field is checked and the blob rehashed before the unsafe deserialize, and any missing, non-regular, symlinked, oversized, unsigned, foreign-role, mismatched, or tampered entry is quarantined and treated as a miss so the caller recompiles. It does provide an optional killable, resource-limited compilation worker: when the executor is configured with one, `Module::from_binary` runs in a short-lived child process the parent caps (Unix `RLIMIT_AS`) and kills on a wall-clock deadline, the worker rehashes the bytes against their expected digest before compiling, and a crashed, killed, non-zero, or malformed worker fails closed. The worker returns the serialized module, which the parent deserializes with its own engine; without an attached worker, compilation remains in-process (Phase A). A trusted on-disk compiled cache with a signed cache record is still absent, so worker output is never persisted across runs. It also has no durable Authority Store: replay/use accounting is process-local and cannot protect across restart or concurrent processes. Consequently, the V2 slice on this branch remains pure-compute only. It delivers authenticated canonical input to core-Wasm v2 guests but has no full Component/WIT input ABI and no effectful host calls. Exact binding on this branch can prove authorization data relationships, but it does not make those missing execution and durability boundaries complete.
+The current branch has a **partial** signed compiled-cache primitive and a killable,
+resource-limited compilation worker, both opt-in per executor. Cache entries
+contain a serialized module plus a COSE record under the compiled-cache role;
+lookup verifies the trusted signer and its limited bound fields, rehashes the blob, and
+quarantines malformed, symlinked, oversized, unsigned, mismatched, or tampered
+entries before deserialization. When configured, the worker rehashes the
+owned input, compiles in a capped short-lived child, and fails closed on
+timeout, crash, non-zero exit, or malformed output. Without an attached
+worker, compilation remains in-process; the Workspace product path does not
+yet attach the worker/cache. The current key/record binds a fixed engine label,
+component digest, and blob digest only. It does not yet bind the manifest,
+exact engine/compiler configuration, target ABI, or reject every unknown
+record field as the target protocol requires.
+
+The durable Authority Store also exists and can be attached for cross-process
+individual token, approval, and idempotency claims; validators remain
+process-local by default. The complete three-claim reservation is not one
+transaction and revocation is not implemented. The verified slice remains
+pure computation: Core Wasm v2 receives authenticated canonical input, but
+there is no general Component/WIT ABI or guest-invoked host effect. These
+primitives do not make the missing execution and durability boundaries
+complete.
 
 ## Component Interface
 
@@ -294,23 +321,46 @@ Stage 1 initially provides neither network nor filesystem interfaces.
 
 Future filesystem access uses virtual grant handles rooted by the host, rejects symlink and traversal escape, and exposes only specific read or output capabilities. Future network access uses an egress broker that revalidates resolved IPs, redirects, TLS identity, data classification, and disclosure records on every request.
 
-Until those brokers exist, manifests requesting filesystem or network access are rejected. As a first host-mediated effect, the `sovereign-effects` crate provides an owner-controlled local outbox: the trusted host — never guest code — writes an approved document to a rooted, single-component, atomically-written file after the full authorization chain has succeeded. It performs no network effect, refuses Red data and symlink/traversal escape, and is the reference shape for the Phase D "one local reference tool with opaque grants".
+Until those brokers exist, manifests requesting filesystem or network access
+are rejected. The `sovereign-effects` crate is an **Experimental host
+orchestration prototype**: trusted host code—not the guest—writes a document
+to a rooted, single-component, atomically replaced local outbox file after the
+current authorization-preparation path. It performs no network effect and
+refuses Red data and symlink/traversal escape. The broker accepts raw
+classification/content rather than an opaque grant, the capability does not
+bind final recipient/bytes, and the execution journal ends before the write.
+It therefore does not satisfy exact-effect binding, durable effect-intent
+ordering, or Phase D's opaque-grant gate.
 
 Red data can never enter a network grant. Amber disclosure requires minimization, preview, and evidence. Personal data is never written to a public blockchain.
 
 ## Authorization and Replay
 
-The runtime uses a durable Authority Store. Validation and reservation/consumption are a single atomic operation across processes. The store tracks token status, uses, expiry, revocation, policy and approval evidence, and idempotency keys.
+The target runtime MUST use a durable Authority Store in which validation and
+reservation/consumption form one recoverable transaction across processes. It
+tracks token status, uses, expiry, revocation, policy/approval commitments, and
+idempotency keys.
 
-An unavailable Authority Store denies execution. Process-local counters are not sufficient for Capability V2.
+An unavailable Authority Store denies effectful or production Capability V2
+execution. Process-local counters are permitted only for the explicitly
+experimental pure-compute backend and can never authorize a host effect.
 
-The durable Authority Store now exists (`sovereign-authority`): consumption of tokens, approvals, and idempotency keys is a crash-safe atomic filesystem claim shared across processes, and an unavailable or corrupt store denies execution. Validators without an attached store remain process-local, and V2 tokens stay restricted to pure computation until crash-safe audit ordering and reviewed host interfaces also exist.
+The current `sovereign-authority` primitive persists token, idempotency, and
+approval claims as three sequential atomic filesystem operations; partial
+failure burns earlier claims and fails closed. It has no transaction or
+revocation API. Approval retention is currently derived from the shorter
+capability expiry rather than approval expiry, so approval one-use is not yet
+restart-safe after purge. Tests cover reopen behavior and concurrent threads,
+not a true subprocess race for all three claim types. Validators without an
+attached store remain process-local. V2 tokens stay restricted to pure
+computation until this gap, crash-safe effect ordering, and reviewed host
+interfaces are complete.
 
 Production time comes from a trusted runtime clock. An untrusted caller cannot provide the validation timestamp.
 
 ## Audit Ordering
 
-Execution ordering is:
+Target effectful execution ordering is:
 
 ```text
 ExecutionRequested (hashes only)
@@ -323,9 +373,19 @@ ExecutionRequested (hashes only)
 
 Each external host effect has its own durable intent before the effect. If intent evidence cannot be persisted, execution is denied. If the external effect may have occurred but result evidence cannot be persisted, the outcome is `Indeterminate` and automatic retry is forbidden.
 
-The `sovereign-execution` crate implements this ordering for the verified executor: a per-execution append-only journal records intent (hashes only) and flushes it before the capability is consumed, records `ExecutionStarted` after consumption, and records a terminal `Completed`/`Failed` verdict after the guest returns. A crash between intent and terminal record recovers as `Indeterminate`, and recovery only reports state — it never re-executes. This journal is lifecycle evidence for the pure-compute path; migrating the signed audit ledger to the COSE audit role and binding host-effect intent to it remain Phase C work.
+The current `sovereign-execution` pure-compute journal has a narrower schema:
+intent contains execution ID, component/input digests, and timestamp; terminal
+records contain a result hash or failure string. It flushes intent before
+capability consumption, records `Started` after consumption, and then
+`Completed`/`Failed` after the guest returns. Reading a crash with no terminal
+record returns the `Started` marker; callers must treat it as indeterminate and
+reconcile it. The crate does not itself normalize that state or retry. Migrating
+the signed audit ledger to the COSE audit role and binding host-effect intent to
+it remain Phase C work.
 
-Evidence includes execution and idempotency IDs, policy/token/approval IDs, artifact and invocation digests, runtime configuration digest, resource-use metrics, host effects, result hash, and stable failure codes.
+Target effect evidence additionally includes idempotency, policy/token/approval
+IDs, manifest/invocation/configuration digests, resource metrics, host effects,
+result hash, and stable failure codes.
 
 ## Stable Failure Classes
 
@@ -364,7 +424,18 @@ Completion requires genuine malicious fixtures covering:
 - trap and timeout evidence;
 - V1-to-V2, worker-to-in-process, component-to-core, and high-risk-to-Wasm backend downgrade attempts.
 
-Current tests cover the Phase A Wasm ceilings plus the implemented foundation's role separation, trust state, publisher envelope, strict/duplicate fields, artifact/manifest/input/resource substitution, immutable snapshots, canonical key-order equivalence, Capability V1/V2 separation, exact allowlists, same-process replay/idempotency, approval fail-closed behavior, Core-Wasm downgrade rejection, and guest-failure consumption. Admission-store tests cover on-disk component and manifest substitution, record tampering and cross-role signature reuse, untrusted/revoked/expired admission keys, trusted-key forged-field claims, poisoned content-addressed entries, duplicate admission, orphan temporary files, and symlinked entries. Executor consumption of admitted artifacts, cache poisoning, restart/cross-process replay, durable audit-intent ordering, Component/WIT behavior, and effectful host interfaces remain completion-gate work.
+Current tests cover the Phase A Wasm ceilings plus role separation, trust state,
+publisher envelopes, strict/duplicate fields, artifact/manifest/input/resource
+substitution, immutable snapshots, canonical key-order equivalence, Capability
+V1/V2 separation, exact allowlists, approval fail-closed behavior, authenticated
+Core Wasm v2 input, downgrade rejection, and guest-failure consumption.
+Admission and executor tests cover on-disk substitution, record tampering,
+cross-role signatures, poisoned/symlinked entries, mandatory admitted handles,
+cache poisoning, store reopen, and concurrent token claims across threads.
+Mandatory worker/cache wiring on product paths, full cache-record binding and
+strict parsing, real subprocess claim races, approval retention, transactional
+authorization and revocation, durable effect-intent ordering, Component/WIT
+behavior, and capability-bound host interfaces remain completion-gate work.
 
 ## Implementation Phases
 
@@ -387,7 +458,14 @@ Phase A alone proves core-Wasm isolation mechanics only; it does not verify publ
 - Capability V2 exact execution claim.
 - Digest-addressed compiled artifact cache and killable resource-limited compilation workers.
 
-The current branch implements only a pure-compute, process-local subset of these requirements. It does **not** complete Phase B. The Component/WIT input ABI and effectful host-call interfaces remain unimplemented. (The durable Authority Store, a killable resource-limited compiler worker, and a trusted signed compiled cache now exist.) None may be represented as available through documentation, runtime flags, compatibility fallback, or a V2 token until its corresponding adversarial tests and completion gate pass.
+The current branch implements the Core Wasm pure-compute subset of these
+requirements, including local admission, authenticated v2 input, the optional
+worker/cache, and optional durable Authority Store attachment. It does **not**
+complete the production extension boundary: Component/WIT and effectful
+host-call interfaces remain unimplemented, and product paths do not yet
+mandate every optional hardening component. None may be represented as a
+general plugin/effect boundary until its adversarial tests and completion gate
+pass.
 
 ### Phase C — Durable Authorization and Evidence
 

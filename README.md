@@ -1,7 +1,7 @@
 # Sovereign Founder OS
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Stage](https://img.shields.io/badge/Stage-1%20Secure%20Kernel-orange)](ROADMAP.md)
+[![Maturity](https://img.shields.io/badge/Maturity-Developer%20Preview-orange)](ROADMAP.md)
 
 > **Build and run your one-person company with AI—without giving up control of your data, decisions, or business.**
 
@@ -43,9 +43,14 @@ Users see goals, decisions, approvals, progress, and the next action—not agent
 
 The **Sovereign Enterprise Graph** will be the structured source of truth beneath these modules: the founder, products, customers, projects, contracts, invoices, knowledge, metrics, risks, and decisions—not a pile of chat history.
 
-## Scope and First Users
+## Scope and Users
 
-The first users are people exploring or operating a one-person business: freelancers, independent consultants and creators, digital service providers, and Micro-SaaS founders. The initial jurisdiction focus is Singapore, with expansion intended through versioned Jurisdiction Packs.
+The long-term audience is people exploring or operating a one-person business:
+freelancers, independent consultants and creators, digital service providers,
+and Micro-SaaS founders. Initial workflow validation focuses on **independent
+consultants** rather than claiming to serve all of these groups at once. The
+first candidate jurisdiction is Singapore, with later expansion through
+versioned Jurisdiction Packs.
 
 Sovereign Founder OS is not a multi-agent chat room, an autonomous lawyer, or a substitute for a founder's judgment and licensed professional advice. It will not put personal business data on a blockchain or promise absolute security.
 
@@ -58,11 +63,14 @@ Business automation becomes dangerous when a model, plugin, cloud account, or pl
 - AI must not grant itself authority; important actions must require independently enforced policy and, when needed, human approval
 - Plugins and external content must be treated as untrusted by default
 - Important actions must leave tamper-evident, understandable evidence
-- Workflows are designed to recover from model, process, node, and provider failure
+- Workflows recover locally from covered process/model failure today;
+  node/provider resilience remains a measured target or research question
 - Core security, export, audit, and recovery will not be premium-only features
 - Security limitations must be stated openly; the project will not claim absolute security
 
-> **Defining demo target:** Kill the model, the server, and the plugin. **The company keeps running.**
+> **Long-term resilience benchmark:** Kill the model, the server, and the
+> plugin. **The company keeps running.** This is a research target, not a
+> current claim.
 
 Read the **[Sovereign Founder OS Manifesto →](MANIFESTO.md)** for the principles we will not compromise.
 
@@ -84,7 +92,7 @@ Read the **[Sovereign Founder OS Manifesto →](MANIFESTO.md)** for the principl
 | **Sovereign Enterprise Graph** | Canonical structured digital twin of the company — not chat history |
 | **Mutually Constrained Autonomy** | Planner, Policy Guard, Executor, Auditor, Recovery Controller, Human Owner — no single node holds all power |
 | **Capability Tokens** | Short-lived, scoped execution permissions; durable token revocation is a target capability |
-| **Resilient Trust Mesh** *(planned)* | Target multi-node trust architecture; the Recovery Mesh is its replication and failover subsystem |
+| **Resilient Trust Mesh** *(research)* | Possible future multi-node trust architecture, pursued only for a measured availability need |
 
 ## Documentation
 
@@ -99,7 +107,7 @@ Read the **[Sovereign Founder OS Manifesto →](MANIFESTO.md)** for the principl
 | [MANIFESTO.md](MANIFESTO.md) | The Sovereign Founder OS position and non-negotiable principles |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | Threat model v0.1 |
-| [ROADMAP.md](ROADMAP.md) | Development roadmap (Stage 0–7) |
+| [ROADMAP.md](ROADMAP.md) | Outcome-led development roadmap (v0.1–v1.0) |
 | [docs/INDEX.md](docs/INDEX.md) | Full documentation map |
 
 ### Design Notes and Project History
@@ -118,7 +126,7 @@ Specialist designs, product drafts, positioning, and historical documents live u
 ## See It
 
 The local app (`sovereign ui`, English/中文) — your business state in an
-encrypted local vault, every send request stopped for human approval, and a
+encrypted local vault, every send request stopped at an approval decision, and a
 one-click attack gauntlet where every denial is a real enforcement path:
 
 | Founder Workspace (工作台) | Security Center |
@@ -141,108 +149,79 @@ when versions are tagged — download, unpack, and run `sovereign ui`.
 
 ## Current Status
 
-**Stage 1: Secure Kernel** — in active development.
+Sovereign Founder OS is a **Developer Preview / pre-release**. No tagged
+release is evidenced in this repository yet. The current product is a narrow,
+local founder workflow backed by substantial security primitives—not the full
+Founder OS and not a production security boundary.
 
-```text
-crates/
-  contracts/      shared types (events, tokens, policy)
-  identity/       device keys and signing
-  artifact/       signed manifests, exact invocation preparation, local admission store
-  audit-ledger/   append-only signed event log
-  authority/      durable cross-process one-use consumption (tokens, approvals, idempotency)
-  execution/      crash-safe execution journal (durable intent, Indeterminate recovery)
-  effects/        audited local outbox file-write broker (first host effect)
-  model/          model gateway: routing, health, failover, disclosure records
-  workflow/       durable checkpointed workflows with idempotent crash resume
-  policy/         deterministic permission engine
-  capability/     legacy V1 and exact-bound Capability V2 tokens
-  vault/          local encrypted storage
-  sandbox/        Phase A isolation + verified V2 pure-compute path
-apps/
-  cli/            sovereign CLI
-```
+The loopback web app (`sovereign ui`, English/中文) currently provides:
+
+- a business-state read-only **Command Center** with business counts, pending
+  decisions, deterministic guidance, and evidence summaries. Current first/open
+  GET paths may initialize the co-located device/Vault key files, so this is not
+  yet an authenticated, side-effect-free read boundary;
+- a **Workspace** for one company profile, append-only customers, fixed local
+  Offer/Invoice templates, a deterministic drafting stand-in, approval or
+  rejection, local RFC 5322 `.eml` composition, revocation of that local file,
+  an unauthenticated local manual-delivery marker, and plaintext JSON export;
+- a **Security Center** for identity/vault metadata, audit verification,
+  disclosure and admission records, state reconciliation, and an in-memory
+  adversarial gauntlet.
+
+The approved-composition path assembles real publisher verification, local
+artifact admission, deterministic policy, signed approval evidence,
+Capability V2, durable one-use authority claims, an execution journal,
+import-free Wasmtime computation, a rooted local outbox write, and signed
+hash-chain evidence. Its present boundary is **Experimental**:
+
+- the backend creates the owner signature after an unauthenticated local API
+  decision; independent owner-presence authentication is not implemented;
+- the capability binds document/resource preparation, but not the final
+  recipient and exact RFC 5322 bytes;
+- the execution journal finishes before the trusted host writes the outbox
+  file, so this is not yet an exact capability-bound effect protocol;
+- the app performs no network send; “delivered” is only a locally entered,
+  unauthenticated marker that someone says the file was sent manually.
+
+The current Model Gateway and workflow demo are also experimental foundations.
+Model providers are deterministic stand-ins rather than LLMs, and caller-owned
+classification/provider self-reported trust must be removed before any real
+public egress. Workflow recovery is another runner over the same durable
+directory, not replicated multi-machine failover. See
+[RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) for the approved privacy
+implementation target.
 
 Run locally:
 
 ```bash
-cargo test --workspace
+cargo test --workspace --locked
 cargo run -p sovereign-cli -- init
 cargo run -p sovereign-cli -- sandbox-check
-cargo run -p sovereign-cli -- demo          # add --fast to skip the pauses
-cargo run -p sovereign-cli -- ui            # local app at http://127.0.0.1:7787
-cargo run -p sovereign-cli -- model-check   # model failover + Red-data guard
-cargo run -p sovereign-cli -- workflow-demo # crash-safe workflow resume
-cargo run -p sovereign-cli -- verify-export backup.json  # offline backup verification
-cargo run -p sovereign-cli -- integrity     # self-audit: state vs. the signed chain
+cargo run -p sovereign-cli -- demo --fast
+cargo run -p sovereign-cli -- ui
+cargo run -p sovereign-cli -- model-check
+cargo run -p sovereign-cli -- workflow-demo
+cargo run -p sovereign-cli -- verify-export export.json
+cargo run -p sovereign-cli -- integrity
 ```
 
-`demo` is a story-driven walkthrough of the secure kernel: it creates your
-local trust root, installs a signed plugin through publisher verification and
-local admission, executes it under an exact one-use Capability V2 inside the
-Wasmtime sandbox, records signed audit evidence, and then runs a seven-attack
-gauntlet (supply-chain tampering, token replay, input substitution, greedy
-manifests, infinite loops, red-data exfiltration, approval bypass, and audit
-tampering) — every denial is a real enforcement path, not a mock.
+Important current limitations:
 
-`ui` serves the local app on 127.0.0.1 only (English/中文). It has three views:
+- the loopback server rejects foreign `Host` headers and non-JSON mutations,
+  but has no authenticated owner session; local callers can read decrypted
+  workspace/export data through its API (private keys are not exposed there);
+- the vault encrypts entries, but its master key is stored beside the data;
+- export is plaintext workspace/audit JSON, not an encrypted backup or restore
+  package, and integrity reconciliation does not bind every workspace field;
+- customer/document editing, real models, network effects, clean-machine
+  restore, Component/WIT plugins, and broader business modules remain targets;
+  Secure Mesh remains Research.
 
-- **Command Center** — the product face: your business at a glance (company,
-  customers, documents), the decisions waiting only on you (approve or reject in
-  place), and a kernel-evidence panel (audit-chain health, signed approvals,
-  model disclosures, admitted plugins). It is strictly read-only aggregation —
-  every number is re-derivable from your export, and opening the view writes
-  nothing and makes no new claim.
-- **Workspace** — the first usable product slice: create your company profile,
-  add customers, generate offer and invoice drafts (local templates, no model),
-  ask the local drafting assistant (deterministic, not an LLM, routed through
-  the resilient model gateway) to suggest outreach text — a suggestion that is
-  never saved to authoritative state and whose only footprint is an audited
-  disclosure — request to send a document (which always stops in the Approval
-  Center for the human owner), export every byte of your business state as one
-  JSON file, and verify any such backup — this machine or another — entirely
-  offline (format, the audit history's cryptographic binding to the device that
-  signed it, and full re-computation of the signed chain). State lives in the
-  encrypted vault; every change passes the policy engine and appends a signed
-  audit event. Approving a send authorizes one exact sandboxed execution that
-  composes the document into a well-formed RFC 5322 email and writes it to a
-  local `outbox/*.eml` file (a real, audited host effect) — addressed to the
-  customer's email if set, otherwise an RFC 2606 placeholder, and always marked
-  "composed locally, not transmitted" — and records the signed evidence;
-  Stage 1 performs no *network* effects — nothing leaves the device. The effect
-  is genuinely revocable: revoking an approved send deletes the `.eml` and
-  records a signed `effect.revoked` event, while the approval evidence is kept
-  as history. The lifecycle closes honestly: an approved send is either revoked
-  or marked delivered — the latter your own attestation that you sent the
-  composed `.eml`, recorded as a signed `delivery.confirmed` event, since
-  Stage 1 sends nothing over the network and never claims to. The whole
-  approval runs as a durable, checkpointed workflow with crash-consistent
-  persistence underneath: state and chain files are replaced atomically,
-  every operation commits audit-first (its events land on the chain in one
-  durable write before the state), and a crash at any point — mid-execution,
-  between effect and commit, or mid-commit — resumes on the next attempt
-  without losing or double-running the effect; the integrity self-audit
-  reports an interrupted tail operation as a retryable warning, distinct
-  from tampering.
-- **Security Center** — device identity, vault entries, admitted plugins
-  (verified from the content-addressed store), the signed audit chain, a
-  state-integrity self-audit that reconciles your authoritative state against
-  that chain (proving every approved, revoked, or delivered document — and every
-  customer — has the signed event that should back it, and failing closed if the
-  chain does not verify), a data-disclosure log of every time a model provider
-  was shown customer data (which provider, whether the data stayed local, what
-  was skipped), and a one-click in-memory run of the attack gauntlet.
-
-The server binds loopback only, rejects foreign `Host` headers
-(DNS-rebinding defense), and requires `application/json` bodies on mutations
-(CSRF defense). It exposes no secrets and never leaves your machine.
-
-The isolated paths currently permit import-free pure computation only. Environment, filesystem, network, WASI, and every other host import are denied. The Phase B foundation verifies role-separated publisher signatures, owns the exact artifact bytes, canonicalizes and binds security-relevant input and resources, and requires an exact one-use Capability V2 before the verified Wasmtime path starts. Replay state is process-local by default and durable when the Authority Store is attached (the workspace app attaches it); a `sovereign_core_wasm_v2` ABI delivers the authenticated canonical input into guest memory (bounds-checked, fail-closed), while v1 guests run input-free.
-
-The artifact crate now also provides the local admission transaction: an owner-controlled content-addressed store plus a locally signed admission record (`artifact-admission` COSE role) that promotes a publisher-verified artifact to an `AdmittedArtifact`, with every load re-deriving digests from the stored bytes. The verified executor requires the admitted handle: execution fails closed unless the presented admission is digest-bound to the exact invocation, checked before any token is consumed.
-
-This is not a production plugin boundary or a completed Phase B. `sandbox-check` remains a mechanical Phase A check using an ephemeral test issuer—not a production trust anchor, and `demo` uses hard-coded demo keys. The Component/WIT input ABI and crash-safe evidence inside the verified sandbox path remain unimplemented. (A killable, resource-limited compilation worker and a trusted signed compiled cache now exist: the Security Center gauntlet compiles every module out-of-process in a child the runtime can cap and kill, caches the result under a signed record, and quarantines any poisoned cache entry before it can be deserialized.) The demo performs no external effects; effectful requests fail closed. See [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
-
-See [ROADMAP.md](ROADMAP.md) for the full development plan.
+The Rust workspace contains thirteen Runtime crates covering contracts,
+identity, artifacts, policy, capabilities, authority, execution, effects,
+vault, audit, sandboxing, models, and workflows. The detailed maturity and
+release gates live in [ROADMAP.md](ROADMAP.md); sandbox protocol boundaries are
+in [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 
 ## Contributing
 
