@@ -28,8 +28,10 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 - **Current:** deterministic Policy Engine
 - **Current:** role-separated signing primitives, publisher/Authority trust stores, and Capability V1/V2 validators
 - **Current:** cryptographic vault prototype (Rust core)
-- **Current:** signed append-only audit ledger prototype
-- **Current foundation:** RFC 0003 signed human approval evidence — approval-required Capability V2 tokens are issued only with owner-signed, exactly bound, one-use (process-local) evidence, and still fail closed without it. Durable cross-process approval consumption remains an Alpha target.
+- **Current:** device-signed hash-chain prototype behind an append-only API;
+  its replaceable local file has no independent rollback anchor and does not
+  prevent deletion
+- **Current foundation:** RFC 0003 approval-role-signed evidence — approval-required Capability V2 tokens are issued only with exactly invocation-bound evidence and fail closed without it. Validators are process-local by default. The Workspace attaches persistent filesystem claims, but approval records may currently be purged before approval expiry, so durable one-use approval is not claimed. Independent owner presence, correct retention, transactional reservation, and revocation remain Alpha targets.
 
 ### Untrusted (always)
 
@@ -64,7 +66,7 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 **Description:** An agent or plugin attempts to expand its permissions beyond what was granted.
 
 **Mitigations:**
-- **Current foundation:** short-lived, one-use Capability V2 binds the exact artifact, operation, input commitments, and resource commitments; replay state is process-local
+- **Current foundation:** short-lived Capability V2 binds the exact artifact, operation, input commitments, and resource commitments; validators are process-local by default, while the Workspace attaches experimental persistent claims with the approval-retention limitation above
 - **Current:** Authority and Publisher signing roles are distinct, and an AI agent cannot make its own key trusted
 - **Current foundation:** strict publisher manifest enforcement and import-free Core Wasm isolation
 - **Alpha target:** durable token revocation, container/micro-VM backends, and reviewed effectful host interfaces
@@ -79,7 +81,7 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 - **Alpha target:** protected business work may reach only this device or an explicitly authorized user/company-owned compute endpoint over authenticated E2EE; it never reaches a public model as raw data
 - **Alpha target:** blind recovery replicas and relays store or transport ciphertext only and are not authorized compute endpoints
 - **Alpha target:** agents never hold root keys
-- **Current:** both Wasmtime paths expose no filesystem, network, environment, WASI, or other host imports; the only host effect is an owner-controlled local outbox file write, performed by the trusted host after full authorization, refusing Red data and path escape
+- **Current:** both Wasmtime paths expose no filesystem, network, environment, WASI, or other host imports; the only host effect is a rooted local outbox file write performed later by trusted host code after the experimental approval/capability path. Exact recipient/content binding and independently authenticated owner presence are not yet enforced.
 - **Alpha target:** Data Disclosure Record for every cloud model call
 - **Alpha target:** output scanning for sensitive patterns
 
@@ -108,7 +110,9 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 **Description:** An attacker or compromised agent attempts to alter or delete operation history.
 
 **Mitigations:**
-- **Current:** append-only signed event-ledger prototype with a hash chain
+- **Current:** device-signed event hash chain with internal-consistency checks;
+  whole-file replacement, prefix truncation, and rollback require an external
+  trusted head to detect
 - **Current primitive / migration pending:** a role-separated Audit COSE signer exists; the ledger still uses its legacy device-signature encoding
 - **Alpha target:** periodic Merkle-root anchoring
 - **Alpha target:** an Auditor role that cannot execute external actions
@@ -121,8 +125,8 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 **Mitigations:**
 - **Alpha target:** leader lease with fencing tokens
 - **Alpha target:** authoritative vs. eventually-consistent data separation
-- **Current foundation:** V2 idempotency and replay checks within one process only
-- **Alpha target:** durable cross-process idempotency, version checks, and multi-node approval for high-value operations
+- **Current foundation:** V2 idempotency and replay checks are process-local by default; the Workspace attaches persistent filesystem claims, tested through reopen and concurrent threads rather than separate OS processes
+- **Alpha target:** one transactional authorization bundle, durable revocation, version checks, fencing, and multi-node approval for high-value operations
 
 ### T8: Supply Chain Attack (Plugins/Dependencies)
 
@@ -170,13 +174,16 @@ Alpha release must pass:
 - [x] Current import-free Wasm fixtures cannot access filesystem, network, environment, WASI, or undeclared host interfaces
 - [x] Current policy fixture rejects Red data sent through a cloud-labelled tool
 - [x] Capability V2 rejects same-process replay and idempotency conflicts
-- [ ] Capability revocation and replay remain rejected across restart and concurrent processes
+- [x] Attached Authority Store rejects covered duplicate claims after reopen and token races across threads
+- [ ] Approval reuse remains rejected after token expiry/purge and across real subprocess races/restart
+- [ ] Transactional authorization-bundle revocation remains rejected across races and restart
 - [ ] Full prompt-injection and data-disclosure paths pass the Alpha gauntlet
 - [ ] Primary model failure does not block data access
 - [x] Current audit-ledger fixture detects hash-chain/signature modification
 - [ ] Recovery works without official cloud servers
 
-Chaos CLI commands for reproducible testing — see [ROADMAP.md](ROADMAP.md) Stage 5.
+Process-kill, concurrency, filesystem-fault, and recovery gates are tracked in
+[ROADMAP.md](ROADMAP.md).
 
 ## Reporting
 

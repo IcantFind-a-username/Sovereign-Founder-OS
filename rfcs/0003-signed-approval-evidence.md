@@ -1,4 +1,4 @@
-# RFC 0003: Signed Human Approval Evidence
+# RFC 0003: Signed Approval Evidence
 
 **Status:** Draft; foundation implemented
 **Stage:** 1
@@ -6,13 +6,16 @@
 
 ## Summary
 
-Define the signed evidence a human owner produces when approving one exact
-invocation, and how that evidence is bound into Capability V2. Before this
+Define approval-role-signed authorization evidence for one exact invocation
+and how that evidence is bound into Capability V2. Before this
 RFC, every approval-required request failed closed because no approval
 protocol existed. After it, an approval is a COSE_Sign1 object signed under a
 dedicated approval role, bound to the exact artifact, manifest, input,
 resource, and policy-decision digests it approves, valid for a bounded
-window, and consumed at most once per process.
+window. The target ceremony proves an independently authenticated human owner
+reviewed the exact request. The current Workspace instead turns an
+unauthenticated local API decision into a backend signature; it does not prove
+human presence or review.
 
 RFC 0002's invariants apply unchanged. This RFC adds the approval role and
 object; it does not enable effectful execution, which still additionally
@@ -76,8 +79,9 @@ rejected.
 - Capability V2's 30-second policy-freshness window exists to bound the gap
   between evaluation and issuance. A human cannot click in 30 seconds
   reliably, so when valid approval evidence is present the policy-age limit
-  extends to the approval window (600 s). The approval itself attests that
-  the human reviewed that exact decision.
+  extends to the approval window (600 s). The signed object attests approval-
+  role authorization; it is human-review evidence only when an independently
+  authenticated preview/confirmation ceremony controls use of that key.
 
 ## Binding into Capability V2
 
@@ -91,18 +95,27 @@ rejected.
 - **Consumption:** the validator requires the same signed approval object
   whenever the token carries an `approval_evidence` claim, re-verifies it
   against the presented invocation and decision, requires the summary claim
-  to match the object exactly, and consumes `approval_id` at most once.
+  to match the object exactly, and attempts to consume `approval_id` at most
+  once within the supported replay backend.
   A token without evidence for an approval-required decision, or evidence
   where none is required, fails closed.
 
 ## Replay and Durability (honest labels)
 
-Approval one-use accounting is process-local, like token replay accounting.
-Restart-safe and cross-process approval consumption requires the RFC 0002
-durable Authority Store and is not claimed. Until then, approvals authorize
-pure computation only, and the workspace application's approval records
-remain workflow evidence — they are upgraded to this protocol when the
-workspace issues real capabilities.
+Approval one-use accounting is process-local when no Authority Store is
+attached. The Workspace attaches persistent filesystem claims, but the current
+validator stores approval consumption only until the shorter capability expiry,
+not the approval's own expiry. After capability expiry and purge, the same
+still-valid approval may be presented with a newly issued token. Durable
+one-use approval is therefore **not claimed**.
+
+The implementation target retains approval consumption through approval
+expiry (and any required audit-retention window), reserves token/approval/
+idempotency in one recoverable transaction, supports durable revocation, and
+proves behavior using real subprocess restart/race tests. Approval evidence is
+also necessary but not sufficient for an external effect: independent owner
+presence, exact effect preview/payload binding, durable intent/result ordering,
+and a reviewed host broker remain required.
 
 ## Threat Cases (tested)
 
@@ -111,9 +124,14 @@ workspace issues real capabilities.
   decision than presented.
 - Expired approval, future-dated approval, approval predating its policy
   decision, and out-of-range lifetime.
-- Approval reuse across two tokens (second consumption denied).
+- Approval reuse across two tokens before persistent-record purge (second
+  consumption denied).
 - Evidence supplied when policy does not require approval.
 - Token claiming approval evidence that does not match the presented object,
   or presented without any object.
 - Legacy behavior preserved: issuance without evidence fails closed for
   approval-required decisions.
+
+Target regression coverage additionally expires and purges the first token,
+restarts in a new process while the approval remains valid, and proves that a
+new token cannot reuse the approval.

@@ -78,7 +78,8 @@ sovereign chaos simulate-data-exfiltration
 sovereign chaos restore
 ```
 
-See [THREAT_MODEL.md](THREAT_MODEL.md) and [ROADMAP.md](ROADMAP.md) Stage 5.
+See [THREAT_MODEL.md](THREAT_MODEL.md) and the release/security gates in
+[ROADMAP.md](ROADMAP.md).
 
 ## Scope
 

@@ -27,9 +27,10 @@ Sovereign Founder OS
 
 The current implementation focuses on the Sovereign Runtime secure kernel. That is an implementation sequence, not a separate product identity: every runtime capability exists to support real Founder OS workflows.
 
-## Current Stage 1 Architecture
+## Current Developer-Preview Architecture
 
-The executable workspace currently consists of the Rust CLI, eight Runtime crates, and a cross-crate adversarial test package:
+The executable workspace currently consists of the Rust CLI, thirteen Runtime
+crates, and a cross-crate adversarial test package:
 
 ```text
 sovereign-cli
@@ -41,21 +42,65 @@ sovereign-cli
 ├── policy
 ├── capability
 │   ├── Capability V1 (legacy Phase A compatibility)
-│   └── exact-bound, one-use Capability V2 (process-local state)
+│   └── exact invocation-bound Capability V2
+├── authority
+│   └── experimental persistent token/approval/idempotency claims
+├── execution
+│   └── crash journal; a no-terminal Started marker requires reconciliation
+├── effects
+│   └── rooted local outbox write/revoke broker
 ├── vault
 ├── audit-ledger
-└── sandbox
-    ├── import-free Wasmtime path (Phase A)
-    └── verified pure-compute V2 path (Phase B foundation)
+├── sandbox
+│   ├── import-free Wasmtime path (Phase A)
+│   ├── verified admitted-artifact V2 pure-compute path
+│   ├── authenticated Core Wasm v2 input ABI
+│   └── optional killable compiler worker + signed cache
+├── model
+│   └── deterministic routing/failover simulator
+└── workflow
+    └── same-directory durable checkpoints and resume
 
 sovereign-adversarial-tests
 ```
 
-Stage 1 currently provides prototypes for role-separated signing and trust stores, deterministic policy decisions, scoped and expiring capability tokens, encrypted local storage, a signed append-only audit ledger, and capability-gated sandbox execution. The Phase B foundation verifies a publisher-signed manifest, snapshots the exact artifact bytes, validates strict input and resource grants, prepares canonical invocation commitments, and binds them into Capability V2 before the verified executor starts. Both Wasmtime paths permit pure computation only, apply fuel, epoch, memory, table, and instance limits, and expose no host imports or WASI.
+The local app already exposes a minimal Workspace, read-only Founder Command
+Center, and Security Center. It stores a company profile, customers, fixed
+Offer/Invoice drafts, approvals, local outbox lifecycle, disclosures, and audit
+history. This is not yet the target Sovereign Enterprise Graph.
 
-`VerifiedArtifact` proves publisher provenance and byte identity. The artifact crate's `ArtifactStore` now separately implements the local admission transaction: verified bytes are persisted in an owner-controlled content-addressed store, and a record signed by the local `artifact-admission` role binds the component digest, manifest digest, risk class, backend, ABI, empty host capabilities, and installation state into an `AdmittedArtifact`. Loading re-derives every digest from the stored bytes and fails closed; filenames are never evidence. The current sandbox is still not a production plugin boundary: the verified executor does not yet require the admitted handle, compilation remains in-process, replay accounting is process-local, the core-Wasm ABI does not receive canonical input, the mechanical `sandbox-check` uses an ephemeral issuer, and no guest can invoke an audited external side effect. The Founder Command Center, Sovereign Enterprise Graph, Crew Orchestrator, Model Mesh, Domain Packs, Recovery Mesh, durable authorization, and production host interfaces are not implemented yet. See [ROADMAP.md](ROADMAP.md) and [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
+The current primitives include role-separated signatures and trust stores,
+deterministic policy decisions, Capability V2, an encrypted-entry vault, a
+    device-signed hash chain behind an append-only API, local artifact admission,
+    persistent individual authority claims, crash-journaled pure computation, authenticated canonical
+guest input, and resource-constrained import-free Wasmtime execution. The
+verified V2 executor requires an `AdmittedArtifact`; loading re-derives digests
+from stored bytes and fails closed. A killable compilation worker and signed
+compiled cache exist, but are optional and are not attached to every product
+path.
 
-The remaining sections describe the target architecture unless they explicitly state a current Stage 1 capability.
+The assembled local-outbox path is **Experimental**, not a general effect or
+plugin boundary. The application currently creates owner approval evidence
+after an unauthenticated loopback/API decision. Its capability binds document
+and resource preparation, not the final recipient or exact RFC 5322 bytes, and
+the execution journal completes before the trusted host writes the outbox
+file. The Authority Store persists individual filesystem claims, but current
+tests do not prove a true multi-process boundary and approval records may be
+purged before the approval itself expires. The complete token/approval/
+idempotency reservation is not one transaction and has no revocation API. Core
+Wasm guests cannot invoke host effects.
+
+The Model Gateway contains deterministic stand-ins and an unsafe legacy
+classification/trust API; it is not a real Model Mesh. Workflow checkpoints
+support another runner over the same directory, not replicated node failover.
+The broader Enterprise Graph, Crew Orchestrator, Domain Packs, Recovery Mesh,
+production Component/WIT host interfaces, real model adapters, and network
+effects are targets. See [ROADMAP.md](ROADMAP.md),
+[RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md), and
+[RFC 0004](rfcs/0004-data-sovereignty-boundaries.md).
+
+The remaining sections describe the target architecture unless they
+explicitly state a current capability.
 
 ## Target Runtime and Trust Flow (Planned)
 
@@ -199,19 +244,29 @@ A unified Model Gateway routes requests to:
 
 | Model Type | Use Case |
 | --- | --- |
-| Local small model | Privacy classification, extraction, sensitive summarization |
-| Low-cost cloud model | Formatting, routine copy |
-| Strong reasoning model | Strategy, complex research |
+| Local or authorized owned-node model | Protected-data classification, extraction, summarization, and reasoning |
+| Public cloud model | Compiler-created, purpose-bound public projections only |
+| Strong reasoning model | Strategy and research within the effective data boundary |
 | Multimodal model | Web, images, documents, video |
 | Coding model | Websites and prototypes |
 
-Every call records: provider, model, cost, latency, quality, and data disclosure scope.
+Every supported dispatch records value-free visibility and route evidence.
+Provider-declared cost, latency, quality, and retention are metadata—not proof
+that a provider enforced a promise.
 
-Automatic failover: primary provider → secondary provider → local model degradation.
+Failover may move only among recipients already authorized by the same immutable
+policy snapshot and compiled request. Provider self-description and caller
+labels never grant data access. Raw protected values remain local or on an
+explicitly authorized E2EE owned compute endpoint; public providers receive
+only compiler-created projections. See [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md).
 
-## Plugin Architecture (In Progress)
+## Plugin Architecture (Experimental foundation)
 
-The target architecture treats plugins as **untrusted by default**. Stage 1 currently implements the import-free Wasmtime Phase A path plus a pure-compute, process-local Phase B foundation for publisher verification and exact invocation binding.
+The target architecture treats plugins as **untrusted by default**. The current
+repository implements import-free Wasmtime paths plus a pure-compute foundation
+for publisher verification, local admission, exact invocation binding, durable
+authority when attached, and authenticated Core Wasm v2 input. It is not a
+general Component/WIT extension boundary.
 
 - Signed manifest declaring exact permissions
 - Low-risk plugins: WASM/WASI sandbox
@@ -222,7 +277,12 @@ The target architecture treats plugins as **untrusted by default**. Stage 1 curr
 
 ## Event Sourcing (Partially Implemented)
 
-The current audit-ledger crate implements a signed, append-only hash chain. The target architecture builds authoritative enterprise state from richer events such as:
+The current audit-ledger crate exposes an append-only API over a replaceable
+local JSON file whose entries form a device-signed hash chain. Verification
+proves internal chain consistency; without an independently trusted device key
+and anchored head it cannot detect whole-bundle replacement, valid-prefix
+truncation, or rollback. The target architecture builds authoritative
+enterprise state from richer events such as:
 
 ```text
 event_id, venture_id, actor_id, action, resource,
@@ -230,7 +290,9 @@ capability_id, timestamp, payload_hash, previous_event_hash,
 device_signature, policy_decision_hash
 ```
 
-Tamper detection exists in the current ledger prototype. Derived snapshots and recovery replay from checkpoints are planned.
+Internal tamper detection exists in the current ledger prototype. Authenticated
+head checkpoints, rollback detection, derived snapshots, and recovery replay
+are planned.
 
 ## Technology Stack (Planned)
 
