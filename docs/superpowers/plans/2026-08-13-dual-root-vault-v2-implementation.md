@@ -557,16 +557,25 @@ pages, finds an empty schema, and sets/verifies the ceiling again. The bundled
 C symbols for extension loading exist, but the rusqlite feature is absent and
 the authorizer/API surface keeps them unreachable.
 
-- [ ] **Step 4: Run GREEN, official fixtures, and deliberate mutations**
+- [ ] **Step 4: Run GREEN, PRAGMA-path fixtures, and deliberate mutations**
 
-Run focused tests, doc tests, and a fixed interoperability fixture generated and
-independently verified with the official SQLCipher CLI blob-literal syntax;
-record its cryptographic hash and known rows. Open it through the 67-byte shim,
-check known rows, and assert build/runtime version plus every cipher setting.
-Create through the shim and independently reopen with the CLI syntax.
-Direct 32-byte input must fail the vector. Temporarily treat DBK as a password,
-enable a plaintext header, enable WAL, and omit one profile check; the
-applicable test must fail each time. Restore each mutation and rerun.
+Run focused tests, doc tests, and one checked-in, fixed-hash interoperability
+fixture generated through SQLCipher's officially documented fixed
+`PRAGMA key = "x'<64 hex>'"` blob-literal path. Record its known queries, open it
+through the 67-byte engine shim, and assert empty schema, integrity,
+build/runtime version, and every cipher setting. Create a fresh database through
+the shim and reopen it through the fixed PRAGMA path. This second path is
+independent from the engine encoder/raw-key call site but uses the same pinned
+SQLCipher object; do not call it an independent CLI binary/distribution test.
+An ordinary passphrase PRAGMA made from the same fixed 32 public test bytes may
+accept key setup but must fail at first page access, while the blob-literal path
+succeeds without changing the fixture. Do not add another unsafe C raw-key test
+entry point. A separate ignored generator may produce a review candidate and
+print its semantic evidence and hash, but must not overwrite the admitted
+fixture or make SQLCipher's random salt/page IVs deterministic. Mutate the
+fixture hash, an encrypted page, one key nibble, DBK-as-password path, plaintext
+header, WAL, and one profile check; the applicable test must fail each time.
+Restore each mutation and rerun.
 
 - [ ] **Step 5: Full gate, review, commit, push**
 

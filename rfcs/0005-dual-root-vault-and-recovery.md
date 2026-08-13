@@ -481,14 +481,23 @@ treated as a password and bypasses the password-to-page-encryption-key PBKDF2
 step. SQLCipher still derives its separate HMAC key according to the admitted
 raw-key profile and still uses its normal encrypted header and per-database
 salt; the implementation does not claim that all SQLCipher PBKDF2 work is
-absent. Because upstream
-does not publish this repository's fixture as an official vector, CI generates
-and independently verifies a fixed interoperability fixture with the official
-SQLCipher CLI blob-literal syntax, records its cryptographic hash and known
-rows, then opens it through the shim. A repository-created database is reopened
-with the CLI syntax in the other direction. Both tests assert SQLCipher
-build/runtime version and the complete cipher profile. Direct 32-byte input
-must fail this interoperability test.
+absent. Because upstream does not publish this repository's fixture as an
+official vector, the repository checks in one reviewed, fixed-hash fixture
+created via SQLCipher's officially documented
+`PRAGMA key = "x'<64 hex>'"` blob-literal path and records its stable known
+queries. CI opens that fixture through the engine's 67-byte `sqlite3_key` shim;
+it also creates a fresh engine database and reopens it through the fixed PRAGMA
+path. The PRAGMA path is independent from the engine's encoder and raw-key call
+site but uses the same pinned SQLCipher 4.14 object. This is **not** evidence of
+interoperability with an independent CLI binary/distribution: the locked source
+package contains no `shell.c` and the qualification environment has no
+SQLCipher CLI. Both directions assert SQLCipher build/runtime version, complete
+cipher profile, empty schema, and integrity results. A fixed ordinary
+passphrase PRAGMA made from the same 32 public test bytes may accept key setup
+but must fail on first page authentication, proving it is not the raw-key blob
+path without adding another unsafe C entry point. A generator reproduces the
+fixture semantics, not identical ciphertext: SQLCipher's random salt/page IVs
+are never made deterministic.
 
 ### Exact SQLCipher and SQLite profile
 
@@ -1209,8 +1218,9 @@ Implementations MUST NOT:
 
 - SQLCipher `4.14.0` compile/runtime version for the released initial profile,
   completed advisory/delta review, upstream compatibility fixtures, and a
-  fixed-hash/known-row raw-key fixture independently generated and verified
-  with the official SQLCipher CLI syntax,
+  fixed-hash/known-query raw-key fixture generated through the officially
+  documented SQLCipher PRAGMA blob-literal path and cross-opened through the
+  engine shim (without claiming an independent CLI/distribution),
   exact pragma readback, encrypted-header proof, wrong-key failure, and no
   plaintext canary in database/journal/sidecar.
 - A mandatory uncached wrapper run on exact native
