@@ -75,7 +75,9 @@ Mitigations are labelled **Current** when enforced by the repository today and *
 **Description:** An agent, plugin, or compromised model path attempts to read and transmit secrets.
 
 **Mitigations:**
-- **Alpha target:** Red-zone data never leaves the device through any model or tool path
+- **Alpha target:** non-exportable root/company/device keys, permanent credentials, and recovery secrets remain device-bound handles and never become model or tool payloads
+- **Alpha target:** protected business work may reach only this device or an explicitly authorized user/company-owned compute endpoint over authenticated E2EE; it never reaches a public model as raw data
+- **Alpha target:** blind recovery replicas and relays store or transport ciphertext only and are not authorized compute endpoints
 - **Alpha target:** agents never hold root keys
 - **Current:** both Wasmtime paths expose no filesystem, network, environment, WASI, or other host imports; the only host effect is an owner-controlled local outbox file write, performed by the trusted host after full authorization, refusing Red data and path escape
 - **Alpha target:** Data Disclosure Record for every cloud model call

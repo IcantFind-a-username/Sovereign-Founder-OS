@@ -22,8 +22,8 @@ This page helps contributors find the current source of truth without reading th
 | Make a first contribution | [CONTRIBUTING.md](../CONTRIBUTING.md) and current open issues |
 | Understand product direction | [README.md](../README.md) and [MANIFESTO.md](../MANIFESTO.md) |
 | Change runtime architecture | [ARCHITECTURE.md](../ARCHITECTURE.md) and the relevant [RFC](../rfcs/) |
-| Review security | [THREAT_MODEL.md](../THREAT_MODEL.md), [SECURITY.md](../SECURITY.md), and [RFC 0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md) |
-| Study privacy or resilience targets | [Privacy model](design/privacy-model.md) and [Distributed systems](design/distributed-systems.md) |
+| Review security | [THREAT_MODEL.md](../THREAT_MODEL.md), [SECURITY.md](../SECURITY.md), [RFC 0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md), and [RFC 0004](../rfcs/0004-data-sovereignty-boundaries.md) |
+| Study privacy or resilience targets | [Privacy model](design/privacy-model.md), [data sovereignty boundary](../rfcs/0004-data-sovereignty-boundaries.md), and [Distributed systems](design/distributed-systems.md) |
 | Discuss product UI | [GUI design draft](product/gui-design.zh-CN.md) (Chinese) |
 | Understand the category positioning | [Why Not Another Agent?](positioning/why-not-another-agent.md) |
 | Trace how the idea evolved | [Historical Chinese design archive](archive/zh/README.md) |
@@ -52,3 +52,4 @@ If documents conflict, current implementation plus accepted RFCs take precedence
 | [0001](../rfcs/0001-canonical-task-contract.md) | Draft | Canonical task contract |
 | [0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md) | Draft; partially implemented | WASM sandbox and plugin capabilities |
 | [0003](../rfcs/0003-signed-approval-evidence.md) | Draft; foundation implemented | Signed human approval evidence |
+| [0004](../rfcs/0004-data-sovereignty-boundaries.md) | Draft; approved implementation target | Data sovereignty, privacy compilation, visibility, and compute placement |
