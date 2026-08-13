@@ -148,7 +148,8 @@ DBK (random 32 bytes) -- raw-key sqlite3_key --> SQLCipher database
   established by Programs 1C0/1C1 and consumed by 1D. Fields read from
   `vault.slots`, `vault.format`,
   the database, a path, or caller text cannot establish this expectation.
-- `workspace_id` and every wrapper/record/key ID are independent random 32-byte
+- `workspace_id`, `database_id`, every wrapper/record/key ID, and every
+  business `object_id` are independent random 32-byte
   protocol identifiers. They are never paths, labels, counters, or hashes of
   keys/content.
 - DeviceKEK and RecoveryKEK independently wrap only the complete DBK record.
@@ -170,10 +171,14 @@ DBK (random 32 bytes) -- raw-key sqlite3_key --> SQLCipher database
 | Database | SQLCipher | released rusqlite 0.40.2 bundle: SQLCipher exactly 4.14.0; fixed profile below |
 | Backup transport | age v1 | standard X25519 recipient mode; Programs 1B0/1B1 |
 
-All XChaCha nonces come directly from the OS CSPRNG and are never caller
-supplied, derived, or reused. Authentication completes before plaintext is
-released. Only maintained upstream implementations and published formats are
-used; Sovereign implements no primitive.
+All keys, protocol IDs, salts, and XChaCha nonces come through a direct,
+fallible operating-system CSPRNG call and are never caller supplied, derived,
+or reused. Any entropy failure zeroizes supported partial buffers and occurs
+before any database, sidecar, key-store record, wrapper, or temporary state is
+published. Production has one closed system-entropy adapter and no custom RNG
+backend; only crate-private tests inject failures. Authentication completes
+before plaintext is released. Only maintained upstream implementations and
+published formats are used; Sovereign implements no primitive.
 
 ### Argon2id policy
 
@@ -192,9 +197,9 @@ a new reviewed profile tag, not mutation of tag `1`.
 ## Typed wrapper AAD
 
 A generic, optional-field context object is forbidden. Each wrapper has a
-distinct internal Rust AAD type. Integers are unsigned big-endian, every ID is
-exactly 32 bytes, literals are exact ASCII without a terminator, and no field
-is optional:
+distinct internal Rust AAD type. Integers are unsigned big-endian, every ID in
+this profile is exactly 32 bytes, literals are exact ASCII without a
+terminator, and no field is optional:
 
 ```text
 DeviceDbkAad =
@@ -245,7 +250,19 @@ The first implementation pins:
 ```toml
 rusqlite = { version = "=0.40.2", default-features = false,
   features = ["bundled-sqlcipher-vendored-openssl", "hooks", "limits"] }
+openssl-sys = { version = "=0.9.117", default-features = false }
 ```
+
+These dependencies live only in the private, `publish = false` workspace crate
+`sovereign-vault-v2-engine`. The shipped CLI and the legacy
+`sovereign-vault` crate have no dependency edge to that engine during Program
+1A. This physical separation is part of the admission boundary: the default
+release CLI dependency tree and binary MUST contain no engine, rusqlite,
+libsqlite3, OpenSSL, `sqlite3_key`, `sqlcipher_export`, or `cipher_version`
+symbol introduced by this profile. Program 1D may add a narrow product
+dependency only after this RFC has admitted the newer exact SQLCipher profile
+and all activation prerequisites have passed. A downstream Cargo feature is
+not an adequate substitute for this dependency-graph separation.
 
 That released lockfile resolution currently bundles SQLCipher exactly `4.14.0`
 through `libsqlite3-sys = 0.38.2`; it MUST NOT be described as 4.17.0 or
@@ -289,25 +306,121 @@ allowlist and every virtual-table/schema construction; and product callers
 cannot submit SQL. A new compile option or newly reachable built-in fails the
 admitted profile.
 
-The Vault crate build gate rejects ambient dependency overrides including
+The only qualification entry point is the checked-in
+`scripts/qualify-vault-v2.sh` command wrapper. It rejects ambient dependency
+overrides including
 `LIBSQLITE3_SYS_USE_PKG_CONFIG`, `LIBSQLITE3_FLAGS`,
 `SQLITE_MAX_VARIABLE_NUMBER`, `SQLITE_MAX_EXPR_DEPTH`, `SQLITE_MAX_COLUMN`,
 `OPENSSL_NO_VENDOR`, `SQLCIPHER_LIB_DIR`, `SQLCIPHER_INCLUDE_DIR`,
 `SQLCIPHER_STATIC`, `OPENSSL_DIR`, `OPENSSL_LIB_DIR`, `OPENSSL_INCLUDE_DIR`,
-`PKG_CONFIG_*`, `VCPKGRS_DYNAMIC`, and every relevant Cargo target-prefixed
-form. The gate uses a closed allowlist: any newly observed dependency-shaping
-variable fails until this RFC is amended. Generic C toolchain variables are
-recorded and controlled by the release builder. A clean subprocess build test
-proves the vendored source/provider is selected. No system SQLite/SQLCipher,
-alternate crypto provider, or runtime replacement is accepted. Cargo.lock,
-enabled features, vendored C compiler flags, provider identity/version,
-notices, hashes, and the pre-implementation advisory decision are recorded in
-the verification ledger.
+`OPENSSL_CONFIG_DIR`, `OPENSSL_LIBS`, `OPENSSL_STATIC`, `OPENSSL_SRC_PERL`,
+`PERL`, `OPENSSL_RUST_USE_NASM`, `PKG_CONFIG_*`, `VCPKGRS_DYNAMIC`, and every
+relevant Cargo target-prefixed form read by `libsqlite3-sys` or `openssl-sys`.
+`openssl-src` reads `OPENSSL_SRC_PERL`, `PERL`, and
+`OPENSSL_RUST_USE_NASM` directly rather than through the target-prefix helper;
+the wrapper rejects those exact global forms. The gate uses a closed
+allowlist: any newly observed dependency-shaping or build-tool-selection
+variable fails until this RFC is amended. It removes Perl injection variables,
+Rust/linker flags, and unapproved tool overrides; constructs a positive-
+allowlist child environment; resolves and records canonical path, version, and
+SHA-256 for Cargo, rustc, C compiler, archiver, ranlib, Perl, and make; creates
+and owns a new `CARGO_TARGET_DIR`; and runs Cargo `--frozen --offline` only
+after a separate `cargo fetch --locked` acquisition step. Its `full` mode
+reuses the fresh target only within that one invocation and deletes it on exit.
+The child starts from `env -i` and receives only fresh home/temp directories,
+reviewed Cargo/rustup homes, locale/reproducibility values, exact absolute tool
+paths, the exact build target, offline mode, and a PATH composed from reviewed
+Perl/make/linker directories. Repository/Cargo source replacement is rejected.
+Cargo-generated `HOST`, `TARGET`, `OUT_DIR`, and `CARGO_MAKEFLAGS` are allowed
+only inside the child, never inherited from the caller.
+
+A downstream crate `build.rs` runs after dependencies may already have built
+and Cargo may reuse cached artifacts, so it is defense in depth only; it MUST
+NOT be represented as the upstream dependency gate. Every engine-resolving
+command, including workspace Clippy/tests/docs and metadata/tree inspection,
+runs through the wrapper. CI performs dependency acquisition separately and
+then uses an uncached wrapper job; a cached product-only job excludes this
+unlinked package. A negative matrix sets every listed variable independently
+and proves qualification stops before Cargo. A clean subprocess build then
+proves the vendored source/provider is selected. No system
+SQLite/SQLCipher, alternate crypto provider, or runtime replacement is
+accepted. Cargo.lock, enabled features, vendored C compiler flags, provider
+identity/version, notices, hashes, and the pre-implementation advisory
+decision are recorded in the verification ledger.
+
+Task 1 admits exactly the native triple `x86_64-unknown-linux-gnu`. The wrapper
+verifies the rustc host, rejects incoming target/linker selection, sets that
+exact target, and requires Cargo build-script `HOST == TARGET`. Musl, wasm,
+cross-builds, Windows, macOS, and every other ABI fail the engine gate until a
+later amendment names the exact triple and a mandatory real native job passes.
+This does not block product builds because the product has no dependency on the
+engine. Task 5 may add only the separately qualified triples named there.
+
+The pinned graph resolves statically linked OpenSSL 3.6.3, whose configuration
+loading is process-global. Program 1A is therefore a binary-first dedicated
+experimental process, not a reusable database library. `main` first calls the
+sole private process bootstrap and receives a non-constructible
+`CryptoProcessOwner`; all database opens require that token. DBK, raw handle,
+connection, and FFI code compile only into the process target. The package's
+library target exposes only a value-free protocol/version surface.
+
+`openssl-sys 0.9.117` does not expose `OPENSSL_init_crypto` or
+`OPENSSL_INIT_NO_LOAD_CONFIG`. The one audited FFI module therefore declares
+that exact official C ABI and pinned constant locally, backed by the exact
+direct `openssl-sys` link/version dependency. Its process-bootstrap entry point
+calls `OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, NULL)` before dispatch,
+requires return `1`, and produces the owner token. An AST/call-graph gate
+proves there is no other OpenSSL caller, `openssl_sys::init`, or process
+bootstrap and that `main` cannot dispatch first.
+
+Behavioral qualification starts the real binary in fresh subprocesses.
+Hostile `OPENSSL_CONF`, include, engine, and module paths must leave the exact
+provider/profile unchanged. A separate test-only fresh worker first performs a
+real `OPENSSL_INIT_LOAD_CONFIG` call under a profile-changing configuration and
+proves the later bootstrap/profile admission fails; an in-memory boolean is
+not evidence of actual OpenSSL global state.
+
+The real LOAD_CONFIG negative control is the only additional raw call, is
+compiled under `cfg(test)` inside the same FFI module, and is absent from the
+normal/release process. The production AST still contains exactly the two
+entry points named by this RFC.
+
+Because OpenSSL initialization cannot be retroactively changed, this result
+does not authorize in-process product embedding. Program 1D must keep a
+dedicated authenticated broker or separately prove one process-wide
+initialization owner before every dependency use. The
+shipped CLI remains physically unlinked from Program 1A, so it cannot
+accidentally become that process-global owner.
 
 ### Raw DBK handoff
 
-Sovereign uses one tiny reviewed unsafe wrapper around SQLCipher's
-`sqlite3_key`. The official API documentation applies the same key
+Sovereign uses one reviewed private FFI module with exactly two unsafe entry
+points: the process bootstrap above and this SQLCipher connection-hardening
+operation. No unsafe code exists elsewhere. The latter requires
+`&CryptoProcessOwner`, first requires `sqlite3_threadsafe() == 1`, owns the
+exact raw `sqlite3_open_v2` call, and calls
+`sqlite3_key` as the first post-open database operation. It does not use
+rusqlite's safe open path, which installs a busy timeout before returning. It
+then calls both
+`sqlite3_enable_load_extension(handle, 0)` and
+`sqlite3_db_config(handle, SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, 0, &out)` and
+requires `SQLITE_OK` plus `out == 0`, then transfers the solely owned handle
+once through `Connection::from_handle_owned`; every earlier error closes it
+exactly once. The locked rusqlite `DbConfig` enum does
+not expose option `1005`, and its safe extension helper requires the forbidden
+`load_extension` feature, so these operations are deliberately consolidated in
+the same audited unsafe function rather than spread across additional shims.
+No third unsafe entry point exists, and no page-reading call may occur inside
+or before this boundary.
+
+The returned private `HardenedConnection` is explicitly `!Send + !Sync`; the
+dedicated process thread owns it for its lifetime. After ownership transfer,
+the factory sets the fixed busy timeout and remaining safe no-page controls.
+This deliberately replaces the rusqlite safe-open bookkeeping that could not
+be used without violating raw-key order, and static assertions pin the
+replacement.
+
+The official API documentation applies the same key
 interpretation rules as
 `PRAGMA key`; passing the 32 arbitrary DBK bytes directly would therefore use
 passphrase semantics and is forbidden. The wrapper hex-encodes the DBK into the
@@ -319,8 +432,11 @@ configuration map. The wrapper checks the return code and exposes no raw
 connection pointer or arbitrary key input to product code.
 
 This 67-byte syntax selects SQLCipher raw-key mode; the random DBK is not
-treated as a password and is not run through SQLCipher's PBKDF2. SQLCipher
-still uses its normal encrypted header and per-database salt. Because upstream
+treated as a password and bypasses the password-to-page-encryption-key PBKDF2
+step. SQLCipher still derives its separate HMAC key according to the admitted
+raw-key profile and still uses its normal encrypted header and per-database
+salt; the implementation does not claim that all SQLCipher PBKDF2 work is
+absent. Because upstream
 does not publish this repository's fixture as an official vector, CI generates
 and independently verifies a fixed interoperability fixture with the official
 SQLCipher CLI blob-literal syntax, records its cryptographic hash and known
@@ -334,9 +450,14 @@ must fail this interoperability test.
 Before any schema or data query, the closed connection factory:
 
 1. opens only a fixed database name inside a newly created, private, verified
-   staging directory with `SQLITE_OPEN_NOFOLLOW` and no URI, shared-cache,
-   create-on-normal-open, or extension flags;
-2. passes the raw DBK to `sqlite3_key` as the first database operation, checks
+   staging directory with the exact applicable flags
+   `READ_ONLY` or `READ_WRITE[|CREATE for the internal initializer only]`,
+   `NOFOLLOW`, `PRIVATE_CACHE`, `NO_MUTEX`, and `EXRESCODE`; URI,
+   shared-cache, create-on-normal-open, and extension flags are absent. The
+   connection is never shared concurrently, and tests pin these flags and the
+   missing-file/symlink/URI failure behavior;
+2. passes the raw DBK to `sqlite3_key` as the first post-open database
+   operation, checks
    its return code, and performs no page-reading or page-writing operation yet;
 3. sets only the connection cipher profile that SQLCipher requires after keying
    and before first page access: compatibility `4`, page size `4096`,
@@ -346,34 +467,56 @@ Before any schema or data query, the closed connection factory:
    bypasses password-to-DBK derivation, but the profile remains pinned;
 4. before page access, sets `cipher_memory_security=ON`, enables defensive mode,
    disables DQS/trusted schema and both extension-loading routes through the C
-   configuration APIs, installs the closed authorizer, and verifies each
-   returned connection flag;
-5. performs the first and only authentication probe before any database-
-   mutating PRAGMA: `SELECT count(*) FROM sqlite_schema`. A failure closes the
-   handle without journal-mode conversion, schema write, fallback, or partial
-   plaintext;
+   configuration APIs, installs the closed authorizer, sets and reads back all
+   fixed `sqlite3_limit` ceilings through the no-page-access C API, and verifies
+   each returned connection flag and limit;
+5. for an existing database, performs the first authentication probe after
+   those resource ceilings are active and before any database-mutating PRAGMA:
+   `SELECT count(*) FROM sqlite_schema`. A failure closes the handle without
+   journal-mode conversion, schema write, fallback, or partial plaintext. For
+   a newly created zero-byte database the same query is only an empty-schema
+   probe and is not called key authentication. Before any write, the initializer
+   sets and reads back `max_page_count=1,048,576`. It then runs exactly
+   `BEGIN IMMEDIATE; CREATE TABLE __sovereign_v2_page_probe
+   (only_row INTEGER PRIMARY KEY CHECK (only_row = 1)) STRICT;
+   INSERT INTO __sovereign_v2_page_probe VALUES (1);
+   DROP TABLE __sovereign_v2_page_probe; COMMIT;` and closes. No other schema
+   statement is allowed in Task 1. This forces encrypted pages while leaving
+   the application schema empty. It then uses the normal
+   no-`CREATE` factory to reopen and authenticate the resulting encrypted
+   pages, require zero application objects, and set/verify the page ceiling
+   again. An interrupted initializer never returns an admitted connection, and
+   the completed database must reject a wrong DBK on that independent reopen;
 6. after the probe, reads back `cipher_status`, cipher/provider versions and
    every observable cipher profile value. The encrypted-header setting remains
    its SQLCipher default; the factory does **not** call the
    `cipher_plaintext_header_size=0` setter and instead verifies readback `0`;
-7. for an existing database, reads and verifies `journal_mode=DELETE`,
-   application ID, schema version, `max_page_count`, and all fixed metadata;
-   any mismatch fails rather than changing the database during normal open.
-   The create-only initializer sets those database values after the authenticated
-   empty-schema probe, commits the fixed schema, closes, and reopens through the
-   normal verifier; and
-8. sets connection/runtime controls `temp_store=MEMORY`, `synchronous=FULL`,
-   `foreign_keys=ON`, limits, and the authorizer's final deny set, then verifies
-   them before returning the typed connection.
+7. for an existing database, reads and verifies `journal_mode=DELETE` without
+   converting it. It first rejects `page_count > 1,048,576`, then sets the
+   per-connection `max_page_count=1,048,576` ceiling and verifies the returned
+   value; `max_page_count` is not treated as persistent metadata. Task 1 owns
+   only the encrypted container/profile. Task 3 defines the exact
+   `application_id`, `user_version`, registry, and metadata schema and then
+   adds their post-authentication verification. SQLite's internal
+   `schema_version` cookie is never used as an application version; and
+8. sets and verifies the remaining connection/runtime controls
+   `temp_store=MEMORY`, `synchronous=FULL`, `foreign_keys=ON`, and the
+   authorizer's final deny set before returning the typed connection.
 
 The default encrypted SQLCipher header is mandatory; no plaintext-header setter
 is called and readback must be exactly `0`. WAL is disabled. Rollback journal
 plus `synchronous=FULL` is the v1 durability profile. Database and rollback
 journal use fixed names inside the verified private directory; temporary SQL
 storage is memory-only.
+Readback `0` alone does not prove the plaintext-header setter was absent: a
+source/AST gate and ordered no-page operation test separately forbid any
+`cipher_plaintext_header_size` assignment. Normal-open profile or journal
+mismatches compare pre/post file hashes and fail without repair; a successful
+readback after silent conversion is not accepted evidence.
 `cipher_integrity_check` and SQLite `integrity_check` run after initialization,
 migration, backup construction, and before activation; routine open uses the
-authenticated schema probe and exact metadata checks.
+authenticated schema probe and the exact profile/container checks available at
+that implementation stage. Task 3 adds the fixed application metadata checks.
 
 SQLCipher is responsible for page encryption and transaction recovery. This
 RFC does not claim power-loss guarantees beyond the tested filesystem/platform
@@ -400,7 +543,7 @@ processed:
 | Expression depth | 32 |
 | Compound SELECT terms | 16 |
 | Bound variables | 999 |
-| Trigger depth | 0; schema contains no triggers |
+| Trigger depth | 0; schema/user triggers and cascading foreign-key actions are forbidden |
 | Attached databases | 0 |
 | LIKE/GLOB pattern | 256 bytes |
 | Worker threads | 0 |
@@ -426,6 +569,82 @@ sealed authoritative adapters. The initial registry is:
 | `BusinessStateV1` | 1 | `BackupEligible` |
 | `VentureProfileV1` | 2 | `BackupEligible` |
 
+Program 1A Task 3 fixes the first application schema exactly. The SQLite
+`application_id` is `0x53464f53` (`SFOS`), `user_version` is `2`, and the
+closed object-registry version is `1`. These values are set in the same
+transaction that creates the following static DDL; routine open verifies all
+three after raw-key authentication and before returning typed access:
+
+`0x53464f53` is a pre-release project identifier and is not represented as an
+assigned SQLite magic value. Task 3 records a fresh check against SQLite's
+official `magic.txt`; before any stable external file-format promise, the
+project must either register that value or amend this RFC and migrate to a
+different exact ID. A collision blocks the format claim but is not treated as
+a cryptographic authentication mechanism.
+
+```sql
+CREATE TABLE vault_metadata_v1 (
+    singleton INTEGER NOT NULL UNIQUE CHECK (singleton = 1),
+    workspace_id BLOB NOT NULL
+        CHECK (typeof(workspace_id) = 'blob' AND length(workspace_id) = 32),
+    database_id BLOB NOT NULL
+        CHECK (typeof(database_id) = 'blob' AND length(database_id) = 32),
+    format_version INTEGER NOT NULL CHECK (format_version = 2),
+    registry_version INTEGER NOT NULL CHECK (registry_version = 1),
+    key_epoch INTEGER NOT NULL CHECK (key_epoch = 1),
+    PRIMARY KEY (workspace_id, database_id)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE business_object_v1 (
+    workspace_id BLOB NOT NULL,
+    database_id BLOB NOT NULL,
+    object_id BLOB NOT NULL
+        CHECK (typeof(object_id) = 'blob' AND length(object_id) = 32),
+    object_type INTEGER NOT NULL CHECK (object_type IN (1, 2)),
+    backup_disposition INTEGER NOT NULL CHECK (backup_disposition = 1),
+    revision INTEGER NOT NULL CHECK (revision >= 1),
+    chunk_count INTEGER NOT NULL CHECK (chunk_count BETWEEN 1 AND 64),
+    byte_count INTEGER NOT NULL CHECK (byte_count BETWEEN 0 AND 268435456),
+    PRIMARY KEY (workspace_id, database_id, object_id),
+    FOREIGN KEY (workspace_id, database_id)
+        REFERENCES vault_metadata_v1(workspace_id, database_id)
+        ON UPDATE NO ACTION ON DELETE NO ACTION
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE business_chunk_v1 (
+    workspace_id BLOB NOT NULL,
+    database_id BLOB NOT NULL,
+    object_id BLOB NOT NULL,
+    chunk_index INTEGER NOT NULL CHECK (chunk_index BETWEEN 0 AND 63),
+    chunk_bytes BLOB NOT NULL
+        CHECK (typeof(chunk_bytes) = 'blob' AND length(chunk_bytes) <= 4194304),
+    PRIMARY KEY (workspace_id, database_id, object_id, chunk_index),
+    FOREIGN KEY (workspace_id, database_id, object_id)
+        REFERENCES business_object_v1(workspace_id, database_id, object_id)
+        ON UPDATE NO ACTION ON DELETE NO ACTION
+) STRICT, WITHOUT ROWID;
+```
+
+Exactly one metadata row is required. Its key epoch must equal the authenticated
+sidecar `db_key_epoch` and the fixed profile value `1` on insert and every open;
+a future DBK epoch requires the separately journaled RFC migration already
+required above. The typed transaction checks that the
+ordered chunk set is contiguous, its count equals `chunk_count`, and its
+overflow-safe byte sum equals `byte_count` before commit and again on read.
+The fixed profile uses immediate `NO ACTION` foreign keys, not `RESTRICT` or a
+cascading action: SQLite can enforce this schema while trigger depth is zero.
+Foreign-key cascades and schema/user triggers are forbidden. The only typed
+delete transaction first deletes every
+chunk for one exact `(workspace_id, database_id, object_id)`, verifies the
+affected-row count against the authenticated object row, then deletes that
+object row in the same immediate transaction. Deleting metadata remains
+forbidden. A direct parent delete, partial child delete, wrong identity, or
+failpoint rolls back the whole mutation.
+There is no generic metadata/value table. Any DDL, tag, disposition,
+`application_id`, `user_version`, or registry change is a versioned migration
+and RFC amendment; SQLite's mutable internal `schema_version` cookie is never
+an application version.
+
 Unknown tags are invalid. Strings, plugins, model output, manifests, and callers
 cannot create a tag or change disposition. `VentureProfileV1` exists only for
 the exact current demo `venture_profile` schema; it is not a generic JSON
@@ -434,8 +653,9 @@ registry version. Credentials, identity, authority, audit signing, sessions,
 recovery internals, freshness anchors, and unfinished
 effects have no table or generic blob escape hatch in this database.
 
-Foreign keys and `CHECK` constraints enforce object IDs, tags, chunk order,
-chunk count, byte counts, and workspace/database identity. Logical names and
+Foreign keys and `CHECK` constraints enforce identity, fixed tags, per-row
+indices, and per-row size bounds; the sealed transaction and read verifier
+enforce the cross-row chunk order, count, and aggregate byte total. Logical names and
 business content are columns inside SQLCipher, never file names or clear
 sidecar fields. The schema has no views, triggers, virtual tables, dynamic SQL,
 or caller-defined table/column names.
@@ -757,12 +977,16 @@ points, atomic sidecar replacement, and directory durability. A platform is
 `Unavailable` if its native job is skipped, optional, injected, simulator-only,
 or failing. A TPM simulator never proves hardware backing.
 
-The cryptographic architecture is a closed release allowlist. The initial
-qualified candidates are `x86_64` and `aarch64`, subject to the named platform
-jobs above. RustCrypto's portable XChaCha implementation assumes constant-time
-integer multiplication; a new 32-bit, PowerPC, embedded, or other CPU target is
-`Unavailable` until an architecture-specific review and timing/implementation
-evidence closes that precondition. Cross-compilation success is not evidence.
+The cryptographic architecture is a closed exact-triple allowlist. Task 1
+qualifies only `x86_64-unknown-linux-gnu`. Task 5 may add
+`aarch64-apple-darwin` and `x86_64-pc-windows-msvc` only after the named real
+native jobs prove `HOST == TARGET`, ABI/profile, custody, and durability.
+Musl, GNU Windows, x86_64 macOS, aarch64 Linux, 32-bit, PowerPC, embedded, and
+every other target remain `Unavailable` until an amendment names that exact
+triple and adds architecture/toolchain evidence plus a mandatory native job.
+RustCrypto's portable XChaCha implementation assumes constant-time integer
+multiplication; that precondition is part of each review. Cross-compilation
+success is never qualification evidence.
 
 ## Rollback and residual leakage
 
@@ -824,6 +1048,14 @@ Implementations MUST NOT:
   with the official SQLCipher CLI syntax,
   exact pragma readback, encrypted-header proof, wrong-key failure, and no
   plaintext canary in database/journal/sidecar.
+- A mandatory uncached wrapper run on exact native
+  `x86_64-unknown-linux-gnu`, with the full ambient-variable negative matrix,
+  frozen/offline fresh target, recorded tool hashes, and no bare-Cargo engine
+  qualification path in CI.
+- Real-binary subprocess tests proving process-first NO_LOAD_CONFIG under
+  hostile configuration, rejection after a real LOAD_CONFIG-first adversary,
+  private `CryptoProcessOwner` mediation, and an AST/call graph containing only
+  the two allowed unsafe FFI entry points.
 - RFC 9106 and upstream XChaCha vectors plus repository golden typed-AAD vectors.
 - Recovery-slot deletion, bit corruption, cross-workspace substitution, and
   valid-slot replacement all make device unwrap fail through the bound
@@ -831,7 +1063,8 @@ Implementations MUST NOT:
   and device wrappers, while a complete older valid sidecar remains a
   documented rollback case.
 - Compile/static assertions for secret opacity, algorithm/nonce non-selection,
-  no extension/attach/dynamic SQL, and no release test store.
+  no extension/attach/dynamic SQL, no engine API in the protocol-only library,
+  and no release test store.
 - Bound, malformed, corruption, truncation, schema substitution, wrong
   workspace/database/epoch/role, cross-wrapper, and unknown object-tag tests.
 - Transaction/fault tests at begin, row/chunk insert, commit, journal sync,

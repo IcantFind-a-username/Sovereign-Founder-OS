@@ -69,6 +69,18 @@ multi-file atomicity out of the business-data store. This is a cryptographic,
 database-profile, platform-adapter, and migration foundation. It is not yet a
 product enrollment, backup, recovery, or workspace-protection claim.
 
+Program 1A lives in the separate `publish = false`
+`sovereign-vault-v2-engine` workspace crate. The shipped CLI and legacy Vault
+have no dependency edge to it; the exact SQLCipher 4.14/OpenSSL graph is absent
+from product release trees and binaries. It is a binary-first dedicated
+process: a protocol-only library exposes no DBK/connection API, `main` creates
+the private OpenSSL process-owner before dispatch, and every database open
+requires that owner. Task 1 qualifies only exact native
+`x86_64-unknown-linux-gnu` through the sanitized uncached wrapper; Task 5 must
+separately name and qualify any additional triple. Program 1D may add a narrow
+broker/dependency edge only after the newer exact SQLCipher profile and
+process boundary receive RFC review.
+
 Exit gate:
 
 - no v2 API, writer, protector, migration output, or release-test seam creates

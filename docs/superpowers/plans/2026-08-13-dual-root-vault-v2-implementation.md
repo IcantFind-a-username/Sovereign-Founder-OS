@@ -11,7 +11,8 @@ reader-first importer—without activating it in the product or overstating
 whole-workspace confidentiality.
 
 **Architecture:** A random 32-byte DBK opens one bundled SQLCipher 4.14.0
-database through a tiny audited `sqlite3_key` raw-key wrapper. A native-store
+database through one audited FFI module with exactly two narrow entry points:
+process bootstrap and raw-key/connection hardening. A native-store
 DeviceKEK and an Argon2id-unlocked RecoveryKEK independently XChaCha-wrap that
 DBK with distinct typed AAD. SQLCipher owns page encryption, transactions,
 rollback journaling, and crash recovery. The database accepts only closed typed
@@ -27,6 +28,14 @@ real-candidate qualification, and the complete
 workspace plaintext inventory are mandatory prerequisites for a later
 activation slice.
 
+The engine is a separate `publish = false` workspace crate,
+`sovereign-vault-v2-engine`. During Program 1A neither the shipped CLI nor the
+legacy `sovereign-vault` crate depends on it. Do not implement this separation
+as a default-off Cargo feature: workspace `--all-features`, feature unification,
+or an accidental downstream selection could otherwise link the admitted-only
+SQLCipher 4.14.0 objects into a product binary. Program 1D and the newer exact
+SQLCipher profile require a distinct RFC-reviewed dependency-edge change.
+
 ## Exact dependency profile
 
 Dependencies are introduced only by the task that uses them:
@@ -35,22 +44,37 @@ Dependencies are introduced only by the task that uses them:
 # Task 1
 rusqlite = { version = "=0.40.2", default-features = false,
   features = ["bundled-sqlcipher-vendored-openssl", "hooks", "limits"] }
+openssl-sys = { version = "=0.9.117", default-features = false }
 zeroize = { version = "=1.9.0", features = ["derive"] }
 
-# Task 2
+# Task 1 dev-only evidence harness
+serde = { version = "=1.0.228", default-features = false,
+  features = ["derive", "std"] }
+tempfile = "=3.27.0"
+sha2 = { version = "=0.10.9", default-features = false }
+syn = { version = "=2.0.118", default-features = false,
+  features = ["full", "parsing"] }
+static_assertions = "=1.1.0"
+trybuild = "=1.0.116"
+
+# Task 2 normal dependencies. Move, do not duplicate, the exact serde and sha2
+# entries above from dev-dependencies to dependencies.
 chacha20poly1305 = { version = "=0.11.0", default-features = false,
   features = ["alloc", "zeroize"] }
 argon2 = { version = "=0.5.3", default-features = false,
   features = ["alloc", "zeroize"] }
 keyring = { version = "=4.1.5", default-features = false, features = ["v1"] }
+getrandom = { version = "=0.4.3", default-features = false }
+serde_json = { version = "=1.0.150", default-features = false,
+  features = ["std"] }
+serde_json_canonicalizer = "=0.3.2"
+base64 = { version = "=0.22.1", default-features = false, features = ["alloc"] }
 
 # Task 4
 cap-std = "=4.0.2"
 cap-fs-ext = "=4.0.2"
-
-# Dev-only assertion harness
-static_assertions = "=1.1.0"
-trybuild = "=1.0.116"
+aes-gcm = { version = "=0.10.3", default-features = false,
+  features = ["aes", "alloc", "zeroize"] }
 ```
 
 The released locked graph is expected to resolve `libsqlite3-sys = 0.38.2` and
@@ -67,8 +91,8 @@ amendment) and that profile passes the
 gates, or the owner approves a separate exact-source dependency plan. Never use
 a semver range or runtime “at least” check as the admitted profile.
 
-Before writing implementation code, record
-`cargo tree -p sovereign-vault -e features`, verify the vendored source/version,
+Before writing implementation code, record the frozen engine feature tree
+through `scripts/qualify-vault-v2.sh`, verify the vendored source/version,
 and review all relevant advisories and release deltas. The reviewed candidate
 revision beginning `62648175` carries 4.17.0 but is unreleased/unsigned in this
 path; do not pin it from an abbreviated identifier or silently use master. An
@@ -77,21 +101,112 @@ source-provenance and supply-chain decision, reproducible hash/build/license
 evidence, and amended RFC/dependency profile. A material unresolved issue blocks
 rather than triggers improvised build plumbing.
 
-The crate build gate fails when dependency-shaping ambient overrides are set,
+The single executable qualification entry point is
+`scripts/qualify-vault-v2.sh`. It rejects unapproved ambient input, constructs
+a positive-allowlist child environment, creates and owns a fresh dedicated
+`CARGO_TARGET_DIR`, and only then invokes the exact Cargo command. Every command
+that resolves or builds `sovereign-vault-v2-engine`—including workspace
+Clippy/tests, docs, metadata/tree inspection, CI, and recorded local
+qualification—goes through this wrapper. Its `full` mode reuses one fresh
+target only within that invocation; no qualification restores or writes a
+shared target cache.
+
+The wrapper fails when dependency-shaping or vendored-build-tool ambient
+overrides are set,
 including `LIBSQLITE3_SYS_USE_PKG_CONFIG`, `LIBSQLITE3_FLAGS`,
 `SQLITE_MAX_VARIABLE_NUMBER`, `SQLITE_MAX_EXPR_DEPTH`, `SQLITE_MAX_COLUMN`,
 `OPENSSL_NO_VENDOR`, `SQLCIPHER_{LIB_DIR,INCLUDE_DIR,STATIC}`,
-`OPENSSL_{DIR,LIB_DIR,INCLUDE_DIR}`, `PKG_CONFIG_*`, `VCPKGRS_DYNAMIC`, and
-their relevant target-prefixed forms. Treat this as a closed allowlist: a new
-dependency-shaping variable stops for RFC review. Record release C toolchain
-variables separately and prove vendored selection in a clean subprocess. A
-rejected build may have compiled a dependency before the Vault build script
-runs, but cannot complete or qualify an artifact.
+`OPENSSL_{DIR,LIB_DIR,INCLUDE_DIR,CONFIG_DIR,LIBS,STATIC}`,
+`OPENSSL_SRC_PERL`, `PERL`, `OPENSSL_RUST_USE_NASM`, `PKG_CONFIG_*`,
+`VCPKGRS_DYNAMIC`, and their relevant target-prefixed forms. The direct
+`openssl-src` tool variables are rejected in their exact global forms. Treat
+this as a closed allowlist: a newly observed dependency-shaping or tool-
+selection variable stops for RFC review. It also removes `PERL5OPT`,
+`PERL5LIB`, `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and unapproved linker/tool
+overrides; resolves Cargo, rustc, C compiler, archiver, ranlib, Perl, and make
+from an approved path set; and records their canonical paths, versions, and
+SHA-256 digests. Qualification is `--frozen --offline` after a separate
+`cargo fetch --locked` acquisition step, so the controlled child does not run
+network acquisition. A new tool or environment input stops for review.
+
+The child starts from `env -i` and receives only fresh `HOME`/`TMPDIR`, the
+reviewed Cargo/rustup homes, `LANG`/`LC_ALL`, fixed `SOURCE_DATE_EPOCH`, exact
+absolute Cargo/rustc/rustdoc/C compiler/archiver/ranlib paths, the exact
+`CARGO_BUILD_TARGET`, `CARGO_NET_OFFLINE=true`, and a PATH assembled only from
+the reviewed Perl/make/linker directories. Repository and Cargo source-config
+replacement is rejected. Cargo-created build-script variables such as
+`HOST`, `TARGET`, `OUT_DIR`, and `CARGO_MAKEFLAGS` are allowed only inside the
+child and are recorded where relevant; they are not accepted from the caller.
+
+`crates/vault-v2-engine/build.rs` repeats the checks as defense in depth, but a
+downstream build script runs too late to prevent an overridden upstream
+dependency from compiling or being reused from Cargo's cache. It is never the
+qualification gate by itself. Negative tests set each variable independently,
+invoke the wrapper, and require refusal before Cargo. CI has a dedicated
+uncached qualification step; ordinary cached product jobs exclude the unlinked
+engine package.
 
 Do not invent or add keyring transitive provider features. `keyring` v1 selects
 its native provider by target; if locked Cargo metadata proves an explicit
 downstream feature is required, stop for dependency review and amend this plan
 before code.
+
+Task 2 uses only the direct fallible `getrandom::fill` API for every DBK, KEK,
+salt, nonce, and protocol ID. It does not enable or call an AEAD convenience
+generator, `rand`, a custom backend, or handwritten operating-system RNG FFI.
+An entropy error zeroizes every partially filled supported buffer, publishes no
+wrapper/sidecar/key-store/database state, and returns one value-free terminal
+error. The exact native-target gate also rejects opt-in/custom `getrandom`
+backends. A crate-private `SystemEntropy` wrapper is the only production
+implementation; a crate-private test double may inject failure at each fill
+boundary but is absent from normal/release binaries. Task 2's JSON stack is not
+a generic persistence escape hatch: it
+parses only the bounded closed sidecar type with duplicate/unknown-field denial,
+then requires byte-for-byte equality with RFC 8785 serialization before any
+KDF or unwrap. Base64 is the exact unpadded URL-safe alphabet; SHA-256 is used
+only for the RFC-defined domain-separated recovery-slot commitment.
+
+Task 4's pinned AES-GCM dependency is legacy-reader-only. It may authenticate
+and decrypt the exact current 12-byte-nonce/full-tag record into a zeroizing
+typed importer buffer, but exposes no legacy encrypt, key-generation, arbitrary
+AAD, or write API. It never falls back between AES-GCM and the v2 profiles after
+an authentication failure.
+
+Task 1 qualifies exactly `x86_64-unknown-linux-gnu`, with native
+`HOST == TARGET`. The wrapper verifies the rustc host, rejects incoming
+`--target`/`CARGO_BUILD_TARGET` and target-linker overrides, then sets that
+exact target itself before Cargo. Every other triple/ABI—including musl, wasm,
+cross-compiles, Windows, and macOS—fails the engine gate until Task 5 adds its
+own exact triple and real native mandatory job. This does not block product
+builds because the product has no dependency on the engine.
+
+Program 1A is a binary-first dedicated experimental process, not a reusable
+database library. `src/main.rs` immediately obtains a private,
+non-constructible `CryptoProcessOwner` from the sole unsafe bootstrap before
+dispatching any command. The bootstrap declares the exact official C ABI and
+the pinned `OPENSSL_INIT_NO_LOAD_CONFIG` constant locally because
+`openssl-sys 0.9.117` does not expose them, calls
+`OPENSSL_init_crypto(..., NULL)`, and requires return value `1`. The exact
+direct `openssl-sys` dependency supplies the reviewed link/version boundary;
+the AST/call-graph gate permits no `openssl_sys::init`, other OpenSSL caller, or
+alternate bootstrap. Every SQLCipher open requires `&CryptoProcessOwner`.
+
+The package library target contains only a value-free protocol/version surface;
+DBK, connection, and FFI code compile only into the private process target.
+Behavioral qualification invokes the real binary in a fresh subprocess. A
+test-only fresh worker first calls `OPENSSL_INIT_LOAD_CONFIG` with a hostile
+configuration, then proves the later bootstrap/profile gate refuses it; a
+boolean marker is not accepted as evidence of global OpenSSL state. Normal
+fresh-process tests set hostile `OPENSSL_CONF`, `OPENSSL_CONF_INCLUDE`,
+`OPENSSL_ENGINES`, and `OPENSSL_MODULES` and require the identical admitted
+provider/profile. Program 1D still must keep a dedicated authenticated broker
+or separately prove a single process-wide initialization owner; arbitrary
+in-process embedding remains forbidden.
+
+The LOAD_CONFIG adversary is the only additional raw OpenSSL call, lives under
+`cfg(test)` inside the same FFI module, and is proven absent from the normal and
+release binaries. “Exactly two entry points” refers to production code; the
+source gate separately allowlists this one test-only negative control.
 
 ## Global constraints
 
@@ -103,10 +218,17 @@ before code.
   HMAC-SHA512, encrypted header, `cipher_memory_security=ON`, memory-only temp,
   rollback journal, `synchronous=FULL`, foreign keys, trusted schema off,
   defensive mode, and no extension/attach/dynamic SQL path.
-- DBK reaches SQLCipher only through the audited raw-key `sqlite3_key` wrapper.
-  The wrapper is the first database operation; connection-specific cipher
-  settings follow it before any page access. DBK never enters SQL text,
-  `String`, argv, environment, logs, or configuration.
+- DBK reaches SQLCipher only through one audited unsafe connection-hardening
+  entry point. It owns `sqlite3_open_v2`, calls `sqlite3_key` as the first
+  post-open database operation, then disables/verifies both extension routes
+  with `sqlite3_enable_load_extension(handle, 0)` and
+  `sqlite3_db_config(handle, SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, 0, &out)`.
+  The locked safe rusqlite API cannot express option 1005 without enabling the
+  forbidden loading feature, so no extra raw-handle shim is permitted. The
+  only other unsafe entry point is the process-first OpenSSL bootstrap; unsafe
+  code outside this single FFI module is forbidden. Cipher
+  settings and no-page C limits follow before first page access. DBK never
+  enters SQL text, `String`, argv, environment, logs, or configuration.
 - Every XChaCha seal gets a fresh OS-random 24-byte nonce; callers cannot supply
   nonces, algorithms, raw keys, or generic AAD.
 - Argon profile tag 1 is exactly v=19, m=65,536 KiB, t=3, p=4, 16-byte random
@@ -124,7 +246,10 @@ before code.
   that absence a protection: the rusqlite loading feature is disabled, the
   connection explicitly sets `SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION=0`, the
   authorizer rejects the SQL function, no raw connection/loading API escapes,
-  and tests prove neither route can be enabled.
+  and tests verify both initialization switches are disabled and that no
+  supported/public path can re-enable either route. This does not claim hostile
+  new unsafe code holding a raw handle is cryptographically unable to re-enable
+  compiled C machinery; the AST/raw-handle gate excludes that code.
 - Record compiled upstream built-ins such as JSON/FTS/RTree/DBSTAT/SOUNDEX
   instead of claiming they are absent. Fixed schema and Rust features expose no
   virtual tables/views/triggers or caller functions; the authorizer denies all
@@ -163,18 +288,25 @@ before code.
 
 ## Fixed limits and schema
 
-The connection factory calls `sqlite3_key` first and applies only cipher and C
-connection-safety settings before its first page access. It does not call the
-plaintext-header setter. `SELECT count(*) FROM sqlite_schema` is the first
-authentication probe; only after it succeeds may normal open verify (never
-silently convert) journal mode, application/schema IDs, max-page count, and
-database metadata. Create-only initialization sets fixed database values and
-then closes/reopens through the normal verifier. Runtime SQLite limits are:
+After raw `sqlite3_open_v2`, the factory calls `sqlite3_key` first, disables extension loading,
+and applies cipher/C connection safety plus every fixed `sqlite3_limit` before
+its first page access. It does not call the plaintext-header setter. For an
+existing database, `SELECT count(*) FROM sqlite_schema` is the first
+authentication probe; only after it succeeds may normal open inspect database
+PRAGMAs. For a zero-byte create-only database it is merely an empty-schema
+probe: before its first write the initializer sets and reads back
+`max_page_count=1,048,576`, runs the one fixed create/insert/drop page-forcing
+transaction, commits and closes, then independently reopens through the normal
+no-`CREATE` verifier before returning. Runtime SQLite limits are:
 SQL 64 KiB, one SQL value 16 MiB, 128 columns, expression depth 32, 16 compound
 terms, 999 variables, trigger
 depth 0, attached databases 0, LIKE pattern 256 bytes, and worker threads 0.
-It sets/verifies `max_page_count=1,048,576` (4 GiB at 4096-byte pages), rejects
-an existing database above that ceiling, and denies later changes. The typed
+After authentication it rejects `page_count > 1,048,576`, then sets and
+verifies the per-connection `max_page_count=1,048,576` ceiling and denies later
+changes; it does not treat that PRAGMA as persistent metadata. Task 1 does not
+invent an application/schema version. Task 3 fixes `application_id`,
+`user_version`, registry, and metadata; SQLite's internal `schema_version`
+cookie is never the application version. The typed
 schema caps one object at 64 fixed 4 MiB chunks/256 MiB, one transaction's
 aggregate new payload at 256 MiB and 10,000 objects, a wrapper sidecar at 256
 KiB, recovery input at 1,024 bytes,
@@ -200,23 +332,29 @@ exists.
 ## File map
 
 ```text
-crates/vault/src/lib.rs           opaque public errors/format; no v2 activation API
-crates/vault/build.rs             reject dependency-shaping ambient overrides
-crates/vault/src/secret.rs        non-formatting zeroizing secret holders
-crates/vault/src/sqlcipher.rs     connection factory + only unsafe sqlite3_key shim
-crates/vault/src/schema.rs        fixed schema, typed business adapters, transactions
-crates/vault/src/wrappers.rs      three typed AAD encodings and XChaCha wrappers
-crates/vault/src/key_slots.rs     fixed Argon2 recovery/device slot records
-crates/vault/src/platform.rs      sealed keyring::v1 native DeviceKEK adapter
-crates/vault/src/recovery.rs      RecoverySession<ReadOnly> implementation
-crates/vault/src/storage.rs       cap-dir DB/sidecar staging and durable replacement
-crates/vault/src/legacy.rs        exact unversioned AES-GCM read-only importer
-crates/vault/src/migration.rs     internal side-by-side staging transaction
-crates/vault/tests/public.rs      production opacity/fail-closed external tests
-crates/vault/tests/ui/            trybuild compile-fail surface tests
+crates/vault-v2-engine/src/lib.rs           value-free protocol/version only; no engine API
+crates/vault-v2-engine/src/main.rs          sole dedicated-process bootstrap and dispatcher
+crates/vault-v2-engine/src/engine/mod.rs    private process-owned engine state
+crates/vault-v2-engine/src/engine/process.rs private CryptoProcessOwner/OpenSSL bootstrap
+crates/vault-v2-engine/src/engine/ffi.rs    sole unsafe C ABI/open/key/hardening boundary
+crates/vault-v2-engine/build.rs             reject dependency-shaping ambient overrides
+crates/vault-v2-engine/src/engine/secret.rs non-formatting zeroizing secret holders
+crates/vault-v2-engine/src/engine/sqlcipher.rs closed connection/profile state machine
+crates/vault-v2-engine/src/engine/schema.rs        fixed schema, typed business adapters, transactions
+crates/vault-v2-engine/src/engine/wrappers.rs      three typed AAD encodings and XChaCha wrappers
+crates/vault-v2-engine/src/engine/key_slots.rs     fixed Argon2 recovery/device slot records
+crates/vault-v2-engine/src/engine/platform.rs      sealed keyring::v1 native DeviceKEK adapter
+crates/vault-v2-engine/src/engine/recovery.rs      RecoverySession<ReadOnly> implementation
+crates/vault-v2-engine/src/engine/storage.rs       cap-dir DB/sidecar staging and durable replacement
+crates/vault-v2-engine/src/engine/legacy.rs        exact unversioned AES-GCM read-only importer
+crates/vault-v2-engine/src/engine/migration.rs     internal side-by-side staging transaction
+crates/vault-v2-engine/tests/public.rs      protocol opacity/metadata/process behavior tests
+crates/vault-v2-engine/tests/process.rs     fresh real-binary qualification tests
+crates/vault-v2-engine/tests/ui/            trybuild compile-fail surface tests
 tests/adversarial/tests/          supported-API downgrade/exfiltration checks
 .github/workflows/vault-platform.yml  mandatory native-store/durability jobs
 docs/security/vault-v2-verification.md evidence and honest readiness ledger
+scripts/qualify-vault-v2.sh      sole sanitized Cargo qualification entry point
 ```
 
 ---
@@ -226,19 +364,28 @@ docs/security/vault-v2-verification.md evidence and honest readiness ledger
 **Files:**
 - Modify: `Cargo.toml`
 - Modify: `Cargo.lock`
-- Modify: `crates/vault/Cargo.toml`
-- Create: `crates/vault/build.rs`
-- Modify: `crates/vault/src/lib.rs`
-- Create: `crates/vault/src/secret.rs`
-- Create: `crates/vault/src/sqlcipher.rs`
-- Create: `crates/vault/tests/public.rs`
-- Create: `crates/vault/tests/ui.rs`
-- Create: `crates/vault/tests/ui/secret_surface.rs`
-- Create: `crates/vault/tests/ui/secret_surface.stderr`
+- Create: `crates/vault-v2-engine/Cargo.toml` (`publish = false`)
+- Create: `crates/vault-v2-engine/build.rs`
+- Create: `crates/vault-v2-engine/src/lib.rs`
+- Create: `crates/vault-v2-engine/src/main.rs`
+- Create: `crates/vault-v2-engine/src/engine/mod.rs`
+- Create: `crates/vault-v2-engine/src/engine/process.rs`
+- Create: `crates/vault-v2-engine/src/engine/ffi.rs`
+- Create: `crates/vault-v2-engine/src/engine/secret.rs`
+- Create: `crates/vault-v2-engine/src/engine/sqlcipher.rs`
+- Create: `crates/vault-v2-engine/tests/public.rs`
+- Create: `crates/vault-v2-engine/tests/process.rs`
+- Create: `crates/vault-v2-engine/tests/ui.rs`
+- Create: five independent `crates/vault-v2-engine/tests/ui/*.rs` fixtures and
+  their reviewed Rust-1.97 `.stderr` files
+- Create: `scripts/qualify-vault-v2.sh`
+- Modify: `.github/workflows/ci.yml`
 
-**Internal interfaces:** `DbKey`, `RawSqlcipherKey`, `SqlcipherProfile`,
+**Private process interfaces:** `CryptoProcessOwner`, `DbKey`,
+`RawSqlcipherKey`, `SqlcipherProfile`,
 `ConnectionMode::{ReadWriteCreateInternal,ReadWrite,ReadOnlyRecovery}`, and a
-closed `open_sqlcipher` factory. No public connection or raw handle escapes.
+closed `open_sqlcipher(&CryptoProcessOwner, ...)` factory. The library target
+contains none of these types. No public connection or raw handle escapes.
 
 - [ ] **Step 1: Write failing profile, opacity, and raw-key tests**
 
@@ -250,31 +397,80 @@ Add exact named tests for:
 - `connection_profile_matches_every_required_pragma`;
 - `extensions_attach_writable_schema_and_dynamic_sql_are_denied`;
 - `oversized_values_and_sql_fail_at_fixed_limits`; and
-- `raw_dbk_never_reaches_sql_text_logs_or_environment`.
+- `raw_dbk_never_reaches_sql_text_logs_or_environment`;
+- `fresh_process_ignores_hostile_openssl_configuration`; and
+- `prior_load_config_process_is_rejected_by_profile_gate`.
+
+The tests must derive evidence independently rather than trust a production
+“observed profile” or operation transcript. Add exact 67-byte encoder vectors
+for DBKs containing `00`, `0f`, `ab`, and `ff`; verify every byte and the
+absence of NUL, and scan DB/journal for raw DBK, 64-byte hex, and full token.
+Read cipher/provider/provider version, SQLCipher/SQLite runtime versions,
+compile options, every available C connection setting, and every SQLite limit
+through the actual engine/C readback. SQLite has no API that reads back the
+original `sqlite3_open_v2` flags, so exact `syn` AST/call-site inspection proves
+the fixed flag expression while missing-file, `NOFOLLOW`, URI, read-only, and
+create-only behavior tests prove its effects. The AST gate also proves the
+OpenSSL bootstrap is the first project-controlled crypto action, the raw-key
+call is the first database action after open, and there is exactly one unsafe
+FFI module with the two named entry points. Each resource limit has boundary
+and boundary-plus-one coverage.
+Source/AST gates prove the plaintext-header setter, arbitrary SQL, raw handle,
+backup/export/copy, and additional OpenSSL/SQLite unsafe calls are absent.
+
+Normal-open tests cover missing file with no creation, symlink/`NOFOLLOW`, URI
+rejection, wrong key, WAL/profile mismatch, and an unexpected object in the
+Task 1 empty pre-schema container. They compare pre/post file hashes to prove
+the factory fails without repair. Create tests prove the exact fixed
+create/drop page-forcing transaction is the only initializer schema operation,
+an interrupted initializer never returns, and the completed empty container
+rejects a wrong key after independent reopen. Journal tests scan both old and
+replacement canaries while a real transaction is active and cover commit plus
+rollback.
 
 Use `matches!` for typed errors, not `assert_eq!` on a plaintext-bearing success
 type. Put compile-fail tests on the public API proving downstream code cannot
 name `DbKey`, reach the raw handle/shim, construct create mode, or choose a
 cipher. Add `static_assertions::assert_not_impl_any!` for
-`DbKey: Clone, Debug, Display, Serialize, Deserialize` inside the crate.
+both `DbKey` and `RawSqlcipherKey`: `Clone`, `Debug`, `Display`, `Serialize`,
+and `DeserializeOwned`; positively assert the intended zeroize-on-drop traits.
+Assert `HardenedConnection: !Send + !Sync` inside the private binary unit tests.
+The five public-surface trybuild cases are independent, and their final stderr must fail for
+privacy, not an unresolved crate or test-harness dependency.
 
 - [ ] **Step 2: Capture genuine RED**
 
 ```bash
-cargo test -p sovereign-vault --lib sqlcipher::tests --locked -- --nocapture
-cargo test -p sovereign-vault --test public --locked -- --nocapture
-cargo test -p sovereign-vault --test ui --locked -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::sqlcipher::tests --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test public --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test process --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui --frozen -- --nocapture
 ```
 
-First run `-- --list` for filtered targets and reject `running 0 tests`. Save
-missing-module/API stderr. If Rust is unavailable locally, create the tests-only
-commit and require the draft-PR CI failure before implementation.
+First create the private crate, exact dev dependencies, and locked graph so the
+harness itself compiles. Then run `-- --list` for filtered targets and reject
+`running 0 tests`. Save missing-engine-API stderr; missing `trybuild`,
+`static_assertions`, package, or lockfile is not valid RED. The stacked PR must
+target `main` (or an explicitly amended CI trigger) because current CI runs
+only for `main` pull requests; absence of a workflow run is never evidence.
+
+In the same Task 1 slice, change CI so dependency acquisition is an explicit
+`cargo fetch --locked` step, then run engine/workspace qualification only via
+`./scripts/qualify-vault-v2.sh full` in a job that restores no target cache.
+Any ordinary cached product-only job must pass
+`--exclude sovereign-vault-v2-engine`. CI directly invokes the wrapper's
+negative environment matrix and exact host/target check. A bare workspace
+Cargo command is not accepted as engine evidence.
 
 - [ ] **Step 3: Pin minimal dependencies and implement one unsafe shim**
 
 Add only Task 1 dependencies. Confirm `rusqlite = 0.40.2` resolves
 `libsqlite3-sys = 0.38.2` and bundled SQLCipher 4.14.0; record the exact feature
-tree and advisory/delta review. Add a precise static/call-graph gate rejecting
+tree, crates.io checksums, native-target resolution, vendored amalgamation
+hashes, and advisory/delta review. The recorded review includes the 4.15
+`sqlcipher_export` fix, SQLite/FTS5 issues, and the OpenSSL 3.6.3 OCSP/TLS
+issue with exact non-reachability reasoning rather than “no advisories.” Add a
+precise static/call-graph gate rejecting
 `sqlcipher_export`, dynamic `ATTACH`, `rusqlite::backup::Backup`,
 `Connection::backup`, and database/page-copy calls. Stop on a material
 unresolved finding rather than changing sources ad hoc.
@@ -284,26 +480,57 @@ override. Add negative CI/build tests that set each variable independently and
 require a non-zero build before an artifact can qualify. Record approved
 target-specific compile options, `cipher_provider`, provider version, and the
 vendored source hashes; an unrecognized provider or build profile fails.
+Run all qualification Cargo commands through the wrapper and its fresh target
+directory. Use `--frozen`; the exact transitive
+`libsqlite3-sys` version is guaranteed by the reviewed lockfile, not by
+rusqlite's semver declaration alone.
 
-The only new unsafe function accepts `&DbKey`, fills a fixed zeroizing 67-byte
-buffer with the official 67-byte raw-key blob literal
-`x'<64 lowercase hex digits>'`, calls `rusqlite::ffi::sqlite3_key` with exact
-pointer/length, checks `SQLITE_OK`, and clears both encoded and DBK buffers as
-their lifetimes end. Passing 32 arbitrary bytes directly is a regression to
-passphrase semantics and is forbidden. The shim contains
-a line-by-line safety comment and exposes neither arbitrary bytes nor a raw
+The only unsafe module has exactly two reviewed entry points. First,
+`bootstrap_crypto_process` declares the pinned official OpenSSL C ABI/constant,
+calls `OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, NULL)` as `main`'s
+first project-controlled crypto action, checks return `1`, and returns the
+private `CryptoProcessOwner`. Second, `open_key_and_harden_connection` accepts
+`&CryptoProcessOwner`, the closed path/mode, and `&DbKey`; first calls
+`sqlite3_threadsafe()` and requires admitted compile-time value `1`, then calls
+raw `sqlite3_open_v2` with the exact flags and, on success, makes
+`sqlite3_key` the first post-open SQLite call. This avoids rusqlite's safe open
+path, which installs a busy timeout before returning and therefore cannot prove
+the required order. The function fills a fixed zeroizing 67-byte buffer with
+the official raw-key blob literal
+`x'<64 lowercase hex digits>'`, and calls `rusqlite::ffi::sqlite3_key` with
+the exact pointer/length as the first post-open database operation. It next calls
+`sqlite3_enable_load_extension(handle, 0)` and
+`sqlite3_db_config(handle, SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, 0, &out)`,
+requires both `SQLITE_OK` and `out == 0`, then transfers its solely owned handle
+once through `Connection::from_handle_owned`. Every earlier error closes the
+handle exactly once. The locked safe `DbConfig` omits option 1005 and the safe
+extension helper needs the forbidden feature; no third unsafe entry point or
+second raw-handle shim is allowed. Passing 32 arbitrary bytes directly is a
+regression to passphrase semantics and is forbidden. Both functions contain
+line-by-line safety comments and expose neither arbitrary bytes nor a raw
 connection pointer.
 
-The raw-key shim is the first database operation. The connection factory then
-applies only the RFC cipher and C connection-safety settings, and uses a schema
-count as the first page-access/key authentication probe. It performs profile
-readback and verifies journal/application/schema/max-page database state only
-after that probe; normal open fails on mismatch and never converts journal mode
-or creates a missing database. Create mode is a separate initializer followed
-by independent normal reopen. The bundled C symbols for extension loading exist, but the rusqlite
-feature is absent; the factory explicitly disables both loading routes with
-`SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION=0`, verifies the returned state, and the
-authorizer/API surface keeps them unreachable.
+The resulting private `HardenedConnection` adds a non-send/non-sync marker and
+never crosses the dedicated process thread. After ownership transfer, the
+factory sets the fixed busy timeout and remaining safe no-page controls before
+authentication. Private static assertions pin this replacement for rusqlite's
+bypassed safe-open bookkeeping.
+
+The raw-key call is the first post-open database operation. The factory then
+applies only the RFC cipher/C connection-safety settings, installs the closed
+authorizer, and sets/reads back every fixed `sqlite3_limit` before page access.
+For an existing database it uses the schema count as the first authentication
+probe. It verifies profile/journal/page-count state only afterward; Task 3,
+not Task 1, defines `application_id`, `user_version`, registry and metadata.
+Normal open fails on mismatch without changing the file, converting journal
+mode, or creating a missing database. Create mode treats the zero-byte schema
+query only as an empty-schema probe. Before any initializer write it sets and
+reads back the page ceiling, then runs one fixed create/insert/drop transaction
+solely to force an encrypted page, commits/closes, and returns success only
+after an independent normal no-`CREATE` reopen authenticates the encrypted
+pages, finds an empty schema, and sets/verifies the ceiling again. The bundled
+C symbols for extension loading exist, but the rusqlite feature is absent and
+the authorizer/API surface keeps them unreachable.
 
 - [ ] **Step 4: Run GREEN, official fixtures, and deliberate mutations**
 
@@ -318,11 +545,19 @@ applicable test must fail each time. Restore each mutation and rerun.
 
 - [ ] **Step 5: Full gate, review, commit, push**
 
-Inspect `cargo tree -p sovereign-vault -e features` and the bundled C build.
+Inspect the wrapper-recorded
+`./scripts/qualify-vault-v2.sh cargo tree -p sovereign-vault-v2-engine -e features --frozen`
+output and bundled C build.
+Also save `cargo tree -p sovereign-cli -e features --locked` and require it to
+contain none of `sovereign-vault-v2-engine`, `rusqlite`, `libsqlite3-sys`, or
+`openssl-sys`. Build the release CLI and inspect symbols/strings for
+`sqlite3_key`, `sqlcipher_export`, and `cipher_version`; any match introduced
+by Program 1A is a release-boundary failure.
 Run the plan-wide gate in Task 6. Commit only after independent review:
 
 ```bash
-git add Cargo.toml Cargo.lock crates/vault
+git add Cargo.toml Cargo.lock crates/vault-v2-engine \
+  scripts/qualify-vault-v2.sh .github/workflows/ci.yml
 git commit -m "feat(vault): add fixed SQLCipher engine"
 ```
 
@@ -333,14 +568,14 @@ Push, fetch, and verify the exact remote branch contains the commit.
 **Files:**
 - Modify: `Cargo.toml`
 - Modify: `Cargo.lock`
-- Modify: `crates/vault/Cargo.toml`
-- Modify: `crates/vault/src/lib.rs`
-- Create: `crates/vault/src/wrappers.rs`
-- Create: `crates/vault/src/key_slots.rs`
-- Create: `crates/vault/src/platform.rs`
-- Create: `crates/vault/src/recovery.rs`
-- Modify: `crates/vault/tests/public.rs`
-- Add: `crates/vault/tests/ui/recovery_read_only.rs`
+- Modify: `crates/vault-v2-engine/Cargo.toml`
+- Modify: `crates/vault-v2-engine/src/engine/mod.rs`
+- Create: `crates/vault-v2-engine/src/engine/wrappers.rs`
+- Create: `crates/vault-v2-engine/src/engine/key_slots.rs`
+- Create: `crates/vault-v2-engine/src/engine/platform.rs`
+- Create: `crates/vault-v2-engine/src/engine/recovery.rs`
+- Modify: `crates/vault-v2-engine/tests/public.rs`
+- Add: `crates/vault-v2-engine/tests/ui/recovery_read_only.rs`
 
 **Internal interfaces:** `DeviceDbkAad`, `PwkRecoveryKekAad`,
 `RecoveryDbkAad`, `NativeDeviceStore`, internal `TestOnlyDeviceStore`, fixed
@@ -350,7 +585,11 @@ Push, fetch, and verify the exact remote branch contains the commit.
 
 Write golden vectors for every typed AAD and one-field mutation of every field.
 Add cross-purpose/cross-role/cross-workspace/database/epoch substitution tests,
-fresh-nonce tests, and dependency upstream XChaCha/RFC 9106 vectors.
+fresh-nonce tests, direct fallible OS-entropy tests, and dependency upstream
+XChaCha/RFC 9106 vectors. Inject an entropy failure before and partway through
+each required DBK/KEK/salt/nonce/ID fill and prove no database, sidecar, keyring
+record, wrapper, temporary file, or other durable state was created or changed;
+the returned error and its Debug/source chain are value-free.
 
 Tests must prove:
 
@@ -379,10 +618,10 @@ rollback boundary, not misclassified as tamper detection.
 - [ ] **Step 2: Capture focused RED**
 
 ```bash
-cargo test -p sovereign-vault --lib wrappers::tests --locked -- --nocapture
-cargo test -p sovereign-vault --lib key_slots::tests --locked -- --nocapture
-cargo test -p sovereign-vault --lib recovery::tests --locked -- --nocapture
-cargo test -p sovereign-vault --test ui recovery_read_only --locked -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::wrappers::tests --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::key_slots::tests --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::recovery::tests --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui recovery_read_only --frozen -- --nocapture
 ```
 
 - [ ] **Step 3: Implement the minimal roots**
@@ -428,18 +667,18 @@ selection, task-secret environment names, raw keys, and file-key writers.
 Record Cargo feature evidence and run Task 6's full gate. Commit:
 
 ```bash
-git add Cargo.toml Cargo.lock crates/vault
+git add Cargo.toml Cargo.lock crates/vault-v2-engine
 git commit -m "feat(vault): add typed dual DBK wrappers"
 ```
 
 ### Task 3: Implement the closed transactional business schema
 
 **Files:**
-- Create: `crates/vault/src/schema.rs`
-- Modify: `crates/vault/src/lib.rs`
-- Modify: `crates/vault/src/sqlcipher.rs`
-- Modify: `crates/vault/src/recovery.rs`
-- Modify: `crates/vault/tests/public.rs`
+- Create: `crates/vault-v2-engine/src/engine/schema.rs`
+- Modify: `crates/vault-v2-engine/src/engine/mod.rs`
+- Modify: `crates/vault-v2-engine/src/engine/sqlcipher.rs`
+- Modify: `crates/vault-v2-engine/src/engine/recovery.rs`
+- Modify: `crates/vault-v2-engine/tests/public.rs`
 - Modify: `tests/adversarial/tests/security_invariants.rs`
 
 **Internal interfaces:** sealed `BusinessStateV1` and `VentureProfileV1`
@@ -455,6 +694,16 @@ Add exact tests that:
   failpoint;
 - foreign keys/checks reject wrong workspace/database ID, tag, chunk order,
   count, byte total, duplicate ID, and oversize values;
+- every workspace/database/object ID is exactly 32 bytes, matching the
+  external binding and typed AAD profile;
+- metadata `key_epoch`, the authenticated sidecar `db_key_epoch`, and the
+  profile constant must all be exactly `1`; any other value fails open rather
+  than being treated as a rotatable current profile;
+- with trigger depth fixed at zero and schema/user triggers forbidden, the
+  sealed delete path removes all exact
+  child chunks and then the parent object in one immediate transaction;
+  direct parent deletion, partial deletion, wrong identity, affected-row-count
+  mismatch, and every intervening failpoint leave the complete old object;
 - unknown/caller/plugin/model tags cannot compile or are rejected before SQL;
 - rollback journal recovery yields the old or complete new transaction;
 - plaintext names/content never appear in database header, rollback journal,
@@ -465,25 +714,47 @@ Add exact tests that:
 - [ ] **Step 2: Capture RED**
 
 ```bash
-cargo test -p sovereign-vault --lib schema::tests --locked -- --nocapture
-cargo test -p sovereign-adversarial-tests --test security_invariants vault_v2_closed_schema --locked -- --exact --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::schema::tests --frozen -- --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-adversarial-tests --test security_invariants vault_v2_closed_schema --frozen -- --exact --nocapture
 ```
 
 List exact names first and reject zero-test results.
 
 - [ ] **Step 3: Implement the minimum static schema**
 
-Create only metadata, business object, and ordered chunk tables. Use static SQL,
-foreign keys, fixed `CHECK`s, prepared parameters, and one immediate transaction
-per logical mutation. Store registry and schema version in authenticated
-SQLCipher pages and verify them on every open. No view, trigger, virtual table,
-attach, caller SQL, dynamic identifier, or generic metadata/value table.
+Implement the exact RFC DDL and constants: `application_id=0x53464f53`,
+`user_version=2`, registry version `1`, and only
+`vault_metadata_v1`, `business_object_v1`, and `business_chunk_v1`. Create the
+tables, one metadata row, and both application-version PRAGMAs in one immediate
+transaction, close, and verify them through normal open. Use only the RFC's
+static SQL, foreign keys, fixed `CHECK`s, prepared parameters, and one immediate
+transaction per logical mutation. Verify exactly one metadata row, identity,
+versions, exact key epoch `1` against the authenticated sidecar, DDL shape,
+contiguous chunk count/order, and overflow-safe byte sum on every open/read.
+The authorizer's closed function set includes only the exact
+DDL/check/query functions required by this schema. No view, trigger, virtual
+table, attach, caller SQL, dynamic identifier, or generic metadata/value table.
+Foreign keys use immediate `NO ACTION`, never `RESTRICT` or cascade; the typed
+object-delete transaction deletes and verifies the complete child set before
+deleting the parent. Real behavior tests set
+`SQLITE_LIMIT_TRIGGER_DEPTH=0`, prove a direct parent delete with children is
+rejected, and prove the exact child-first transaction succeeds. The static
+schema, authorizer, and DDL verification separately forbid schema/user triggers.
+
+Record a current check of SQLite's official `magic.txt` for the provisional
+`0x53464f53` value. This internal pre-release engine does not claim the value
+is registered; stable external format publication is blocked until registration
+or an RFC-defined ID migration.
 
 The sealed constructor—not callers—assigns the one object tag and backup
 disposition.
 The read API returns typed zeroizing buffers and verifies chunk count/length
 before allocation. Recovery uses the same typed query layer under its stronger
 authorizer.
+
+Changing any constant, DDL token, object tag, or backup disposition requires a
+new RFC-defined versioned migration; SQLite's internal `schema_version` is
+observed only as SQLite state and is never used as the application version.
 
 - [ ] **Step 4: GREEN and fault/mutation matrix**
 
@@ -494,7 +765,7 @@ tag, and skip a chunk; tests must fail. Restore and rerun.
 - [ ] **Step 5: Full gate, review, commit, push**
 
 ```bash
-git add crates/vault tests/adversarial
+git add crates/vault-v2-engine tests/adversarial
 git commit -m "feat(vault): transact closed business objects"
 ```
 
@@ -503,12 +774,12 @@ git commit -m "feat(vault): transact closed business objects"
 **Files:**
 - Modify: `Cargo.toml`
 - Modify: `Cargo.lock`
-- Modify: `crates/vault/Cargo.toml`
-- Create: `crates/vault/src/storage.rs`
-- Create: `crates/vault/src/legacy.rs`
-- Create: `crates/vault/src/migration.rs`
-- Modify: `crates/vault/src/lib.rs`
-- Modify: `crates/vault/tests/public.rs`
+- Modify: `crates/vault-v2-engine/Cargo.toml`
+- Create: `crates/vault-v2-engine/src/engine/storage.rs`
+- Create: `crates/vault-v2-engine/src/engine/legacy.rs`
+- Create: `crates/vault-v2-engine/src/engine/migration.rs`
+- Modify: `crates/vault-v2-engine/src/engine/mod.rs`
+- Modify: `crates/vault-v2-engine/tests/public.rs`
 - Modify: `tests/adversarial/tests/security_invariants.rs`
 
 **Internal output:** a `VerifiedV2Staging` evidence value with DB/sidecar
@@ -554,9 +825,9 @@ database binding must make every case terminal rather than invoke legacy.
 - [ ] **Step 2: Capture genuine RED on current code**
 
 ```bash
-cargo test -p sovereign-vault --lib legacy::tests::missing_key_never_regenerates --locked -- --exact --nocapture
-cargo test -p sovereign-vault --lib migration::tests::role_keys_block_activation --locked -- --exact --nocapture
-cargo test -p sovereign-adversarial-tests --test security_invariants vault_v2_failure_never_falls_back --locked -- --exact --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::legacy::tests::missing_key_never_regenerates --frozen -- --exact --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::migration::tests::role_keys_block_activation --frozen -- --exact --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-adversarial-tests --test security_invariants vault_v2_failure_never_falls_back --frozen -- --exact --nocapture
 ```
 
 Confirm current `Vault::init` regenerates the absent key or lacks the new typed
@@ -564,7 +835,8 @@ failure; save that RED evidence.
 
 - [ ] **Step 3: Implement read-only import into side-by-side staging**
 
-Add only Task 4 cap dependencies. Retain a capability directory for sidecar and
+Add only the exact Task 4 dependencies listed above: `cap-std`, `cap-fs-ext`,
+and legacy-reader-only `aes-gcm`. Retain a capability directory for sidecar and
 legacy I/O; reject symlinks/reparse paths and insecure permissions, use
 no-follow final opens, and lock cooperating writers. SQLite's stock VFS remains
 path based, so create rather than adopt a random private staging directory and
@@ -600,7 +872,7 @@ to try v1; the downgrade test must fail.
 - [ ] **Step 5: Full gate, review, commit, push**
 
 ```bash
-git add Cargo.toml Cargo.lock crates/vault tests/adversarial
+git add Cargo.toml Cargo.lock crates/vault-v2-engine tests/adversarial
 git commit -m "feat(vault): verify side-by-side legacy import"
 ```
 
@@ -609,9 +881,9 @@ git commit -m "feat(vault): verify side-by-side legacy import"
 **Files:**
 - Create: `.github/workflows/vault-platform.yml`
 - Modify: `.github/workflows/ci.yml`
-- Modify: `crates/vault/src/platform.rs`
-- Modify: `crates/vault/src/storage.rs`
-- Add platform integration tests under `crates/vault/tests/`
+- Modify: `crates/vault-v2-engine/src/engine/platform.rs`
+- Modify: `crates/vault-v2-engine/src/engine/storage.rs`
+- Add platform integration tests under `crates/vault-v2-engine/tests/`
 - Add platform fault harness under `scripts/`
 
 **Outcome:** three named required checks—macOS native store, Windows native
@@ -628,11 +900,14 @@ Service session and proves the selected keyring v1 provider; macOS uses the
 runner Keychain; Windows uses Credential Manager. Ambient developer secrets are
 never read.
 
-Jobs also assert the closed cryptographic CPU-architecture allowlist. Initial
-candidates are only `x86_64` and `aarch64`; a 32-bit, PowerPC, embedded, or
-other target is `Unavailable` until a separate review proves the locked
-XChaCha implementation's constant-time multiplication precondition and adds a
-mandatory native job. Cross-compilation alone does not qualify a target.
+Jobs assert exact native triples, not OS/architecture classes. Task 1 admits
+only `x86_64-unknown-linux-gnu`; Task 5 may add exactly
+`aarch64-apple-darwin` and `x86_64-pc-windows-msvc` after each runner proves
+`HOST == TARGET`, the native key store, ABI/profile, and all mandatory tests.
+Musl, GNU Windows, x86_64 macOS, aarch64 Linux, 32-bit, PowerPC, embedded, and
+every other target remain `Unavailable` until a separate review names the
+exact triple, proves the locked primitive/toolchain assumptions, and adds a
+mandatory real native job. Cross-compilation is never qualification.
 
 Add native permission/no-follow/reparse, process race, rollback-journal crash,
 sidecar replacement, directory durability, and close/reopen tests. Jobs fail if
@@ -647,8 +922,10 @@ go green when one job is skipped.
 
 - [ ] **Step 3: Implement isolated native jobs and lock feature evidence**
 
-Before code, save `cargo tree -p sovereign-vault -e features` separately on all
-three targets. `keyring = =4.1.5` remains `default-features=false, features=[v1]`.
+Before code, run the qualification wrapper and save
+`./scripts/qualify-vault-v2.sh cargo tree -p sovereign-vault-v2-engine -e features --frozen`
+separately on all three exact native triples. `keyring = =4.1.5` remains
+`default-features=false, features=[v1]`.
 If a provider cannot be proven native from locked metadata and a real roundtrip,
 stop that platform as `Unavailable`; do not guess a transitive feature.
 
@@ -666,7 +943,7 @@ an `OsProtected` software integration path only; it is not hardware assurance.
 - [ ] **Step 5: Review, commit, push, inspect all required checks**
 
 ```bash
-git add .github/workflows crates/vault scripts
+git add .github/workflows crates/vault-v2-engine scripts
 git commit -m "ci(vault): require native custody and durability"
 ```
 
@@ -683,7 +960,7 @@ job is not passing platform evidence.
 - Modify: `docs/INDEX.md`
 - Modify: `rfcs/0005-dual-root-vault-and-recovery.md`
 - Create: `docs/security/vault-v2-verification.md`
-- Add final negative tests/searches under `crates/vault/tests/` and
+- Add final negative tests/searches under `crates/vault-v2-engine/tests/` and
   `tests/adversarial/tests/`
 
 - [ ] **Step 1: Add final claim and activation-blocker tests**
@@ -728,14 +1005,19 @@ allowlisted inventory script. Any `Blocked*` entry keeps activation forbidden.
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo test --workspace --locked
-cargo test -p sovereign-vault --doc --locked
+./scripts/qualify-vault-v2.sh full
 ./scripts/check-file-size.sh
 cargo build -p sovereign-cli --release --locked
-cargo tree -p sovereign-vault -e features
+cargo tree -p sovereign-cli -e features --locked
 git diff --check HEAD --
 ```
+
+`full` runs, in one sanitized child environment and one newly created target,
+workspace Clippy with all targets/features and `-D warnings`, all workspace
+tests, engine docs, the frozen engine feature tree, and the engine
+release/process checks, all with `--frozen`. The script deletes the
+target on exit and emits the tool/source/profile evidence manifest. It rejects
+an unknown subcommand rather than becoming a general shell launcher.
 
 Also run pinned frontend type checking, `cargo audit`, dependency review, secret
 scan, SQLCipher version/profile/raw-key fixtures, release binary inspection,
@@ -761,7 +1043,7 @@ Critical/High finding with fresh RED/GREEN evidence, rerun all gates, then:
 git status --short
 git diff --cached --name-status
 git add README.md ARCHITECTURE.md THREAT_MODEL.md ROADMAP.md docs rfcs \
-  crates/vault tests/adversarial Cargo.toml Cargo.lock .github/workflows scripts
+  crates/vault-v2-engine tests/adversarial Cargo.toml Cargo.lock .github/workflows scripts
 git commit -m "security(vault): verify transactional v2 readiness"
 ```
 

@@ -60,28 +60,70 @@ also fixed a defensive-mode bypass in `sqlcipher_export`. Program 1A therefore
 must not silently equate “latest Rust binding” with “latest SQLCipher,” must not
 use `sqlcipher_export`, dynamic `ATTACH`, or extension loading in the supported
 path, and must record the exact runtime `cipher_version` and compile options.
-A released 4.14.0-backed binding may be used only for the non-product engine
-slice after a scoped advisory review; backup or product activation is blocked
-until an accepted dependency source carries the reviewed upstream version. An
-unreleased git revision is a separate supply-chain decision, not an automatic
-upgrade.
+A released 4.14.0-backed binding may be used only in the separate,
+`publish = false` `sovereign-vault-v2-engine` workspace crate after a scoped
+advisory review. Neither the shipped CLI nor legacy Vault depends on it, and
+their release tree/binary must contain no SQLCipher/OpenSSL symbols introduced
+by this profile. Backup or product activation is blocked until an accepted
+dependency source carries the reviewed upstream version. An unreleased git
+revision is a separate supply-chain decision, not an automatic upgrade.
+Task 1 qualifies only native `x86_64-unknown-linux-gnu`; broader OS/CPU labels
+and cross-compilation are not cryptographic/platform evidence.
 
 The locked bundled build compiles SQLite's extension-loading machinery, and
 the upstream build scripts accept environment variables that can change SQLite
-limits/compile flags or defeat vendored OpenSSL selection. Sovereign therefore
-does not claim those symbols are absent: the Vault build rejects dependency-
-shaping ambient overrides, records provider/version/compile options, omits the
-Rust loading feature, explicitly disables the C and SQL loading routes on every
-connection, and exposes no raw connection or loading API. A runtime authorizer
-is defense in depth, not a substitute for the build/profile gate.
+limits/compile flags, select build interpreters/tooling, or defeat vendored
+OpenSSL selection. A repository-owned pre-Cargo preflight rejects the exact
+global and target-prefixed inputs read by `libsqlite3-sys`, `openssl-sys`, and
+`openssl-src`; a downstream crate build script is only defense in depth because
+dependencies may already have executed or come from Cargo's cache. The one
+checked-in wrapper creates a clean target, rebuilds a positive-allowlist child
+environment, pins `HOST == TARGET`, records exact tool hashes/versions, and
+runs qualification frozen/offline; bare Cargo is not evidence. Sovereign does
+not claim compiled loading symbols are absent: the Rust loading feature is
+omitted, the audited raw-connection entry point disables/verifies both switches
+before page access, the authorizer denies SQL use, and no supported API can
+re-enable them. A runtime authorizer is defense in depth, not a substitute for
+the build/profile gate.
+
+The pinned graph resolves OpenSSL 3.6.3. [Official OpenSSL
+initialization](https://docs.openssl.org/3.6/man3/OPENSSL_init_crypto/) and
+[configuration](https://docs.openssl.org/3.6/man5/config/) are process-global,
+and `OPENSSL_CONF` can change provider properties before
+SQLCipher fetches cryptographic implementations. Program 1A is therefore a
+binary-first experimental process, not an embeddable database library. `main`
+first creates a private process-owner token via the only OpenSSL bootstrap;
+every database open requires it. Because `openssl-sys 0.9.117` does not expose
+the required function/constant, the single audited FFI module declares the
+official ABI and pinned constant against an exact direct dependency, then
+calls and verifies `OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG, NULL)`.
+AST/call-graph and fresh-process hostile-config tests prove the supported
+entry path; a real LOAD_CONFIG-first adversary must be rejected by profile
+admission. This proof does not authorize embedding in an arbitrary process.
+Program 1D must retain a dedicated authenticated broker or separately prove
+one process-wide initialization owner.
 
 SQLCipher documents that `sqlite3_key` applies the same input parsing rules as
 `PRAGMA key`. Passing 32 arbitrary bytes is therefore not the specified raw-key
 form. The binding must encode the 32-byte DBK as an in-memory `x'<64 hex>'`
 blob literal, call `sqlite3_key` before the first database operation, verify the
 schema and cipher integrity, and zeroize both the DBK and encoded buffer. This
-avoids SQL interpolation while preserving SQLCipher's defined no-KDF raw-key
-semantics.
+avoids SQL interpolation and bypasses the password-to-page-encryption-key
+PBKDF2 step. It is not a universal “no KDF” mode: with HMAC enabled SQLCipher
+still derives its distinct HMAC key through its pinned fast-PBKDF2 path.
+
+The scoped advisory review records three currently non-reachable classes
+rather than claiming “no advisories”: the SQLCipher 4.15
+`sqlcipher_export` defensive-mode fix, SQLite/FTS5 issues requiring arbitrary
+SQL plus disabled defensive mode, and the OpenSSL 3.6.3 OCSP/TLS issue outside
+the SQLCipher RAND/EVP/HMAC/PBKDF2 call set. Each non-reachability claim is a
+temporary Program 1A gate, not permission to activate the profile. The
+independently regenerated SQLCipher 4.14 amalgamation hashes have been
+identified during pre-implementation review, but become repository evidence
+only when Task 1 records and re-verifies them and Task 6 publishes the
+verification ledger. Until then this paragraph is a Target gate, not a claim
+that such a ledger already exists. Upstream tag-signing trust remains an
+explicit provenance item rather than an assumed verification.
 
 ## Layered decisions
 
