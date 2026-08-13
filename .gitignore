@@ -29,3 +29,7 @@ secrets/
 
 # Local notes (not for publication)
 notes/
+
+# Isolated development workspaces and agent execution ledgers
+.worktrees/
+.superpowers/
