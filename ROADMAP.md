@@ -33,8 +33,9 @@ used only for a named exit criterion with evidence.
 ## Current verified state
 
 The repository is a **Developer Preview / pre-release** with no tagged release.
-The workspace currently passes 183 Rust tests plus formatting, lint,
-file-size, locked dependency, TypeScript, and release-build gates.
+A fresh `cargo test --workspace --locked -- --list` enumerates 186 Rust tests.
+Formatting, lint, file-size, locked dependency, TypeScript, and release-build
+gates are configured in the repository.
 
 ### Founder product today
 
@@ -80,7 +81,7 @@ prove independently authenticated human intent or exact effect authorization.
 | --- | --- |
 | **Identity, policy, capability** | Current cryptographic/deterministic primitives; owner ceremony, final effect binding, key lifecycle, and hardware/OS storage remain targets. |
 | **Vault and audit** | Current prototype: AES-GCM entries and a replaceable-file, device-signed hash chain that proves internal consistency. This remains Experimental as a product boundary: the raw vault key sits beside the data, and rollback anchoring, restore, and state-value commitments are absent. |
-| **Authority and execution** | Experimental filesystem claims plus crash journal. A known approval-expiry retention gap prevents a durable one-use approval claim; claims are not transactional, revocation is absent, and process-level coverage remains. |
+| **Authority and execution** | Experimental filesystem claims plus crash journal. Approval claims now retain the verified signed approval expiry; token-expiry purge, store reopen, replay denial, and approval-expiry purge are tested. Token/idempotency/approval claims remain ordered filesystem operations rather than one transaction; revocation, full real-subprocess validator races, and independent owner admission remain. |
 | **Artifacts and Wasm** | Current verification/admission and tested import-free V2 pure computation; worker/cache are optional, cache bindings are partial, and Component/WIT/high-risk isolation remain. |
 | **Model Gateway** | Current prototype: an Experimental deterministic routing simulator, not a real model or local-model sandbox. Caller classification and provider self-reported trust can authorize unsafe Amber/Green cloud routing; [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) must remove it before real egress. |
 | **Workflow and releases** | Same-directory checkpoint resume and `v*` release automation exist; no lease, replication, real node failover, or tagged preview exists. |
@@ -183,8 +184,8 @@ persona and first private-AI tasks; mandate isolated compilation/cache on the
 product path; deliver 1C0's admitted owner authenticator, expiry-bound session,
 and single one-use approval issuer; bind recipient/content/policy/expiry
 into an opaque effect grant; make authorization claims transactional and
-revocable; retain approval claims through approval expiry; upgrade audit/effect
-ordering and rollback anchoring; implement RFC 0005 Program 1A as a non-product
+revocable; add full real-subprocess validator race coverage; upgrade audit/
+effect ordering and rollback anchoring; implement RFC 0005 Program 1A as a non-product
 SQLCipher/key-custody engine with a closed legacy importer while keeping legacy
 workspaces isolated and honestly labelled; add process-kill,
 concurrency, and filesystem-fault tests; publish preview binaries.

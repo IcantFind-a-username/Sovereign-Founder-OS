@@ -1,3 +1,11 @@
+> **Status: Superseded — do not execute.**
+>
+> This historical plan would replace the current Experimental product UI and
+> withdraw its export, disclosure, and integrity paths before an authenticated
+> product router exists. Use the additive
+> [Consultant Playground Standalone v2 plan](2026-08-14-consultant-playground-standalone-v2-implementation.md)
+> instead; the body below is retained unchanged as design history.
+
 # Independent Consultant Synthetic Playground Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

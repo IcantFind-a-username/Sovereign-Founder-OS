@@ -58,6 +58,6 @@ an accepted RFC proposal.
 | --- | --- | --- |
 | [0001](../rfcs/0001-canonical-task-contract.md) | Draft | Canonical task contract |
 | [0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md) | Draft; partially implemented | WASM sandbox and plugin capabilities |
-| [0003](../rfcs/0003-signed-approval-evidence.md) | Draft; partial foundation | Signed approval-role evidence; human ceremony remains target |
+| [0003](../rfcs/0003-signed-approval-evidence.md) | Draft; partial foundation | Signed approval-role evidence; approval-expiry retention is tested, while owner ceremony, transactional reservation, revocation, and full subprocess races remain Target |
 | [0004](../rfcs/0004-data-sovereignty-boundaries.md) | Draft; approved implementation target | Data sovereignty, privacy compilation, visibility, and compute placement |
 | [0005](../rfcs/0005-dual-root-vault-and-recovery.md) | Draft; implementation none | Dual-root Vault, backup, and recovery target |

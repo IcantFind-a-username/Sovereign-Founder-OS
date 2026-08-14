@@ -520,8 +520,10 @@ This design is intentionally decomposed. Each stage gets its own plan, tests, re
 3. **Authority + Exact Effect Protocol v1 (local outbox first):** bind exact
    effect bytes/recipient/provider/resource to the 1C0 approval, Capability V2,
    durable authority reservation, execution journal, effect outcome, and signed
-   evidence. Fix approval retention and define `Indeterminate`; no real network
-   effect bypasses this state machine.
+   evidence. Build on the completed approval-expiry retention fix, move the
+   still-ordered token/idempotency/approval claims into one recoverable
+   reservation, add revocation and real-subprocess races, and define
+   `Indeterminate`; no real network effect bypasses this state machine.
 4. **Vault Program 1B0 — backup/restore mechanics:** add the separately
    encrypted business backup, trust-continuity artifact, loss-matrix tests,
    rotation, and clean-machine harness from a closed backup registry. Snapshot
