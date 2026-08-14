@@ -290,6 +290,8 @@ The first implementation pins:
 rusqlite = { version = "=0.40.2", default-features = false,
   features = ["bundled-sqlcipher-vendored-openssl", "hooks", "limits"] }
 openssl-sys = { version = "=0.9.117", default-features = false }
+# Task 1 dev-only recursive source-closure scanner
+proc-macro2 = { version = "=1.0.106", default-features = false }
 ```
 
 These dependencies live only in the private, `publish = false` workspace crate
@@ -359,7 +361,11 @@ cargo fetch --manifest-path Cargo.toml --target x86_64-unknown-linux-gnu
 
 It MUST NOT be replaced or accompanied by
 `cargo update`, `cargo generate-lockfile`, metadata/tree/check/build/test, or
-any other dependency/build script. Review of the resulting lock diff requires
+any other dependency/build script. If this sole fetch attempt fails or leaves
+partial state for any reason, implementation stops for amendment and re-review.
+It is not retried, and a pre-existing Cargo home, copied registry, or warmed
+cache MUST NOT be substituted and described as the required fresh-home
+transition. Review of the resulting lock diff requires
 every old `(name, version, source)` entry to remain unchanged and permits only
 the engine package and its exact Task 1 dependency closure to be added. The
 post-transition lock SHA-256 and review are recorded, followed by
@@ -385,19 +391,29 @@ allowlist: any newly observed dependency-shaping or build-tool-selection
 variable fails until this RFC is amended. It removes Perl injection variables,
 Rust/linker flags, and unapproved tool overrides; constructs a positive-
 allowlist child environment; resolves and records canonical path, version, and
-SHA-256 for Cargo, rustc, C compiler, archiver, ranlib, Perl, and make; creates
-and owns a new `CARGO_TARGET_DIR`; and runs Cargo `--frozen --offline` only
-after the reviewed one-time lock transition and a separate
+SHA-256 for Cargo, rustc, rustdoc, cargo-clippy, clippy-driver, C compiler,
+archiver, ranlib, Perl, and make; creates and owns a new `CARGO_TARGET_DIR`;
+and runs Cargo `--frozen --offline` only after the reviewed one-time lock
+transition and a separate
 `cargo fetch --locked` acquisition step. Its `full` mode
 reuses the fresh target only within that one invocation and deletes it on exit.
 The child starts from `env -i` and receives only fresh home/temp directories,
 reviewed Cargo/rustup homes, locale/reproducibility values, exact absolute tool
-paths, the exact build target, offline mode, and a PATH composed from reviewed
+paths, including absolute `CARGO`, `RUSTC`, and `RUSTDOC` values plus wrapper-
+private `SOVEREIGN_CARGO_CLIPPY` and `SOVEREIGN_CLIPPY_DRIVER` bindings, the
+exact build target, offline mode, and a PATH composed from reviewed
 Perl/make/linker directories. Every Cargo configuration file that Cargo would
 discover in the repository, its ancestors, or the selected `CARGO_HOME` is
 rejected, and caller `--config` is forbidden; Program 1A has no approved Cargo-
 config extension surface. This closes source replacement and
 `target.*.rustflags` routes, including cfg-driven `getrandom` backend changes.
+The wrapper invokes normal Cargo commands through the absolute `CARGO` binding.
+For Clippy it invokes `SOVEREIGN_CARGO_CLIPPY` directly, never `cargo clippy`,
+and exports that same absolute `CARGO` binding for cargo-clippy's Cargo child.
+Before Clippy runs, the canonical `clippy-driver` sibling selected by that exact
+cargo-clippy executable MUST equal the independently reviewed, hashed, and
+absolute `SOVEREIGN_CLIPPY_DRIVER` binding. Neither Clippy executable may be
+selected through the child PATH.
 Negative tests create a temporary config for each forbidden backend and require
 refusal before dependency compilation. Cargo-generated `HOST`, `TARGET`,
 `OUT_DIR`, and `CARGO_MAKEFLAGS` are allowed only inside the child, never
@@ -478,8 +494,18 @@ disabled and every target is explicit.
 Project-authored `macro_rules!` and all other macro definitions are forbidden.
 Every macro invocation, attribute, and derive uses a closed allowlist. Beyond
 normal AST visiting, the visitor recursively scans every `syn::Macro.tokens`
-token tree, including nested groups, and rejects `unsafe`, `extern`, raw symbol
-names, `include`, `path`, and every other forbidden token. No allowed macro may
+token tree structurally through the direct exact dev dependency
+`proc-macro2 = { version = "=1.0.106", default-features = false }`, including
+nested `proc_macro2::TokenTree::Group` streams, and rejects `unsafe`, `extern`,
+raw symbol names, `include`, `path`, and every other forbidden token. The
+`proc-macro2 1.0.106` tuple already exists in the pre-transition baseline lock,
+but Task 1 still adds and reviews the engine's direct dev-dependency edge and
+enabled feature set while requiring that old tuple to remain unchanged.
+`syn::__private`, token-stream stringification, and Debug/Display text scans are
+forbidden anywhere in the source-closure gate. Recursion, token classification,
+and every allow/deny decision use the public `proc_macro2::TokenTree` structure;
+exact identifier classification may inspect only the individual `Ident` token's
+value, never serialized enclosing token or group text. No allowed macro may
 generate additional project-authored FFI or unsafe code. Separate production
 and `cfg(test)` allowlists detect direct and aliased paths, glob imports, raw
 symbol declarations, and calls, proving exactly the two project-authored
@@ -1335,7 +1361,16 @@ Implementations MUST NOT:
   is not a permanent five-fixture limit for the project: Task 2 declares the
   separate `tests/recovery_ui.rs` Cargo target and owns only
   `tests/recovery_ui/recovery_read_only.rs` plus its `.stderr`; neither enters
-  the Task 1 harness or fixture group.
+  the Task 1 harness or fixture group. These five compile-fail cases are
+  acceptance evidence, not meaningful initial RED while the engine
+  implementation is absent: absence already makes forbidden names fail to
+  compile. Behavior/profile/API tests supply the first genuine RED. Before
+  accepting the boundary, expose each forbidden boundary one at a time only in
+  a temporary copy or temporary mutation and require trybuild to fail because
+  the case unexpectedly compiled. Never commit a leak feature, public probe
+  API, or mutation. Restore the source after every case, then require all five
+  reviewed fixtures to pass. A missing package, missing fixture, unresolved
+  dependency, or zero-test result is neither RED nor acceptance evidence.
 - Bound, malformed, corruption, truncation, schema substitution, wrong
   workspace/database/epoch/role, cross-wrapper, and unknown object-tag tests.
 - Transaction/fault tests at begin, row/chunk insert, commit, journal sync,

@@ -54,6 +54,7 @@ tempfile = "=3.27.0"
 sha2 = { version = "=0.10.9", default-features = false }
 syn = { version = "=2.0.118", default-features = false,
   features = ["full", "parsing", "visit"] }
+proc-macro2 = { version = "=1.0.106", default-features = false }
 static_assertions = "=1.1.0"
 trybuild = "=1.0.116"
 
@@ -106,7 +107,11 @@ cargo fetch --manifest-path Cargo.toml --target x86_64-unknown-linux-gnu
 
 This exception MUST NOT run `cargo update`, `cargo generate-lockfile`,
 `cargo metadata`, `cargo tree`, `cargo check`, `cargo build`, `cargo test`, or
-any other dependency/build script. Review the resulting lock diff and require
+any other dependency/build script. If this sole fetch attempt fails or leaves
+partial state for any reason, stop for plan/RFC amendment and re-review. Do not
+retry it, and do not reuse a pre-existing Cargo home, copied registry, or warmed
+cache while describing the result as the required fresh-home transition.
+Review the resulting lock diff and require
 every pre-existing `(name, version, source)` entry to be unchanged; only the
 engine package and its exact Task 1 dependency closure may be added. Record the
 post-transition lock SHA-256 and the completed review, then run
@@ -148,25 +153,34 @@ including `LIBSQLITE3_SYS_USE_PKG_CONFIG`, `LIBSQLITE3_FLAGS`,
 this as a closed allowlist: a newly observed dependency-shaping or tool-
 selection variable stops for RFC review. It also removes `PERL5OPT`,
 `PERL5LIB`, `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and unapproved linker/tool
-overrides; resolves Cargo, rustc, C compiler, archiver, ranlib, Perl, and make
-from an approved path set; and records their canonical paths, versions, and
-SHA-256 digests. Qualification is `--frozen --offline` after the reviewed
-one-time lock transition and a separate `cargo fetch --locked` acquisition
-step, so the controlled child does not run network acquisition. A new tool or
-environment input stops for review.
+overrides; resolves Cargo, rustc, rustdoc, cargo-clippy, clippy-driver, C
+compiler, archiver, ranlib, Perl, and make from an approved path set; and
+records their canonical paths, versions, and SHA-256 digests. Qualification is
+`--frozen --offline` after the reviewed one-time lock transition and a separate
+`cargo fetch --locked` acquisition step, so the controlled child does not run
+network acquisition. A new tool or environment input stops for review.
 
 The child starts from `env -i` and receives only fresh `HOME`/`TMPDIR`, the
 reviewed Cargo/rustup homes, `LANG`/`LC_ALL`, fixed `SOURCE_DATE_EPOCH`, exact
-absolute Cargo/rustc/rustdoc/C compiler/archiver/ranlib paths, the exact
-`CARGO_BUILD_TARGET`, `CARGO_NET_OFFLINE=true`, and a PATH assembled only from
-the reviewed Perl/make/linker directories. Qualification rejects every Cargo
-config file that Cargo would discover in the repository/ancestors or selected
-`CARGO_HOME`, not only source replacement, and rejects caller `--config`.
-Program 1A has no approved Cargo-config extension surface; this closes
-`target.*.rustflags` routes that could replace the default `getrandom` backend
-or otherwise mutate code generation. Cargo-created build-script variables such as
-`HOST`, `TARGET`, `OUT_DIR`, and `CARGO_MAKEFLAGS` are allowed only inside the
-child and are recorded where relevant; they are not accepted from the caller.
+absolute `CARGO`, `RUSTC`, `RUSTDOC`, C compiler, archiver, and ranlib paths,
+plus wrapper-private absolute `SOVEREIGN_CARGO_CLIPPY` and
+`SOVEREIGN_CLIPPY_DRIVER` bindings, the exact `CARGO_BUILD_TARGET`,
+`CARGO_NET_OFFLINE=true`, and a PATH assembled only from the reviewed
+Perl/make/linker directories. Qualification rejects every Cargo config file
+that Cargo would discover in the repository/ancestors or selected `CARGO_HOME`,
+not only source replacement, and rejects caller `--config`. Program 1A has no
+approved Cargo-config extension surface; this closes `target.*.rustflags`
+routes that could replace the default `getrandom` backend or otherwise mutate
+code generation. Cargo-created build-script variables such as `HOST`, `TARGET`,
+`OUT_DIR`, and `CARGO_MAKEFLAGS` are allowed only inside the child and are
+recorded where relevant; they are not accepted from the caller. The wrapper
+invokes normal Cargo commands through the absolute `CARGO` binding. For Clippy
+it invokes `SOVEREIGN_CARGO_CLIPPY` directly, never `cargo clippy`, and exports
+that same absolute `CARGO` binding for cargo-clippy's Cargo child. Before Clippy
+runs, the canonical `clippy-driver` sibling selected by that exact cargo-clippy
+executable MUST equal the independently reviewed, hashed, and absolute
+`SOVEREIGN_CLIPPY_DRIVER` binding. Neither Clippy executable may be selected
+through the child PATH.
 
 `crates/vault-v2-engine/build.rs` repeats the checks as defense in depth, but a
 downstream build script runs too late to prevent an overridden upstream
@@ -510,15 +524,26 @@ target explicitly.
 Project-authored `macro_rules!` and all other macro definitions are forbidden.
 Every macro invocation, attribute, and derive uses a closed allowlist. In
 addition to normal AST visiting, the visitor recursively scans every
-`syn::Macro.tokens` token tree, including nested groups, and rejects `unsafe`,
-`extern`, raw symbol names, `include`, `path`, and every other forbidden token;
-no allowed macro may generate additional project-authored FFI or unsafe code.
-Separate production and `cfg(test)` allowlists detect direct and aliased paths,
-glob imports, raw symbol declarations, and calls, proving exactly two
-project-authored production unsafe FFI entry points plus the single test-only
-OpenSSL LOAD_CONFIG negative control. Required mutation tests hide a third
-unsafe/FFI declaration or call first in a macro definition and then in macro
-invocation tokens; both mutations must fail the source-closure gate.
+`syn::Macro.tokens` token tree structurally through the direct exact dev
+dependency
+`proc-macro2 = { version = "=1.0.106", default-features = false }`, including
+nested `proc_macro2::TokenTree::Group` streams, and rejects `unsafe`, `extern`,
+raw symbol names, `include`, `path`, and every other forbidden token. The
+`proc-macro2 1.0.106` tuple already exists in the pre-transition baseline lock,
+but Task 1 still adds and reviews the engine's direct dev-dependency edge and
+enabled feature set while requiring that old tuple to remain unchanged.
+`syn::__private`, token-stream stringification, and Debug/Display text scans are
+forbidden anywhere in the source-closure gate. Recursion, token classification,
+and every allow/deny decision use the public `proc_macro2::TokenTree` structure;
+exact identifier classification may inspect only the individual `Ident` token's
+value, never serialized enclosing token or group text. No allowed macro may
+generate additional project-authored FFI or unsafe code. Separate production
+and `cfg(test)` allowlists detect direct and aliased paths, glob imports, raw
+symbol declarations, and calls, proving exactly two project-authored production
+unsafe FFI entry points plus the single test-only OpenSSL LOAD_CONFIG negative
+control. Required mutation tests hide a third unsafe/FFI declaration or call
+first in a macro definition and then in macro invocation tokens; both mutations
+must fail the source-closure gate.
 
 The fixed fixture is at least 8192 bytes and page-aligned. The named
 `page_2_ciphertext_bitflip_is_detected_cryptographically` test copies it to a
@@ -563,6 +588,16 @@ This five-case constraint does not prohibit a later, separately declared Cargo
 test target and fixture root; Task 2 recovery UI evidence never enters this
 harness or group.
 
+These five compile-fail cases are acceptance evidence, not meaningful initial
+RED while the engine implementation is absent: absence already makes forbidden
+names fail to compile. Behavior/profile/API tests must supply the first genuine
+RED. Before accepting the boundary, expose each forbidden boundary one at a
+time only in a temporary copy or temporary mutation and require trybuild to
+fail because the case unexpectedly compiled. Never commit a leak feature,
+public probe API, or mutation. Restore the source after every case, then require
+all five reviewed fixtures to pass. A missing package, missing fixture,
+unresolved dependency, or zero-test result is not RED or acceptance evidence.
+
 - [ ] **Step 2: Capture genuine RED**
 
 ```bash
@@ -575,10 +610,14 @@ harness or group.
 First create the private crate, exact dev dependencies, non-production
 skeleton/tests, and perform the one-time reviewed lock transition above so the
 harness itself compiles. Then run `-- --list` for filtered targets and reject
-`running 0 tests`. Save missing-engine-API stderr; missing `trybuild`,
-`static_assertions`, package, or lockfile is not valid RED. The stacked PR must
-target `main` (or an explicitly amended CI trigger) because current CI runs
-only for `main` pull requests; absence of a workflow run is never evidence.
+`running 0 tests`. Capture genuine behavior/profile/API RED before treating the
+five compile-fail cases as acceptance evidence. Save missing-engine-API stderr
+only for those behavior/API tests; missing `trybuild`, `static_assertions`, a
+package, fixture, or lockfile is not valid RED. Perform the five temporary
+boundary-exposure mutations from Step 1 before acceptance and retain only their
+test evidence, never the leaking source. The stacked PR must target `main` (or
+an explicitly amended CI trigger) because current CI runs only for `main` pull
+requests; absence of a workflow run is never evidence.
 
 In the same Task 1 slice, change CI so dependency acquisition is an explicit
 `cargo fetch --locked` step, then run engine/workspace qualification only via
