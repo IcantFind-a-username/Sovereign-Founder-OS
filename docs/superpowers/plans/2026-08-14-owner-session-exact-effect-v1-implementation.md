@@ -1,3 +1,12 @@
+> **Status: Superseded — do not execute.**
+>
+> This historical plan invented a custom HMAC/nonce/sequence IPC protocol,
+> coupled the fixture to the product CLI, and attempted to accept its own
+> effect RFC. Those choices conflict with the program-wide protocol and RFC
+> governance rules. Use the
+> [Synthetic Owner-UV and Exact Local-Outbox Fixture v2 plan](2026-08-14-synthetic-owner-exact-local-outbox-v2-implementation.md)
+> instead; the body below is retained unchanged as design history.
+
 # Synthetic Owner Session and Exact Local-Outbox Fixture v1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

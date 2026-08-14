@@ -348,13 +348,22 @@ experimental pure-compute backend and can never authorize a host effect.
 The current `sovereign-authority` primitive persists token, idempotency, and
 approval claims as three sequential atomic filesystem operations; partial
 failure burns earlier claims and fails closed. It has no transaction or
-revocation API. Approval retention is currently derived from the shorter
-capability expiry rather than approval expiry, so approval one-use is not yet
-restart-safe after purge. Tests cover reopen behavior and concurrent threads,
-not a true subprocess race for all three claim types. Validators without an
-attached store remain process-local. V2 tokens stay restricted to pure
-computation until this gap, crash-safe effect ordering, and reviewed host
+revocation API. Durable approval claims now retain the verified signed
+approval expiry rather than the shorter capability expiry. Tests expire and
+purge the first token, reopen the store while the approval remains valid,
+reject a second token's reuse, and purge the approval at its own expiry. The
+three claims are still ordered filesystem operations rather than one
+transaction, and tests do not yet cover a full real-subprocess validator race
+across all three claim types. Independently admitted owner presence also
+remains absent. Validators without an attached store remain process-local. V2
+tokens stay restricted to pure computation until transactional reservation,
+revocation, crash-safe effect ordering, owner authority, and reviewed host
 interfaces are complete.
+
+Any future RFC 0002 exact-effect profile amendment starts from this Current
+approval-retention fact. It must not plan to fix retention again; its remaining
+authorization work is the one-transaction reservation, revocation, complete
+race/restart evidence, exact effect binding, and owner-authority integration.
 
 Production time comes from a trusted runtime clock. An untrusted caller cannot provide the validation timestamp.
 
@@ -433,9 +442,10 @@ Admission and executor tests cover on-disk substitution, record tampering,
 cross-role signatures, poisoned/symlinked entries, mandatory admitted handles,
 cache poisoning, store reopen, and concurrent token claims across threads.
 Mandatory worker/cache wiring on product paths, full cache-record binding and
-strict parsing, real subprocess claim races, approval retention, transactional
-authorization and revocation, durable effect-intent ordering, Component/WIT
-behavior, and capability-bound host interfaces remain completion-gate work.
+strict parsing, full real-subprocess validator races, transactional
+authorization and revocation, durable effect-intent ordering, independently
+admitted owner presence, Component/WIT behavior, and capability-bound host
+interfaces remain completion-gate work.
 
 ## Implementation Phases
 

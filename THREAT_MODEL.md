@@ -35,7 +35,7 @@ Mitigations are labelled **Current** when enforced by merged repository code and
 - **Current:** device-signed hash-chain prototype behind an append-only API;
   its replaceable local file has no independent rollback anchor and does not
   prevent deletion
-- **Current foundation:** RFC 0003 approval-role-signed evidence — approval-required Capability V2 tokens are issued only with exactly invocation-bound evidence and fail closed without it. Validators are process-local by default. The Workspace attaches persistent filesystem claims, but approval records may currently be purged before approval expiry, so durable one-use approval is not claimed. Independent owner presence, correct retention, transactional reservation, and revocation remain Targets.
+- **Current foundation:** RFC 0003 approval-role-signed evidence — approval-required Capability V2 tokens are issued only with exactly invocation-bound evidence and fail closed without it. Validators are process-local by default. The Workspace attaches persistent filesystem claims whose approval records now retain the verified signed approval expiry; token-expiry purge, store reopen, replay denial, and approval-expiry purge are tested. Independent owner presence, one-transaction reservation, revocation, and a full real-subprocess validator race remain Targets.
 
 ### Untrusted (always)
 
@@ -70,7 +70,7 @@ Mitigations are labelled **Current** when enforced by merged repository code and
 **Description:** An agent or plugin attempts to expand its permissions beyond what was granted.
 
 **Mitigations:**
-- **Current foundation:** short-lived Capability V2 binds the exact artifact, operation, input commitments, and resource commitments; validators are process-local by default, while the Workspace attaches experimental persistent claims with the approval-retention limitation above
+- **Current foundation:** short-lived Capability V2 binds the exact artifact, operation, input commitments, and resource commitments; validators are process-local by default, while the Workspace attaches experimental persistent claims with the transactional, revocation, subprocess, and owner-ceremony limitations above
 - **Current:** Authority and Publisher signing roles are distinct, and an AI agent cannot make its own key trusted
 - **Current foundation:** strict publisher manifest enforcement and import-free Core Wasm isolation
 - **Target:** durable token revocation, container/micro-VM backends, and reviewed effectful host interfaces
@@ -243,7 +243,8 @@ Alpha release must pass:
 - [x] Current policy fixture rejects Red data sent through a cloud-labelled tool
 - [x] Capability V2 rejects same-process replay and idempotency conflicts
 - [x] Attached Authority Store rejects covered duplicate claims after reopen and token races across threads
-- [ ] Approval reuse remains rejected after token expiry/purge and across real subprocess races/restart
+- [x] Attached Authority Store rejects approval reuse after token expiry/purge and store reopen until the signed approval's own expiry
+- [ ] Approval reuse and the full reservation remain rejected across real subprocess validator races/restart, with durable revocation
 - [ ] Transactional authorization-bundle revocation remains rejected across races and restart
 - [ ] Full prompt-injection and data-disclosure paths pass the Alpha gauntlet
 - [ ] Primary model failure does not block data access

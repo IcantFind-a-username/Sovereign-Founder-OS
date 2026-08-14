@@ -103,19 +103,21 @@ rejected.
 ## Replay and Durability (honest labels)
 
 Approval one-use accounting is process-local when no Authority Store is
-attached. The Workspace attaches persistent filesystem claims, but the current
-validator stores approval consumption only until the shorter capability expiry,
-not the approval's own expiry. After capability expiry and purge, the same
-still-valid approval may be presented with a newly issued token. Durable
-one-use approval is therefore **not claimed**.
+attached. When the Workspace attaches the current filesystem Authority Store,
+the durable approval claim now retains the verified signed approval's own
+expiry rather than the shorter capability-token expiry. Tests expire and purge
+the first token, reopen the store while the approval remains valid, reject a
+second token's reuse, and purge the approval at its own expiry.
 
-The implementation target retains approval consumption through approval
-expiry (and any required audit-retention window), reserves token/approval/
-idempotency in one recoverable transaction, supports durable revocation, and
-proves behavior using real subprocess restart/race tests. Approval evidence is
-also necessary but not sufficient for an external effect: independent owner
-presence, exact effect preview/payload binding, durable intent/result ordering,
-and a reviewed host broker remain required.
+This is still a partial durability boundary. Token, idempotency, and approval
+claims are ordered filesystem operations, not one recoverable transaction;
+partial failure burns earlier claims and fails closed. Durable revocation, a
+full real-subprocess validator race, and an independently admitted owner
+ceremony remain Targets. RFC 0003 is therefore not a complete human-approval
+or product-authority claim. Approval evidence is also necessary but not
+sufficient for an external effect: independent owner presence, exact effect
+preview/payload binding, durable intent/result ordering, and a reviewed host
+coordinator remain required.
 
 ## Threat Cases (tested)
 
@@ -125,13 +127,13 @@ and a reviewed host broker remain required.
 - Expired approval, future-dated approval, approval predating its policy
   decision, and out-of-range lifetime.
 - Approval reuse across two tokens before persistent-record purge (second
-  consumption denied).
+  consumption denied), and after the first token's expiry/purge plus Authority
+  Store reopen while the signed approval remains valid.
 - Evidence supplied when policy does not require approval.
 - Token claiming approval evidence that does not match the presented object,
   or presented without any object.
 - Legacy behavior preserved: issuance without evidence fails closed for
   approval-required decisions.
 
-Target regression coverage additionally expires and purges the first token,
-restarts in a new process while the approval remains valid, and proves that a
-new token cannot reuse the approval.
+Target regression coverage still adds a true subprocess validator race and
+durable revocation; current reopen coverage does not establish either one.

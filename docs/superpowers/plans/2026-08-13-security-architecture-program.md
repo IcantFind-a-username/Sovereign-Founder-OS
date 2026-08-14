@@ -42,8 +42,12 @@ Exact Effect Protocol appropriate to its side effect.
   it. Legacy mode may prepare its honestly labelled local outbox artifact until
   migration. Activated v2 mode disables outbox preparation unless the Exact
   Effect slice has passed; preserving a known post-approval composition gap is
-  never a compatibility requirement. Security setup remains an advanced
-  readiness view until product activation is safe.
+  never a compatibility requirement. The synthetic consultant Playground is
+  additive and standalone: it must not replace the current Experimental UI,
+  export, disclosure, integrity, or Workspace paths before an authenticated
+  product router exists. Preserving those paths is continuity, not a security
+  endorsement. Security setup remains an advanced readiness view until product
+  activation is safe.
 - Use Current, Target, and Research exactly as defined in the design documents. Never promote a feature because an RFC or mock exists.
 - Follow strict red-green-refactor. Capture the failing test before production code, then run focused and workspace gates after the minimal fix.
 - Give each slice a fresh implementer, specification review, security/code-quality review, and fix loop until no known Critical or High finding remains in scope.
@@ -54,6 +58,47 @@ Exact Effect Protocol appropriate to its side effect.
   `ActiveV2`, Exact Effect, Credential Broker where applicable, and Privacy all
   pass.
 - Never invent cryptographic primitives, protocol patterns, ratchets, KEM hybrids, suites, key derivation, nonce strategies, or authentication-failure fallbacks.
+
+### Chosen Target reference-slice design
+
+- `broker` names a logical coordinator and authority boundary. It does not
+  require a child process, internal listener, or private transport protocol.
+  The Target synthetic owner/exact-outbox reference slice will use one process
+  with one public loopback listener; that process will own WebAuthn/session
+  state, the coordinator database, and the local outbox. New process isolation
+  requires a concrete threat, an established transport, and a separate RFC.
+- The Target reference executable will be `publish = false`, excluded from
+  product releases, and absent from `sovereign-cli`'s dependency graph. It will
+  exercise only fixed `.example.test` fixture mechanisms. It will not create a
+  product owner, open a product Workspace, satisfy 1C0, complete Program 2,
+  send email, or establish E2EE.
+- Before its reservation transaction, the Target slice will separate
+  side-effect-free Capability V2/RFC 0003 verification from current
+  `AuthorityStore` consumption. An upper fixture coordinator will consume
+  opaque verified proofs and will be the only constructor of the writer's
+  private, non-cloneable, non-serializable, move-only reservation handle. The
+  legacy pure-compute wrapper will preserve current behavior; dependency
+  inversion remains separate future work.
+- After taking its OS lock, the Target fixture will create an ephemeral
+  approval-role signer and random signer epoch. A closed approval bridge will
+  consume one-use, exact-bound fresh-UV grants; only public historical trust
+  records will persist. Restarted pre-dispatch work will not be re-signed, and
+  restarted `Dispatching` work will reconcile only to `Succeeded` or
+  `Indeterminate`.
+- Existing approval claims now retain the verified signed approval expiry.
+  Tests cover token-expiry purge, store reopen and replay denial while the
+  approval remains valid, and purge at approval expiry. The token,
+  idempotency, and approval claims remain ordered filesystem operations rather
+  than one transaction; revocation, a full real-subprocess validator race, and
+  independently admitted owner presence remain unfinished.
+- Product continuity is an invariant for every slice: the current UI and
+  consultant walking skeleton remain runnable. The Target synthetic teaching
+  and security fixtures will use separate commands, routes, state, and
+  maturity labels.
+- Target race qualification will use concurrent requests/threads inside the
+  one lock-holding process plus real process kill/reopen. A second live process
+  will test only lock denial before redb open; a full cross-process validator
+  race remains unfinished.
 
 ## Program 1A: Vault v2 format, custody, and migration engine
 
@@ -311,10 +356,10 @@ cannot create a trusted handle or read credential bytes.
 Required state machine:
 
 ```text
-Prepared → AuthorityReserved → Dispatching
-                                  ├─► Succeeded
-                                  ├─► FailedBeforeDispatch
-                                  └─► Indeterminate
+Prepared ───────► AuthorityReserved ───────► Dispatching
+  │                       │                    ├─► Succeeded
+  └─► FailedBeforeDispatch└─► FailedBeforeDispatch
+                                               └─► Indeterminate
 ```
 
 Exit gate:
@@ -332,10 +377,11 @@ Exit gate:
   expiry, and idempotency. Each dispatch attempt resolves exactly one unchanged
   tuple from that list.
   A tuple change or identity outside the list needs a new preview and approval.
-  The broker may advance within the list only after it proves
-  `FailedBeforeDispatch` with zero exposed request bytes; exposure or uncertain
-  exposure makes timeout/error/drop/crash terminal `Indeterminate`, with no
-  retry or failover;
+  Before entering `Dispatching`, the broker may advance within the list only
+  after it proves `FailedBeforeDispatch` with zero exposed request bytes. Once
+  `Dispatching` is durable, observation can close only as `Succeeded` or
+  `Indeterminate`; exposure or uncertain exposure makes
+  timeout/error/drop/crash terminal `Indeterminate`, with no retry or failover;
 - signed/value-free evidence projects only the random target ID, outcome, and
   provider/model fields independently classified approved-public by the
   registry. Account, tenant, credential-handle, private endpoint/audience, and
@@ -362,10 +408,13 @@ Exit gate:
 - the audit ledger is a signed evidence projection, not the transaction coordinator;
 - the existing pure-compute execution journal remains version-compatible.
 
-The known approval-retention/purge bug is fixed in this program as its own
-first TDD commit; it does not justify storing new secrets before 1D. Exact
-Effect may be built against deterministic fixtures before 1D, but product
-activation and real dispatch remain blocked.
+The approval-retention/purge bug was fixed by commit `6c0259b`: durable
+approval claims retain the verified signed approval expiry, with token-expiry
+purge/store-reopen and approval-expiry regressions. This does not make the
+three ordered claim writes transactional, add revocation, prove a full
+real-subprocess validator race, establish owner presence, or justify storing
+new secrets before 1D. Exact Effect may be built against deterministic
+fixtures before 1D, but product activation and real dispatch remain blocked.
 
 ## Program 3: Data Sovereignty Boundary v1
 
