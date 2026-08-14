@@ -53,7 +53,7 @@ serde = { version = "=1.0.228", default-features = false,
 tempfile = "=3.27.0"
 sha2 = { version = "=0.10.9", default-features = false }
 syn = { version = "=2.0.118", default-features = false,
-  features = ["full", "parsing"] }
+  features = ["full", "parsing", "visit"] }
 static_assertions = "=1.1.0"
 trybuild = "=1.0.116"
 
@@ -92,6 +92,30 @@ amendment) and that profile passes the
 gates, or the owner approves a separate exact-source dependency plan. Never use
 a semver range or runtime “at least” check as the admitted profile.
 
+Task 1 has one narrowly scoped lock transition before qualification. First add
+the Task 1 manifests and the non-production package skeleton and tests, without
+executing any dependency or build script. From a clean, reviewed baseline,
+record the pre-transition `Cargo.lock` SHA-256. Then, with Rust 1.97, the exact
+native target `x86_64-unknown-linux-gnu`, fresh `HOME`, `CARGO_HOME`, and
+`TMPDIR`, and no discoverable Cargo configuration, the only permitted
+unlocked/networked command is exactly:
+
+```bash
+cargo fetch --manifest-path Cargo.toml --target x86_64-unknown-linux-gnu
+```
+
+This exception MUST NOT run `cargo update`, `cargo generate-lockfile`,
+`cargo metadata`, `cargo tree`, `cargo check`, `cargo build`, `cargo test`, or
+any other dependency/build script. Review the resulting lock diff and require
+every pre-existing `(name, version, source)` entry to be unchanged; only the
+engine package and its exact Task 1 dependency closure may be added. Record the
+post-transition lock SHA-256 and the completed review, then run
+`cargo fetch --locked`. Thereafter every resolve, metadata/tree, build, test,
+Clippy, and doc command that can include the engine is wrapper-only with
+`--frozen --offline`. This Task-1/dependency-set-specific transition is absent
+from CI and from `scripts/qualify-vault-v2.sh`; it is never a general unlocked
+mode or repeatable qualification path.
+
 Before writing implementation code, record the frozen engine feature tree
 through `scripts/qualify-vault-v2.sh`, verify the vendored source/version,
 and review all relevant advisories and release deltas. The reviewed candidate
@@ -126,9 +150,10 @@ selection variable stops for RFC review. It also removes `PERL5OPT`,
 `PERL5LIB`, `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and unapproved linker/tool
 overrides; resolves Cargo, rustc, C compiler, archiver, ranlib, Perl, and make
 from an approved path set; and records their canonical paths, versions, and
-SHA-256 digests. Qualification is `--frozen --offline` after a separate
-`cargo fetch --locked` acquisition step, so the controlled child does not run
-network acquisition. A new tool or environment input stops for review.
+SHA-256 digests. Qualification is `--frozen --offline` after the reviewed
+one-time lock transition and a separate `cargo fetch --locked` acquisition
+step, so the controlled child does not run network acquisition. A new tool or
+environment input stops for review.
 
 The child starts from `env -i` and receives only fresh `HOME`/`TMPDIR`, the
 reviewed Cargo/rustup homes, `LANG`/`LC_ALL`, fixed `SOURCE_DATE_EPOCH`, exact
@@ -375,7 +400,12 @@ crates/vault-v2-engine/src/engine/legacy.rs        exact unversioned AES-GCM rea
 crates/vault-v2-engine/src/engine/migration.rs     internal side-by-side staging transaction
 crates/vault-v2-engine/tests/public.rs      protocol opacity/metadata/process behavior tests
 crates/vault-v2-engine/tests/process.rs     fresh real-binary qualification tests
-crates/vault-v2-engine/tests/ui/            trybuild compile-fail surface tests
+crates/vault-v2-engine/tests/ui.rs           Task 1 harness enumerating exactly five public-boundary cases
+crates/vault-v2-engine/tests/ui/             Task 1's five exact trybuild fixtures/stderr files only
+crates/vault-v2-engine/tests/recovery_ui.rs  Task 2 independent recovery compile-fail harness
+crates/vault-v2-engine/tests/recovery_ui/    Task 2 recovery_read_only fixture/stderr only
+crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db fixed pinned-object fixture
+crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db.sha256 reviewed fixture hash
 tests/adversarial/tests/          supported-API downgrade/exfiltration checks
 .github/workflows/vault-platform.yml  mandatory native-store/durability jobs
 docs/security/vault-v2-verification.md evidence and honest readiness ledger
@@ -389,7 +419,8 @@ scripts/qualify-vault-v2.sh      sole sanitized Cargo qualification entry point
 **Files:**
 - Modify: `Cargo.toml`
 - Modify: `Cargo.lock`
-- Create: `crates/vault-v2-engine/Cargo.toml` (`publish = false`)
+- Create: `crates/vault-v2-engine/Cargo.toml` (`publish = false`, all target
+  auto-discovery disabled, every library/binary/integration target explicit)
 - Create: `crates/vault-v2-engine/build.rs`
 - Create: `crates/vault-v2-engine/src/lib.rs`
 - Create: `crates/vault-v2-engine/src/main.rs`
@@ -401,8 +432,19 @@ scripts/qualify-vault-v2.sh      sole sanitized Cargo qualification entry point
 - Create: `crates/vault-v2-engine/tests/public.rs`
 - Create: `crates/vault-v2-engine/tests/process.rs`
 - Create: `crates/vault-v2-engine/tests/ui.rs`
-- Create: five independent `crates/vault-v2-engine/tests/ui/*.rs` fixtures and
-  their reviewed Rust-1.97 `.stderr` files
+- Create: `crates/vault-v2-engine/tests/ui/cannot_name_db_key.rs`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_name_db_key.stderr`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_call_raw_key_shim.rs`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_call_raw_key_shim.stderr`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_reach_raw_handle.rs`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_reach_raw_handle.stderr`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_construct_create_mode.rs`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_construct_create_mode.stderr`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_select_cipher_profile.rs`
+- Create: `crates/vault-v2-engine/tests/ui/cannot_select_cipher_profile.stderr`
+- Create: `crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db`
+- Create: `crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db.sha256`
+- Create: `docs/security/vault-v2-verification.md`
 - Create: `scripts/qualify-vault-v2.sh`
 - Modify: `.github/workflows/ci.yml`
 
@@ -424,7 +466,10 @@ Add exact named tests for:
 - `oversized_values_and_sql_fail_at_fixed_limits`; and
 - `raw_dbk_never_reaches_sql_text_logs_or_environment`;
 - `fresh_process_ignores_hostile_openssl_configuration`; and
-- `prior_load_config_process_is_rejected_by_profile_gate`.
+- `prior_load_config_process_is_rejected_by_profile_gate`;
+- `recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact`;
+- `page_2_ciphertext_bitflip_is_detected_cryptographically`; and
+- `successful_read_only_reopen_preserves_hash_len_and_no_journal`.
 
 The tests must derive evidence independently rather than trust a production
 “observed profile” or operation transcript. Add exact 67-byte encoder vectors
@@ -437,11 +482,57 @@ original `sqlite3_open_v2` flags, so exact `syn` AST/call-site inspection proves
 the fixed flag expression while missing-file, `NOFOLLOW`, URI, read-only, and
 create-only behavior tests prove its effects. The AST gate also proves the
 OpenSSL bootstrap is the first project-controlled crypto action, the raw-key
-call is the first database action after open, and there is exactly one unsafe
-FFI module with the two named entry points. Each resource limit has boundary
-and boundary-plus-one coverage.
+call is the first database action after open, and there is exactly one
+project-authored unsafe FFI module with the two named entry points. This gate
+makes no claim about unsafe code internal to dependencies. Each resource limit
+has boundary and boundary-plus-one coverage.
 Source/AST gates prove the plaintext-header setter, arbitrary SQL, raw handle,
-backup/export/copy, and additional OpenSSL/SQLite unsafe calls are absent.
+backup/export/copy, and additional project-authored OpenSSL/SQLite unsafe calls
+are absent.
+The test `recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact`
+uses `syn::visit` to start from `build.rs`, every explicit Cargo library,
+binary, and integration-test target, and specifically `tests/ui.rs`, then parse
+the complete recursive closure of inline and external modules. Its Task 1
+test-only auxiliary roots are exactly `tests/ui/cannot_name_db_key.rs`,
+`tests/ui/cannot_call_raw_key_shim.rs`,
+`tests/ui/cannot_reach_raw_handle.rs`,
+`tests/ui/cannot_construct_create_mode.rs`, and
+`tests/ui/cannot_select_cipher_profile.rs`; Task 2's
+`recovery_read_only.rs` is not a member of that group and is admitted later
+only through its separate explicit `recovery_ui` harness/root set. An orphan is
+any `.rs` file belonging to none of the recursive module closure, an explicit
+Cargo target, or an exact task-admitted auxiliary fixture root. The gate checks
+cfg-disabled code as syntax and rejects `#[path]`, `include!` and other source
+includes, symlinks, root escapes, ambiguous module resolution, cycles, and
+orphans. Manifests disable automatic target discovery and enumerate every
+target explicitly.
+
+Project-authored `macro_rules!` and all other macro definitions are forbidden.
+Every macro invocation, attribute, and derive uses a closed allowlist. In
+addition to normal AST visiting, the visitor recursively scans every
+`syn::Macro.tokens` token tree, including nested groups, and rejects `unsafe`,
+`extern`, raw symbol names, `include`, `path`, and every other forbidden token;
+no allowed macro may generate additional project-authored FFI or unsafe code.
+Separate production and `cfg(test)` allowlists detect direct and aliased paths,
+glob imports, raw symbol declarations, and calls, proving exactly two
+project-authored production unsafe FFI entry points plus the single test-only
+OpenSSL LOAD_CONFIG negative control. Required mutation tests hide a third
+unsafe/FFI declaration or call first in a macro definition and then in macro
+invocation tokens; both mutations must fail the source-closure gate.
+
+The fixed fixture is at least 8192 bytes and page-aligned. The named
+`page_2_ciphertext_bitflip_is_detected_cryptographically` test copies it to a
+temporary file, changes byte offset 4224 with XOR `0x01`, bypasses only the
+fixture-hash preflight, then opens with the correct public DBK in `READ_ONLY`
+mode and runs the full cipher integrity check. It must return a value-free
+authentication/integrity failure, and the admitted fixture hash is rechecked
+afterward. The named
+`successful_read_only_reopen_preserves_hash_len_and_no_journal` test copies the
+fixture to fixed name `vault.db`, records its SHA-256, length, and directory
+entries, then performs two `READ_ONLY` opens. Each must report
+`sqlite3_db_readonly(main) == 1` and pass the known queries, complete profile,
+and integrity checks; after both closes the hash, length, and directory entries
+must be identical and no rollback-journal, WAL, or SHM file may exist.
 
 Normal-open tests cover missing file with no creation, symlink/`NOFOLLOW`, URI
 rejection, wrong key, WAL/profile mismatch, and an unexpected object in the
@@ -460,8 +551,17 @@ cipher. Add `static_assertions::assert_not_impl_any!` for
 both `DbKey` and `RawSqlcipherKey`: `Clone`, `Debug`, `Display`, `Serialize`,
 and `DeserializeOwned`; positively assert the intended zeroize-on-drop traits.
 Assert `HardenedConnection: !Send + !Sync` inside the private binary unit tests.
-The five public-surface trybuild cases are independent, and their final stderr must fail for
-privacy, not an unresolved crate or test-harness dependency.
+The Task 1 public-boundary `tests/ui.rs` trybuild harness explicitly lists
+exactly these five cases, with no glob and no sixth fixture in this Task 1
+group: `cannot_name_db_key`,
+`cannot_call_raw_key_shim`, `cannot_reach_raw_handle`,
+`cannot_construct_create_mode`, and `cannot_select_cipher_profile`. Each has a
+same-named reviewed Rust-1.97 `.stderr` file, first proves the dependency
+resolved, and then fails for the intended privacy boundary rather than an
+unresolved crate, missing harness dependency, or zero-test condition.
+This five-case constraint does not prohibit a later, separately declared Cargo
+test target and fixture root; Task 2 recovery UI evidence never enters this
+harness or group.
 
 - [ ] **Step 2: Capture genuine RED**
 
@@ -472,7 +572,8 @@ privacy, not an unresolved crate or test-harness dependency.
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui --frozen -- --nocapture
 ```
 
-First create the private crate, exact dev dependencies, and locked graph so the
+First create the private crate, exact dev dependencies, non-production
+skeleton/tests, and perform the one-time reviewed lock transition above so the
 harness itself compiles. Then run `-- --list` for filtered targets and reject
 `running 0 tests`. Save missing-engine-API stderr; missing `trybuild`,
 `static_assertions`, package, or lockfile is not valid RED. The stacked PR must
@@ -485,7 +586,8 @@ In the same Task 1 slice, change CI so dependency acquisition is an explicit
 Any ordinary cached product-only job must pass
 `--exclude sovereign-vault-v2-engine`. CI directly invokes the wrapper's
 negative environment matrix and exact host/target check. A bare workspace
-Cargo command is not accepted as engine evidence.
+Cargo command is not accepted as engine evidence. The one-time unlocked lock
+transition is never encoded in CI or exposed by the wrapper.
 
 - [ ] **Step 3: Pin minimal dependencies and implement one unsafe shim**
 
@@ -559,14 +661,19 @@ the authorizer/API surface keeps them unreachable.
 
 - [ ] **Step 4: Run GREEN, PRAGMA-path fixtures, and deliberate mutations**
 
-Run focused tests, doc tests, and one checked-in, fixed-hash interoperability
-fixture generated through SQLCipher's officially documented fixed
+Run focused tests, doc tests, and the checked-in
+`crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db` and
+`crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db.sha256`.
+The fixed-hash fixture is generated through SQLCipher's officially documented fixed
 `PRAGMA key = "x'<64 hex>'"` blob-literal path. Record its known queries, open it
 through the 67-byte engine shim, and assert empty schema, integrity,
 build/runtime version, and every cipher setting. Create a fresh database through
 the shim and reopen it through the fixed PRAGMA path. This second path is
 independent from the engine encoder/raw-key call site but uses the same pinned
-SQLCipher object; do not call it an independent CLI binary/distribution test.
+SQLCipher object. The public DBK, known queries, byte length, page count, and
+SHA-256 evidence all describe that same pinned SQLCipher 4.14.0 object; they are
+not evidence from an independent CLI binary/distribution and must not be called
+one.
 An ordinary passphrase PRAGMA made from the same fixed 32 public test bytes may
 accept key setup but must fail at first page access, while the blob-literal path
 succeeds without changing the fixture. Do not add another unsafe C raw-key test
@@ -591,7 +698,8 @@ Run the plan-wide gate in Task 6. Commit only after independent review:
 
 ```bash
 git add Cargo.toml Cargo.lock crates/vault-v2-engine \
-  scripts/qualify-vault-v2.sh .github/workflows/ci.yml
+  docs/security/vault-v2-verification.md scripts/qualify-vault-v2.sh \
+  .github/workflows/ci.yml
 git commit -m "feat(vault): add fixed SQLCipher engine"
 ```
 
@@ -602,7 +710,8 @@ Push, fetch, and verify the exact remote branch contains the commit.
 **Files:**
 - Modify: `Cargo.toml`
 - Modify: `Cargo.lock`
-- Modify: `crates/vault-v2-engine/Cargo.toml`
+- Modify: `crates/vault-v2-engine/Cargo.toml` (add only the explicit
+  `recovery_ui` test target)
 - Modify: `crates/vault-v2-engine/src/engine/mod.rs`
 - Create: `crates/vault-v2-engine/src/engine/wrappers.rs`
 - Create: `crates/vault-v2-engine/src/engine/key_slots.rs`
@@ -610,9 +719,9 @@ Push, fetch, and verify the exact remote branch contains the commit.
 - Create: `crates/vault-v2-engine/src/engine/platform.rs`
 - Create: `crates/vault-v2-engine/src/engine/recovery.rs`
 - Modify: `crates/vault-v2-engine/tests/public.rs`
-- Modify: `crates/vault-v2-engine/tests/ui.rs`
-- Add: `crates/vault-v2-engine/tests/ui/recovery_read_only.rs`
-- Add: `crates/vault-v2-engine/tests/ui/recovery_read_only.stderr`
+- Add: `crates/vault-v2-engine/tests/recovery_ui.rs`
+- Add: `crates/vault-v2-engine/tests/recovery_ui/recovery_read_only.rs`
+- Add: `crates/vault-v2-engine/tests/recovery_ui/recovery_read_only.stderr`
 
 **Internal interfaces:** `DeviceDbkAad`, `PwkRecoveryKekAad`,
 `RecoveryDbkAad`, `NativeDeviceStore`, internal `TestOnlyDeviceStore`, fixed
@@ -650,10 +759,13 @@ each SQL-enforced layer so the corresponding test fails. The read-only open flag
 is not SQL-mutable; the factory verifies it independently with
 `sqlite3_db_readonly`.
 
-The outer `tests/ui.rs` harness MUST define exactly one named
+The independent `tests/recovery_ui.rs` harness MUST define exactly one named
 `#[test] fn recovery_read_only()` that invokes only
-`tests/ui/recovery_read_only.rs`. The focused gate first lists tests and rejects
-zero matches. The fixture first successfully references the public
+`tests/recovery_ui/recovery_read_only.rs`. The manifest disables test
+auto-discovery and declares this harness as an explicit `recovery_ui` test
+target; neither the harness nor its fixture is added to Task 1's five-case
+`tests/ui.rs` group. The focused gate first lists tests and rejects zero
+matches. The fixture first successfully references the public
 `ENGINE_PROTOCOL_VERSION`, proving the dependency crate resolved, and then must
 fail because the library target deliberately contains no `engine` item. The
 reviewed diagnostic is therefore E0432/E0433 for an absent item, not E0603; only
@@ -661,8 +773,9 @@ an unresolved crate/package or a failure before the public sentinel is rejected.
 This proves the process engine is not linked into the protocol library, not the
 private recovery typestate's behavior. Binary unit/AST tests above prove the
 real private typestate has no mutation transition. Its checked-in
-`recovery_read_only.stderr` is generated and manually reviewed under Rust 1.97
-and contains the successful-crate/absent-engine diagnostic.
+`tests/recovery_ui/recovery_read_only.stderr` is generated and manually
+reviewed under Rust 1.97 and contains the successful-crate/absent-engine
+diagnostic.
 
 Add strict `vault-v2/vault.slots` tests for RFC 0005's exact JCS shape: duplicate or
 unknown field, non-canonical JSON/Base64url/decimal, wrong ID/nonce/salt/tagged
@@ -724,8 +837,8 @@ introduced.
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::wrappers::tests --frozen -- --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::key_slots::tests --frozen -- --nocapture
 ./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --bin sovereign-vault-v2-engine engine::recovery::tests --frozen -- --nocapture
-./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui --frozen -- --list | rg -q '^recovery_read_only: test$'
-./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test ui recovery_read_only --frozen -- --exact --nocapture
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test recovery_ui --frozen -- --list | rg -q '^recovery_read_only: test$'
+./scripts/qualify-vault-v2.sh cargo test -p sovereign-vault-v2-engine --test recovery_ui recovery_read_only --frozen -- --exact --nocapture
 ```
 
 - [ ] **Step 3: Implement the minimal roots**
@@ -1179,7 +1292,7 @@ job is not passing platform evidence.
 - Modify: `ROADMAP.md`
 - Modify: `docs/INDEX.md`
 - Modify: `rfcs/0005-dual-root-vault-and-recovery.md`
-- Create: `docs/security/vault-v2-verification.md`
+- Modify: `docs/security/vault-v2-verification.md`
 - Add final negative tests/searches under `crates/vault-v2-engine/tests/` and
   `tests/adversarial/tests/`
 

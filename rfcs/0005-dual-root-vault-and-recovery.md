@@ -345,6 +345,29 @@ allowlist and every virtual-table/schema construction; and product callers
 cannot submit SQL. A new compile option or newly reachable built-in fails the
 admitted profile.
 
+Task 1 has one narrowly scoped lock transition before qualification. The Task
+1 manifests and non-production package skeleton and tests are first added
+without executing any dependency or build script. From a clean, reviewed
+baseline, the pre-transition `Cargo.lock` SHA-256 is recorded. Then, with Rust
+1.97, exact native target `x86_64-unknown-linux-gnu`, fresh `HOME`,
+`CARGO_HOME`, and `TMPDIR`, and no discoverable Cargo configuration, the only
+permitted unlocked/networked command is exactly:
+
+```bash
+cargo fetch --manifest-path Cargo.toml --target x86_64-unknown-linux-gnu
+```
+
+It MUST NOT be replaced or accompanied by
+`cargo update`, `cargo generate-lockfile`, metadata/tree/check/build/test, or
+any other dependency/build script. Review of the resulting lock diff requires
+every old `(name, version, source)` entry to remain unchanged and permits only
+the engine package and its exact Task 1 dependency closure to be added. The
+post-transition lock SHA-256 and review are recorded, followed by
+`cargo fetch --locked`. Thereafter every resolve, metadata/tree, build, test,
+Clippy, and doc command that can include the engine is wrapper-only with
+`--frozen --offline`. This Task- and dependency-set-specific exception is
+absent from CI and the wrapper and never creates a general unlocked mode.
+
 The only qualification entry point is the checked-in
 `scripts/qualify-vault-v2.sh` command wrapper. It rejects ambient dependency
 overrides including
@@ -364,7 +387,8 @@ Rust/linker flags, and unapproved tool overrides; constructs a positive-
 allowlist child environment; resolves and records canonical path, version, and
 SHA-256 for Cargo, rustc, C compiler, archiver, ranlib, Perl, and make; creates
 and owns a new `CARGO_TARGET_DIR`; and runs Cargo `--frozen --offline` only
-after a separate `cargo fetch --locked` acquisition step. Its `full` mode
+after the reviewed one-time lock transition and a separate
+`cargo fetch --locked` acquisition step. Its `full` mode
 reuses the fresh target only within that one invocation and deletes it on exit.
 The child starts from `env -i` and receives only fresh home/temp directories,
 reviewed Cargo/rustup homes, locale/reproducibility values, exact absolute tool
@@ -427,8 +451,42 @@ not evidence of actual OpenSSL global state.
 
 The real LOAD_CONFIG negative control is the only additional raw call, is
 compiled under `cfg(test)` inside the same FFI module, and is absent from the
-normal/release process. The production AST still contains exactly the two
-entry points named by this RFC.
+normal/release process. The project-authored production AST still contains
+exactly the two entry points named by this RFC; this source gate makes no claim
+about unsafe code internal to dependencies.
+
+The named test
+`recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact` uses
+`syn` with `full`, `parsing`, and `visit` to start from `build.rs`, every
+explicit Cargo library, binary, and integration-test target, and specifically
+`tests/ui.rs`, then parse the complete recursive closure of inline and external
+modules. Its exact Task 1 test-only auxiliary roots are
+`tests/ui/cannot_name_db_key.rs`,
+`tests/ui/cannot_call_raw_key_shim.rs`,
+`tests/ui/cannot_reach_raw_handle.rs`,
+`tests/ui/cannot_construct_create_mode.rs`, and
+`tests/ui/cannot_select_cipher_profile.rs`. Task 2's
+`tests/recovery_ui/recovery_read_only.rs` is not a member of that group; Task 2
+admits it only through the separately explicit `tests/recovery_ui.rs` Cargo
+test target/root set. An orphan is any `.rs` file belonging to none of the
+recursive module closure, an explicit Cargo target, or an exact task-admitted
+auxiliary fixture root. The gate checks cfg-disabled code as syntax and rejects
+`#[path]`, `include!` and other source includes, symlinks, source-root escapes,
+ambiguous module resolution, cycles, and orphans. Manifest auto-discovery is
+disabled and every target is explicit.
+
+Project-authored `macro_rules!` and all other macro definitions are forbidden.
+Every macro invocation, attribute, and derive uses a closed allowlist. Beyond
+normal AST visiting, the visitor recursively scans every `syn::Macro.tokens`
+token tree, including nested groups, and rejects `unsafe`, `extern`, raw symbol
+names, `include`, `path`, and every other forbidden token. No allowed macro may
+generate additional project-authored FFI or unsafe code. Separate production
+and `cfg(test)` allowlists detect direct and aliased paths, glob imports, raw
+symbol declarations, and calls, proving exactly the two project-authored
+production unsafe FFI entry points and the single test-only OpenSSL LOAD_CONFIG
+negative control. Mutation tests hide a third unsafe/FFI declaration or call
+first in a macro definition and then in macro invocation tokens; both mutations
+must fail the source-closure gate.
 
 Because OpenSSL initialization cannot be retroactively changed, this result
 does not authorize in-process product embedding. Program 1D must keep a
@@ -483,12 +541,20 @@ raw-key profile and still uses its normal encrypted header and per-database
 salt; the implementation does not claim that all SQLCipher PBKDF2 work is
 absent. Because upstream does not publish this repository's fixture as an
 official vector, the repository checks in one reviewed, fixed-hash fixture
-created via SQLCipher's officially documented
+at
+`crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db`
+and its reviewed
+`crates/vault-v2-engine/tests/fixtures/sqlcipher-4.14.0-raw-key-empty.db.sha256`,
+with its Task 1 evidence recorded in
+`docs/security/vault-v2-verification.md`. The fixture is created via SQLCipher's
+officially documented
 `PRAGMA key = "x'<64 hex>'"` blob-literal path and records its stable known
 queries. CI opens that fixture through the engine's 67-byte `sqlite3_key` shim;
 it also creates a fresh engine database and reopens it through the fixed PRAGMA
 path. The PRAGMA path is independent from the engine's encoder and raw-key call
-site but uses the same pinned SQLCipher 4.14 object. This is **not** evidence of
+site but uses the same pinned SQLCipher 4.14 object. The public DBK, known
+queries, byte length, page count, and SHA-256 evidence all describe that same
+pinned object. This is **not** evidence of
 interoperability with an independent CLI binary/distribution: the locked source
 package contains no `shell.c` and the qualification environment has no
 SQLCipher CLI. Both directions assert SQLCipher build/runtime version, complete
@@ -498,6 +564,22 @@ but must fail on first page authentication, proving it is not the raw-key blob
 path without adding another unsafe C entry point. A generator reproduces the
 fixture semantics, not identical ciphertext: SQLCipher's random salt/page IVs
 are never made deterministic.
+
+The fixture is at least 8192 bytes and page-aligned. The named test
+`page_2_ciphertext_bitflip_is_detected_cryptographically` copies it to a
+temporary file, changes byte offset 4224 with XOR `0x01`, bypasses only the
+fixture-hash preflight, then opens with the correct public DBK in `READ_ONLY`
+mode and runs the full cipher integrity check. The result must be a value-free
+authentication/integrity failure, and the original admitted fixture hash is
+rechecked afterward.
+
+The named test
+`successful_read_only_reopen_preserves_hash_len_and_no_journal` copies the
+fixture to fixed name `vault.db`, records its SHA-256, length, and directory
+entries, and performs two `READ_ONLY` opens. Each reports
+`sqlite3_db_readonly(main) == 1` and passes the known queries, complete cipher
+profile, and integrity checks. After both closes the SHA-256, length, and
+directory entries are unchanged, with no rollback-journal, WAL, or SHM file.
 
 ### Exact SQLCipher and SQLite profile
 
@@ -1242,6 +1324,18 @@ Implementations MUST NOT:
 - Compile/static assertions for secret opacity, algorithm/nonce non-selection,
   no extension/attach/dynamic SQL, no engine API in the protocol-only library,
   and no release test store.
+- One explicit no-glob Task 1 public-boundary `tests/ui.rs` trybuild harness
+  containing exactly five fixtures and no sixth case in that Task 1 group:
+  `cannot_name_db_key`, `cannot_call_raw_key_shim`,
+  `cannot_reach_raw_handle`, `cannot_construct_create_mode`, and
+  `cannot_select_cipher_profile`, each with its same-named reviewed Rust-1.97
+  `.stderr`. Every fixture first proves its dependency resolves, is listed by
+  the harness, and fails for the intended privacy boundary rather than a
+  missing harness dependency, unresolved crate, or zero-test condition. This
+  is not a permanent five-fixture limit for the project: Task 2 declares the
+  separate `tests/recovery_ui.rs` Cargo target and owns only
+  `tests/recovery_ui/recovery_read_only.rs` plus its `.stderr`; neither enters
+  the Task 1 harness or fixture group.
 - Bound, malformed, corruption, truncation, schema substitution, wrong
   workspace/database/epoch/role, cross-wrapper, and unknown object-tag tests.
 - Transaction/fault tests at begin, row/chunk insert, commit, journal sync,
