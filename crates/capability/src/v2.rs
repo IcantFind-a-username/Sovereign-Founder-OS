@@ -693,7 +693,7 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
         // RFC 0003: the token's evidence claim, the presented signed object,
         // and the policy requirement must all agree. Any partial combination
         // fails closed.
-        let approval_id = match (
+        let approval_claim = match (
             context.policy_decision.requires_approval(),
             &claims.approval_evidence,
             approval,
@@ -732,7 +732,7 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
                 if self.consumed_approvals.contains(&verified.approval_id) {
                     return Err(CapabilityV2Error::ApprovalReused);
                 }
-                Some(verified.approval_id)
+                Some((verified.approval_id, verified.expires_at_unix))
             }
         };
 
@@ -759,16 +759,16 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
                     claims.expires_at_unix,
                 )
                 .map_err(map_authority_error_idempotency)?;
-            if let Some(approval_id) = approval_id {
+            if let Some((approval_id, approval_expires_at_unix)) = approval_claim {
                 store
-                    .consume_approval(approval_id, now_unix, claims.expires_at_unix)
+                    .consume_approval(approval_id, now_unix, approval_expires_at_unix)
                     .map_err(map_authority_error_approval)?;
             }
         }
 
         self.consumed_tokens.insert(claims.token_id);
         self.idempotency.insert(claims.idempotency_key, fingerprint);
-        if let Some(approval_id) = approval_id {
+        if let Some((approval_id, _)) = approval_claim {
             self.consumed_approvals.insert(approval_id);
         }
         Ok(AuthorizedCapabilityV2 { claims })

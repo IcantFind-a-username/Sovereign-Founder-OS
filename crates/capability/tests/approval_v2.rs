@@ -221,6 +221,15 @@ fn request<'a>(
     policy_decision: &'a PolicyAuthorizationV2,
     idempotency: Uuid,
 ) -> CapabilityV2IssueRequest<'a> {
+    request_with_ttl(invocation, policy_decision, idempotency, 60)
+}
+
+fn request_with_ttl<'a>(
+    invocation: &'a PreparedInvocation,
+    policy_decision: &'a PolicyAuthorizationV2,
+    idempotency: Uuid,
+    ttl_seconds: i64,
+) -> CapabilityV2IssueRequest<'a> {
     CapabilityV2IssueRequest {
         venture_id: VENTURE,
         subject_id: SUBJECT,
@@ -228,7 +237,7 @@ fn request<'a>(
         policy_decision,
         prepared_invocation: invocation,
         options: CapabilityV2IssueOptions {
-            ttl: Duration::seconds(60),
+            ttl: Duration::seconds(ttl_seconds),
             idempotency_key: idempotency,
         },
     }
@@ -540,6 +549,90 @@ fn approval_reuse_across_tokens_is_denied_at_consumption() {
         .unwrap_err(),
         CapabilityV2Error::ApprovalReused
     );
+}
+
+#[test]
+fn durable_approval_survives_token_expiry_purge_until_approval_expiry() {
+    let dir = tempfile::tempdir().unwrap();
+    let invocation = prepared("durable approval retention");
+    let idempotency = Uuid::from_u128(23);
+    let policy_decision = decision(&invocation, AutomationLevel::L3BoundedAuto, idempotency);
+    // The approval remains valid until t+120 while each capability token
+    // expires at t+30.
+    let approval = approve_at(NOW, &invocation, &policy_decision, 120);
+    let first_token = issuer_at(NOW)
+        .issue_approved(
+            request_with_ttl(&invocation, &policy_decision, idempotency, 30),
+            &approval,
+        )
+        .unwrap();
+
+    let mut first = validator_at(NOW + 1)
+        .with_authority_store(sovereign_authority::AuthorityStore::open(dir.path()).unwrap());
+    consume(
+        &mut first,
+        &first_token,
+        &invocation,
+        &policy_decision,
+        Some(&approval),
+    )
+    .unwrap();
+
+    // At t+31 the first token and its idempotency record may be purged, but
+    // the still-valid approval must continue to block a second token.
+    let store = sovereign_authority::AuthorityStore::open(dir.path()).unwrap();
+    store.purge_expired(NOW + 31).unwrap();
+    drop(store);
+
+    let second_token = issuer_at(NOW + 31)
+        .issue_approved(
+            request_with_ttl(&invocation, &policy_decision, idempotency, 30),
+            &approval,
+        )
+        .unwrap();
+    let mut reopened = validator_at(NOW + 31)
+        .with_authority_store(sovereign_authority::AuthorityStore::open(dir.path()).unwrap());
+    match consume(
+        &mut reopened,
+        &second_token,
+        &invocation,
+        &policy_decision,
+        Some(&approval),
+    ) {
+        Err(CapabilityV2Error::ApprovalReused) => {}
+        Err(error) => panic!("unexpected approval replay result: {error:?}"),
+        Ok(()) => panic!("approval replay incorrectly reopened after token-expiry purge"),
+    }
+}
+
+#[test]
+fn expired_approval_purges_at_approval_expiry() {
+    let dir = tempfile::tempdir().unwrap();
+    let invocation = prepared("durable approval expiry");
+    let idempotency = Uuid::from_u128(24);
+    let policy_decision = decision(&invocation, AutomationLevel::L3BoundedAuto, idempotency);
+    let approval = approve_at(NOW, &invocation, &policy_decision, 120);
+    let token = issuer_at(NOW)
+        .issue_approved(
+            request_with_ttl(&invocation, &policy_decision, idempotency, 30),
+            &approval,
+        )
+        .unwrap();
+    let mut validator = validator_at(NOW + 1)
+        .with_authority_store(sovereign_authority::AuthorityStore::open(dir.path()).unwrap());
+    consume(
+        &mut validator,
+        &token,
+        &invocation,
+        &policy_decision,
+        Some(&approval),
+    )
+    .unwrap();
+
+    let store = sovereign_authority::AuthorityStore::open(dir.path()).unwrap();
+    assert_eq!(store.purge_expired(NOW + 31).unwrap(), 2);
+    assert_eq!(store.purge_expired(NOW + 119).unwrap(), 0);
+    assert_eq!(store.purge_expired(NOW + 120).unwrap(), 1);
 }
 
 #[test]
