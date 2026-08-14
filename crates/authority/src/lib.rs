@@ -386,6 +386,29 @@ mod tests {
     }
 
     #[test]
+    fn purge_uses_each_claim_kind_expiry() {
+        let dir = tempdir().unwrap();
+        let store = AuthorityStore::open(dir.path()).unwrap();
+        let token = Uuid::new_v4();
+        let approval = Uuid::new_v4();
+        let idempotency = Uuid::new_v4();
+
+        store.consume_token(token, NOW, NOW + 30).unwrap();
+        store.consume_approval(approval, NOW, NOW + 120).unwrap();
+        store
+            .bind_idempotency(idempotency, &[0x01; 32], NOW, NOW + 30)
+            .unwrap();
+
+        assert_eq!(store.purge_expired(NOW + 31).unwrap(), 2);
+        assert_eq!(
+            store.consume_approval(approval, NOW + 31, NOW + 120),
+            Err(AuthorityError::AlreadyConsumed),
+            "the approval must retain its own later expiry"
+        );
+        assert_eq!(store.purge_expired(NOW + 120).unwrap(), 1);
+    }
+
+    #[test]
     fn purged_idempotency_key_can_be_rebound_without_false_conflict() {
         // An idempotency key that has expired and been purged must not haunt a
         // later, unrelated invocation as a phantom conflict — otherwise expired
