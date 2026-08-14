@@ -19,6 +19,13 @@ repo audit; every entry below points at verified, real state of the code.
 - **Entry format:** priority (P1 urgent / P2 soon / P3 opportunistic) +
   directory-level scope + done criteria that a test (or an exact command)
   can verify.
+- **Model escalation is a tag, not a judgment call.** Entries needing
+  design-heavy work carry a `needs:fable` tag (added by `/plan-feature` or a
+  human). Unattended small-model sessions MUST skip tagged entries — no
+  heroics. If an item accumulates 2 failed-round diagnoses, the session that
+  fails it the second time tags it `needs:fable` and releases it instead of
+  retrying. Tagged items are consumed by a human-driven session on a larger
+  model (`/model`), which removes the tag when the item lands.
 
 ## Queue
 

@@ -12,6 +12,9 @@ When the round is done, stop — do not start a second item in the same session.
 
 - Read `docs/backlog.md`. Take the highest-priority unclaimed item
   (top-most unchecked entry not marked 进行中/IN PROGRESS).
+- If you are an unattended session on a small/default model, skip entries
+  tagged `needs:fable` — those wait for a human-driven session on a larger
+  model. Take the next untagged item instead.
 - Mark it `IN PROGRESS (<date>)` and commit that one-line edit immediately
   (`chore(backlog): claim <task-id>`), so parallel agents don't collide.
 - If the backlog is empty: report that and end the session. Do not invent work.
@@ -39,7 +42,9 @@ When the round is done, stop — do not start a second item in the same session.
   (The Stop hook runs it again anyway — a session cannot end red.)
 - If you cannot get it green this round: revert to the last green state,
   write the diagnosis under the backlog item, and end the session. Do not
-  loop indefinitely.
+  loop indefinitely. If the item already carries a diagnosis from a previous
+  failed round, also tag it `needs:fable` (see backlog rules) so no further
+  small-model rounds burn on it.
 
 ## 5. Commit and book-keep
 
