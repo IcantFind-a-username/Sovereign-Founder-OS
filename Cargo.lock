@@ -1454,6 +1454,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-consultant-playground"
+version = "0.1.0"
+
+[[package]]
 name = "sovereign-contracts"
 version = "0.1.0"
 dependencies = [
