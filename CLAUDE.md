@@ -93,3 +93,9 @@ secret scanning. Toolchain is pinned: 1.97.0.
    clone), and a clone made in-session is a single-branch fetch of `main` —
    automation prompts must clone first (add_repo) and fetch explicit
    refspecs for other branches before any checkout (probe, 2026-08-15).
+6. Every `.rs` file directly under a crate's `tests/` dir compiles as its
+   own crate. Splitting one big integration-test file into several means
+   shared helpers must live in `tests/support/*.rs` and be pulled in per
+   binary via `#[path = "support/x.rs"] mod x;` with `pub(crate)` items —
+   include only what each binary actually calls, or unused helpers trip
+   `dead_code` under clippy's `-D warnings`.
