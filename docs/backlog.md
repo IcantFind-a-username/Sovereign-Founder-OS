@@ -99,7 +99,7 @@ repo audit; every entry below points at verified, real state of the code.
   from `address_space_enforcement()` instead of asserting a cap, and
   `cargo test -p sovereign-cli` covers both outcomes.
 
-- [ ] **P1 | `crates/vault/` | Fail closed when `vault.key` is missing but entries exist.**
+- [ ] **P1 | `crates/vault/` | Fail closed when `vault.key` is missing but entries exist.** IN PROGRESS (2026-08-15)
   `Vault::init` (src/lib.rs:53-59) silently generates a fresh key whenever
   `vault.key` is absent, so a lost or deleted key file turns every existing
   `*.enc` entry into permanently undecryptable data while the vault still opens
