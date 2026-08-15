@@ -114,7 +114,7 @@ repo audit; every entry below points at verified, real state of the code.
   `VaultError::NotInitialized`, a first-run empty root still initializes
   normally, and `cargo test -p sovereign-vault` covers both paths.
 
-- [ ] **P1 | `crates/vault-v2-engine/` | Stand up the engine crate skeleton with pinned dependencies and no cryptography.**
+- [ ] **P1 | `crates/vault-v2-engine/` | Stand up the engine crate skeleton with pinned dependencies and no cryptography.** IN PROGRESS (2026-08-15)
   First code step of RFC 0005 Program 1A, which every encrypted-backup,
   recovery, and multi-device claim is blocked on. Standing finding for the whole
   encryption program, so no session re-derives it: the design is already settled
