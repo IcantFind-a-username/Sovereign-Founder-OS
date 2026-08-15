@@ -86,3 +86,7 @@ repo audit; every entry below points at verified, real state of the code.
   live policy evaluation. Done when: split into ~3 modules each well under
   the limit, `cargo test -p sovereign-cli` passes, and behavior is unchanged
   (same routes serve the same assets).
+
+## Run log
+
+- probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
