@@ -43,7 +43,7 @@ repo audit; every entry below points at verified, real state of the code.
   ≤ ~800 lines, and `cargo test -p sovereign-consultant-playground` passes
   with the same test count as before the split.
 
-- [ ] **P1 | `crates/contracts/` | Add serialization-shape tests for the signed contract types.**
+- [ ] **P1 | `crates/contracts/` | Add serialization-shape tests for the signed contract types.** — IN PROGRESS (2026-08-15)
   The crate has zero tests, yet `CapabilityTokenBody` is the canonical signed
   body whose serde shape is load-bearing for signature verification in
   `crates/capability` — today a field rename would silently invalidate
