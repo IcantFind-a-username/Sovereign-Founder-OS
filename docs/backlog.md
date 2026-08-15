@@ -51,7 +51,7 @@ repo audit; every entry below points at verified, real state of the code.
   field names of `CapabilityTokenBody` and `PolicyDecision`, and renaming any
   field makes `cargo test -p sovereign-contracts` fail.
 
-- [ ] **P1 | `scripts/` | The quality gate exits 0 without running a single check on bash 3.2.**
+- [ ] **P1 | `scripts/` | The quality gate exits 0 without running a single check on bash 3.2.** IN PROGRESS (2026-08-15)
   `test_changed.sh` (line 78) and `check-file-size.sh` (line 12) both use
   `declare -A`, a bash 4 feature. On stock macOS (`/usr/bin/env bash` =
   bash 3.2.57) `test_changed.sh` prints `declare: -A: invalid option`, aborts
