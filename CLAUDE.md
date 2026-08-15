@@ -89,3 +89,7 @@ secret scanning. Toolchain is pinned: 1.97.0.
    when the compiler is happy.
 4. Clippy runs with `-D warnings` including on test targets; even a
    scratch test with `assert!(false)` fails the gate at compile time.
+5. Trigger-fired cloud sessions start with an EMPTY container (no repo
+   clone), and a clone made in-session is a single-branch fetch of `main` —
+   automation prompts must clone first (add_repo) and fetch explicit
+   refspecs for other branches before any checkout (probe, 2026-08-15).
