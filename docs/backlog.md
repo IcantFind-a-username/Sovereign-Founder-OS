@@ -187,6 +187,57 @@ repo audit; every entry below points at verified, real state of the code.
   that mutating a field inside `workspace` still leaves
   `ExportVerification.ok == true`, named so its failure reads as "the export
   boundary changed", and `cargo test -p sovereign-cli` passes.
+  Runtime evidence 2026-08-15 (both halves reproduce end to end on the running
+  binary, so the test below is pinning observed behavior, not a hypothesis):
+  `GET /api/export` after one approved send emitted the customer name
+  `Dr. Tan` verbatim three times in the 10883-byte bundle; editing that name to
+  `ATTACKER RENAMED` and the invoice amount to `999999999` inside `workspace`
+  and re-running `sovereign verify-export` still printed "VERIFIED — this
+  bundle is intact and bound to the device that signed it" and exited 0.
+
+- [ ] **P2 | `apps/cli/src/` | The Security Center reports the owner's real admitted plugin as unverified.**
+  `admitted_plugins_json` (ui.rs:511-562) verifies every record under
+  `artifacts/admissions/` against `demo_admission_trust()` (ui.rs:564-576),
+  which trusts exactly one key: the hard-coded `demo::DEMO_ADMISSION_SECRET`
+  under issuer `founder-device.local` (demo.rs:41, 46). The Workspace admits
+  its plugin with the vault-held owner key under a different issuer,
+  `OWNER_ADMISSION_ISSUER = "founder-device.workspace"` (workspace/mod.rs:69,
+  workspace/kernel_exec.rs:125-136), so the one plugin the owner actually runs
+  can never verify against the anchor the security surface uses. Observed
+  2026-08-15 on a clean root: after a single approved send, `GET /api/state`
+  returned its only admission record as `"verified": false` with "admission
+  record failed verification against the demo trust anchor", while the two
+  records a `demo --fast` run leaves behind both returned `"verified": true`
+  with issuer `founder-device.local` — the surface flags the real plugin and
+  clears the demo ones. P2 rather than P1 because no enforcement is weakened:
+  the Workspace's own load path re-verifies against the owner anchor correctly
+  (workspace/kernel_exec.rs:138-146) and refuses a record that fails, so this
+  is a trust-reporting defect — but a permanent red badge on a correctly
+  admitted plugin teaches the owner to ignore red. `apps/cli/src/ui.rs` is
+  already queued for a split (P3 below) and round 3 put the compile-isolation
+  verdict and its wording in `apps/cli/src/gauntlet_report.rs` rather than
+  growing `ui.rs`; follow that precedent and give this logic its own module.
+  Done when: a record admitted by the Workspace reports `"verified": true` with
+  its real issuer, a record signed by neither anchor is still listed as
+  unverified rather than hidden, and `cargo test -p sovereign-cli` covers both
+  outcomes.
+
+- [ ] **P2 | `apps/cli/src/` | `demo` writes its events and admission records into the owner's real data root.**
+  `Commands::Demo` hands `data_dir()` straight to the demo (main.rs:88), so the
+  story-driven run initializes and writes the same root the Workspace uses.
+  Observed 2026-08-15 against a clean root: one `demo --fast` created
+  `device.json`, a `ledger.json` carrying a demo event, `vault/vault.key` with
+  `vault/venture_profile.enc` and its manifest, and two admission records plus
+  their objects and manifests under `artifacts/` (demo.rs:157, 170, 326,
+  537-538). On an owner's machine those land in the real vault and the real
+  audit ledger, which is the tamper-evident record of what actually happened —
+  seeding it with demo events degrades that evidence rather than just leaving
+  clutter — and the demo's admission records then appear in the Security
+  Center's plugin list. Done when: `demo` runs against an isolated or clearly
+  marked ephemeral root by default, and a test that seeds a populated default
+  root, runs the demo, and re-reads it asserts that root's `ledger.json`,
+  `vault/`, and `artifacts/admissions/` are unchanged. May reuse the `--root`
+  plumbing from the P3 below, but must not depend on the owner passing it.
 
 - [ ] **P2 | `crates/vault/` | Decide and record whether v1 entry blobs stay unbound to their entry name.** `needs:fable`
   `encrypt` (src/lib.rs:173-185) passes no associated data, so a `*.enc` blob
@@ -348,6 +399,22 @@ repo audit; every entry below points at verified, real state of the code.
   live policy evaluation. Done when: split into ~3 modules each well under
   the limit, `cargo test -p sovereign-cli` passes, and behavior is unchanged
   (same routes serve the same assets).
+
+- [ ] **P3 | `apps/cli/src/` | Add a `--root` flag so the app can run against a throwaway state directory.**
+  `data_dir()` (main.rs:78-82) is the only root resolver —
+  `dirs::data_local_dir()` joined with `sovereign-founder-os` — and nothing
+  overrides it: the top-level `Cli` (main.rs:25-30) carries no global option,
+  `ui` accepts only `--port` and `--no-open` (main.rs:47-54), and every
+  subcommand calls `data_dir()` directly (main.rs:88, 91, 106, 200, 347, 374).
+  Overriding `HOME` for the process is therefore the only way to evaluate,
+  test, or demo without touching real state, which is awkward and easy to
+  forget. One flag covers everything, because the vault (`root/vault`), the
+  ledger (`root/ledger.json`), the outbox (`root/outbox`,
+  workspace/ops.rs:359) and the artifact store (`root/artifacts`) all hang off
+  the same root. Done when: `sovereign --root <dir> <command>` (or a documented
+  environment variable) redirects vault, ledger and outbox together, and a test
+  runs a state-writing command with it set and asserts nothing was created
+  under `dirs::data_local_dir()/sovereign-founder-os`.
 
 ## Run log
 
