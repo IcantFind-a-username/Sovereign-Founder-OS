@@ -80,7 +80,7 @@ repo audit; every entry below points at verified, real state of the code.
   its address-space cap on both macOS and Linux (or the cap is applied by a
   portable mechanism), and `cargo test --workspace --locked` is green on macOS.
 
-- [ ] **P1 | `apps/cli/src/` | The Security Center's compile-isolation check passes when the worker never started.**
+- [ ] **P1 | `apps/cli/src/` | The Security Center's compile-isolation check passes when the worker never started.** IN PROGRESS (2026-08-15)
   `run_gauntlet`'s `compile_isolation` check (ui.rs:794-822) accepts any
   `Err(CompileWorkerFailed(_) | CompileWorkerTimeout)` as proof that hostile
   compilation was contained in a child process. That same variant is what a
