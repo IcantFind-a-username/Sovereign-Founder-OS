@@ -63,7 +63,7 @@ repo audit; every entry below points at verified, real state of the code.
   exit and an explicit "unsupported bash" message; plus a test or an exact
   command demonstrating that a gate that cannot run never exits 0.
 
-- [ ] **P1 | `crates/sandbox/` | `cargo test --workspace` is red on macOS: the compile worker's `RLIMIT_AS` blocks exec.** IN PROGRESS (2026-08-15)
+- [x] **P1 | `crates/sandbox/` | `cargo test --workspace` is red on macOS: the compile worker's `RLIMIT_AS` blocks exec.**
   `compile_worker::tests::parent_fails_closed_on_timeout_nonzero_and_garbage_output`
   fails deterministically (3/3 runs) on macOS arm64 at src/compile_worker.rs:301:
   the `/bin/sleep 30` stand-in is expected to hit the 150 ms deadline and yield
@@ -79,6 +79,25 @@ repo audit; every entry below points at verified, real state of the code.
   untouched). Done when: the root cause is identified, the worker spawns under
   its address-space cap on both macOS and Linux (or the cap is applied by a
   portable mechanism), and `cargo test --workspace --locked` is green on macOS.
+
+- [ ] **P1 | `apps/cli/src/` | The Security Center's compile-isolation check passes when the worker never started.**
+  `run_gauntlet`'s `compile_isolation` check (ui.rs:794-822) accepts any
+  `Err(CompileWorkerFailed(_) | CompileWorkerTimeout)` as proof that hostile
+  compilation was contained in a child process. That same variant is what a
+  *failed spawn* produces, so while `setrlimit` was aborting every exec on
+  macOS (fixed 2026-08-15 in `crates/sandbox`) this check reported green with
+  the detail "compiled in a killable, memory-limited worker" even though no
+  worker process ever ran and nothing was compiled anywhere. The check now
+  passes for the right reason on macOS, but its shape still cannot tell the
+  two apart, and the wording is unconditional where the cap is not:
+  `CompileWorker::address_space_enforcement()` returns `Unavailable` on Darwin,
+  yet ui.rs:603, 665 and 821 all claim a memory-limited worker regardless.
+  Found 2026-08-15 during the `crates/sandbox` round; out of that round's
+  scope. Done when: the check distinguishes "the worker ran and the failure was
+  contained" from "the worker never started" (a spawn failure must report
+  `pass: false`), the detail string reports the platform's real enforcement
+  from `address_space_enforcement()` instead of asserting a cap, and
+  `cargo test -p sovereign-cli` covers both outcomes.
 
 - [ ] **P1 | `crates/vault/` | Fail closed when `vault.key` is missing but entries exist.**
   `Vault::init` (src/lib.rs:53-59) silently generates a fresh key whenever
@@ -319,5 +338,6 @@ repo audit; every entry below points at verified, real state of the code.
 
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
 - 2026-08-15: split `physical_boundary.rs` (1192 lines) into `physical_boundary_manifest.rs` + `physical_boundary_source.rs`, with shared lexer/JSON-parser/fixture helpers moved to `tests/support/*.rs` and included per binary via `#[path]`. Same 8 tests pass, `check-file-size.sh`/clippy/fmt/full gate all green.
+- 2026-08-15: fixed the macOS compile worker. The queued hypothesis (dyld reserving more address space than the 1 GiB cap allows) was wrong: Darwin aliases `RLIMIT_AS` onto `RLIMIT_RSS` and rejects *every* finite value with `EINVAL` — verified outside any sandbox on macOS 26.5.2 arm64, where `ulimit -v`, `-m` and `-d` all fail at 1 GiB, 4 GiB, 8 GiB and 64 GiB. Because `setrlimit` is called from `pre_exec`, that error killed the child before `exec`, so `spawn` failed and **no artifact could be compiled at all on macOS** — `Vm::compile` (wasm.rs:311) has no in-process fallback once a worker is attached. So it was a production defect, not a test bug, exactly as the entry warned. No enforcement was relaxed: the `RLIMIT_AS` cap and its fail-closed `setrlimit` error handling are unchanged wherever the platform accepts them, and the `pre_exec` hook is simply not installed where the kernel rejects it — an unenforceable limit was costing the entire worker path. New `AddressSpaceEnforcement::{Enforced,Unavailable}` plus `CompileWorker::address_space_enforcement()` make the difference reportable instead of assumed, and the module doc no longer claims a cap "on Unix". Two new tests: one asserts the child actually reaches `exec` (it failed with `spawn: Invalid argument (os error 22)` before the fix), one pins the honest per-platform enforcement answer. `cargo test --workspace --locked` is now green on macOS (198 tests) and the gate reports ALL GREEN across all six steps. Filed the P1 above: on macOS the Security Center's compile-isolation check was reporting green *because* the worker could not start.
 - 2026-08-15: made both gate scripts bash-3.2-portable and incapable of a false green. `declare -A` is gone from `test_changed.sh` (space-delimited package list + `add_pkg`) and `check-file-size.sh` (a `case`-based `allowlist_limit`); both now refuse to run on bash < 3.2 with exit 3. Two new tripwires: an EXIT trap in `test_changed.sh` turns any exit before the completion marker into a nonzero exit (the old bug exited 0 having run nothing), and `check-file-size.sh` fails when it inspected zero files instead of printing OK. The always-on cheap gates now run even on a clean tree, so no path reaches exit 0 unchecked, and the success line names every step it ran. New `scripts/tests/gate_portability_test.sh` (9 checks, bash 3.2, runs as the gate's first step) pins all of it, including a positive control proving its own construct patterns match. Teeth verified by three temporary mutations, all caught and all reverted: a reintroduced `declare -A`, a commented-out EXIT trap, and a trap-detection pattern that matched its own comment. Gate now runs its five steps for real and stops at the one pre-existing red — `sovereign-sandbox`'s `parent_fails_closed_on_timeout_nonzero_and_garbage_output`, the next P1 — so it is honest but not yet green on macOS.
 - 2026-08-15: pinned the signed wire shapes in `crates/contracts/tests/signed_shape.rs` (14 tests, first tests in the crate): byte-exact goldens for `CapabilityTokenBody`, `PolicyDecision`, and `AuditEventBody`, plus enum wire tokens, null-Option hashing, signature/hash exclusion, and no-silent-default checks. Teeth verified by two temporary mutations of `src/lib.rs`, both caught and both reverted: a `#[serde(rename)]` and a swap of two field declarations (the goldens are byte-exact because `serde_json::to_vec` emits declaration order, so ordering is signed too). Gate run by hand — `test_changed.sh` is unusable on this machine, filed as the new P1 `scripts/` item.

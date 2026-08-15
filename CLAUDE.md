@@ -27,9 +27,7 @@ Developer Preview maturity.
 
 ## Verified commands (green on Linux/CI as of 2026-08-14)
 
-Both gate scripts run on bash 3.2 (stock macOS) as of 2026-08-15. On macOS
-`--workspace` still has one failing sandbox test — see the `crates/sandbox`
-P1 in `docs/backlog.md` before trusting a local full-suite run.
+Green on macOS 26.5 arm64 as well, as of 2026-08-15.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
@@ -113,3 +111,8 @@ secret scanning. Toolchain is pinned: 1.97.0.
    fail when it inspected zero inputs, and treat a scanner's error status
    (`grep` ≥ 2) as a failure — a regex that won't compile matches nothing and
    reads as a pass.
+9. When "the guard worked" and "the guard never ran" produce the same error
+   variant, add a test that the mechanism actually executed. A `pre_exec`
+   hook that fails aborts the child before `exec`, so a platform-unsupported
+   limit surfaces as a spawn error — the same `CompileWorkerFailed` a safely
+   contained hostile compile produces, and it read as a passing check.
