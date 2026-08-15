@@ -27,9 +27,9 @@ Developer Preview maturity.
 
 ## Verified commands (green on Linux/CI as of 2026-08-14)
 
-On macOS both gate scripts abort unrun (bash 3.2) and `--workspace` has one
-failing sandbox test — see the two P1 entries in `docs/backlog.md` before
-trusting a local run.
+Both gate scripts run on bash 3.2 (stock macOS) as of 2026-08-15. On macOS
+`--workspace` still has one failing sandbox test — see the `crates/sandbox`
+P1 in `docs/backlog.md` before trusting a local full-suite run.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
@@ -108,3 +108,8 @@ secret scanning. Toolchain is pinned: 1.97.0.
 7. Assert JSON *keys* structurally (parse, then `contains_key`), never with
    `json.contains("key")` — a shorter key is a substring of a longer real one
    (`event_hash` ⊂ `previous_event_hash`) and the assertion misfires.
+8. A check must never conflate "clean" with "could not run": give every gate
+   script an EXIT-trap completion marker so a premature exit can't return 0,
+   fail when it inspected zero inputs, and treat a scanner's error status
+   (`grep` ≥ 2) as a failure — a regex that won't compile matches nothing and
+   reads as a pass.

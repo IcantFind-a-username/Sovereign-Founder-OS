@@ -51,7 +51,7 @@ repo audit; every entry below points at verified, real state of the code.
   field names of `CapabilityTokenBody` and `PolicyDecision`, and renaming any
   field makes `cargo test -p sovereign-contracts` fail.
 
-- [ ] **P1 | `scripts/` | The quality gate exits 0 without running a single check on bash 3.2.** IN PROGRESS (2026-08-15)
+- [x] **P1 | `scripts/` | The quality gate exits 0 without running a single check on bash 3.2.**
   `test_changed.sh` (line 78) and `check-file-size.sh` (line 12) both use
   `declare -A`, a bash 4 feature. On stock macOS (`/usr/bin/env bash` =
   bash 3.2.57) `test_changed.sh` prints `declare: -A: invalid option`, aborts
@@ -268,6 +268,19 @@ repo audit; every entry below points at verified, real state of the code.
   contains no "encrypted at rest", "E2EE", "recovery-complete", or
   "production-ready" claim.
 
+- [ ] **P2 | `.github/workflows/` | Run the gate self-test in CI.**
+  `scripts/tests/gate_portability_test.sh` (added 2026-08-15) proves the gate
+  scripts run on bash 3.2 and can never exit 0 without checking anything, but
+  nothing in CI invokes it: `ci.yml` calls `check-file-size.sh` directly and
+  never calls `test_changed.sh`, so today the self-test only runs on a
+  developer machine via the gate's own `gate-self-test` step. CI runners are
+  bash 5, so the execution half of the portability claim is only ever proven
+  locally — the static construct scan is what carries it there. Out of scope
+  for the round that added the self-test (`scripts/` only). Done when: the
+  `test` job in `.github/workflows/ci.yml` runs
+  `./scripts/tests/gate_portability_test.sh` before the file-size step, and a
+  run shows it green.
+
 - [ ] **P3 | `.github/workflows/` | Repin the four actions still targeting the Node 20 runtime.**
   Every CI job carries a deprecation annotation. Run 31886107586 (green, commit
   9277f27 on `feature/auto-iterate`) reports "Node.js 20 is deprecated … being
@@ -306,4 +319,5 @@ repo audit; every entry below points at verified, real state of the code.
 
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
 - 2026-08-15: split `physical_boundary.rs` (1192 lines) into `physical_boundary_manifest.rs` + `physical_boundary_source.rs`, with shared lexer/JSON-parser/fixture helpers moved to `tests/support/*.rs` and included per binary via `#[path]`. Same 8 tests pass, `check-file-size.sh`/clippy/fmt/full gate all green.
+- 2026-08-15: made both gate scripts bash-3.2-portable and incapable of a false green. `declare -A` is gone from `test_changed.sh` (space-delimited package list + `add_pkg`) and `check-file-size.sh` (a `case`-based `allowlist_limit`); both now refuse to run on bash < 3.2 with exit 3. Two new tripwires: an EXIT trap in `test_changed.sh` turns any exit before the completion marker into a nonzero exit (the old bug exited 0 having run nothing), and `check-file-size.sh` fails when it inspected zero files instead of printing OK. The always-on cheap gates now run even on a clean tree, so no path reaches exit 0 unchecked, and the success line names every step it ran. New `scripts/tests/gate_portability_test.sh` (9 checks, bash 3.2, runs as the gate's first step) pins all of it, including a positive control proving its own construct patterns match. Teeth verified by three temporary mutations, all caught and all reverted: a reintroduced `declare -A`, a commented-out EXIT trap, and a trap-detection pattern that matched its own comment. Gate now runs its five steps for real and stops at the one pre-existing red — `sovereign-sandbox`'s `parent_fails_closed_on_timeout_nonzero_and_garbage_output`, the next P1 — so it is honest but not yet green on macOS.
 - 2026-08-15: pinned the signed wire shapes in `crates/contracts/tests/signed_shape.rs` (14 tests, first tests in the crate): byte-exact goldens for `CapabilityTokenBody`, `PolicyDecision`, and `AuditEventBody`, plus enum wire tokens, null-Option hashing, signature/hash exclusion, and no-silent-default checks. Teeth verified by two temporary mutations of `src/lib.rs`, both caught and both reverted: a `#[serde(rename)]` and a swap of two field declarations (the goldens are byte-exact because `serde_json::to_vec` emits declaration order, so ordering is signed too). Gate run by hand — `test_changed.sh` is unusable on this machine, filed as the new P1 `scripts/` item.
