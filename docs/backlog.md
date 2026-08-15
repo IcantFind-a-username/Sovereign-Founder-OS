@@ -35,7 +35,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | Split `physical_boundary.rs` before it breaks the file-size gate.**
+- [ ] **P1 | `crates/consultant-playground/tests/` | Split `physical_boundary.rs` before it breaks the file-size gate.** IN PROGRESS (2026-08-15)
   The file is at 1192 lines against the hard 1200 limit in
   `scripts/check-file-size.sh` (allowlist is deliberately empty) — the next
   test added there fails CI for everyone. Split into per-boundary test files.
