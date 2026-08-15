@@ -80,6 +80,46 @@ repo audit; every entry below points at verified, real state of the code.
   its address-space cap on both macOS and Linux (or the cap is applied by a
   portable mechanism), and `cargo test --workspace --locked` is green on macOS.
 
+- [ ] **P1 | `crates/vault/` | Fail closed when `vault.key` is missing but entries exist.**
+  `Vault::init` (src/lib.rs:53-59) silently generates a fresh key whenever
+  `vault.key` is absent, so a lost or deleted key file turns every existing
+  `*.enc` entry into permanently undecryptable data while the vault still opens
+  and reports success. RFC 0004
+  (`rfcs/0004-data-sovereignty-boundaries.md`:537-539) names "silently
+  regenerate a missing key" as an explicitly rejected alternative, so this is
+  live code contradicting an accepted design. It is also the real construction
+  site for the dead `VaultError::NotInitialized` (src/lib.rs:16) that the P2
+  vault entry below asks about — the two overlap, so do not claim both in the
+  same round. Done when: `Vault::init` on a root holding at least one `*.enc`
+  file (or a non-empty `manifest.json`) with no `vault.key` returns
+  `VaultError::NotInitialized`, a first-run empty root still initializes
+  normally, and `cargo test -p sovereign-vault` covers both paths.
+
+- [ ] **P1 | `crates/vault-v2-engine/` | Stand up the engine crate skeleton with pinned dependencies and no cryptography.**
+  First code step of RFC 0005 Program 1A, which every encrypted-backup,
+  recovery, and multi-device claim is blocked on. Standing finding for the whole
+  encryption program, so no session re-derives it: the design is already settled
+  in `rfcs/0004-data-sovereignty-boundaries.md` and
+  `rfcs/0005-dual-root-vault-and-recovery.md`, with task-level detail in
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md` —
+  **no new RFC is needed.** Dependency order is fixed by rfcs/0004:491-524 as
+  1A → 1C0 → (1B0 ∥ 1C1) → 1D, and encrypted backup cannot be the starting
+  point: 1B0 needs this engine plus a SQLCipher version amendment (that plan,
+  lines 1445-1451). No network transport exists in the workspace yet
+  (`crates/effects/src/lib.rs`:26-30), so "E2EE" here means at-rest and backup
+  confidentiality, not transit. This entry deliberately excludes cryptography:
+  add the workspace member with `publish = false`, target auto-discovery
+  disabled and every target explicit, a `build.rs` that rejects
+  dependency-shaping ambient overrides, and a value-free `src/lib.rs` carrying
+  protocol/version constants only — no engine API, no connection type, no raw
+  handle (that plan, lines 436-444 and 465-469). Done when:
+  `cargo build -p sovereign-vault-v2-engine --locked` succeeds, a test asserts
+  the build-script check rejects a hostile ambient override,
+  `cargo test -p sovereign-vault-v2-engine` passes, and
+  `cargo clippy --workspace --all-targets --locked -- -D warnings` stays green
+  (the full workspace suite stays red on macOS until the `crates/sandbox` P1
+  above lands, so it cannot gate this entry).
+
 - [ ] **P2 | `crates/vault/` | Add tamper-detection and reopen tests; resolve the dead `NotInitialized` variant.**
   Unlike sibling `audit-ledger` (which has `tamper_detection`), no vault test
   flips a ciphertext byte or reopens an existing root. `VaultError::NotInitialized`
@@ -102,6 +142,131 @@ repo audit; every entry below points at verified, real state of the code.
   validates the crate through `sovereign_identity::…` re-exports. Done when:
   `crates/identity/tests/public_api.rs` exercises key lifecycle through the
   public API only and passes.
+
+- [ ] **P2 | `crates/vault/` | Create the vault key, manifest, and entry files with owner-only permissions.**
+  `write_atomic` (src/lib.rs:118-137) uses `std::fs::File::create` with no mode
+  and `init` (src/lib.rs:51) uses `create_dir_all`, so under a default umask the
+  master key `vault.key` (src/lib.rs:52-59, 160-163) lands at 0644 inside a 0755
+  directory — weaker than the device signing key, which
+  `crates/identity/src/fs.rs`:189-223 creates 0600 with `O_EXCL|O_NOFOLLOW` and
+  re-verifies after rename (fs.rs:306-328). Defense in depth only, hence P2: the
+  key still sits beside its ciphertext by design at this stage. The on-disk
+  format must not change — only file modes. Four `crates/vault/` entries are
+  now queued; claim at most one of them per round. Done when: a
+  `#[cfg(unix)]` test asserts `vault.key`, `manifest.json`, and `<name>.enc` are
+  mode 0600 and the vault root is 0700 after `Vault::init` followed by `put`,
+  and `cargo test -p sovereign-vault` passes.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Pin the export's plaintext-and-unauthenticated boundary with a test.**
+  `Store::export` (reporting.rs:289-313) writes the whole business graph as
+  cleartext JSON, and `verify_export` (verify.rs:12-120) re-verifies only the
+  Ed25519 audit chain and the device binding — the `workspace` object itself is
+  counted, never authenticated (verify.rs:74-98). Nothing today stops a later
+  change from being described as an encrypted or verified backup. Done when: a
+  test asserts a known customer name appears verbatim in the exported bytes and
+  that mutating a field inside `workspace` still leaves
+  `ExportVerification.ok == true`, named so its failure reads as "the export
+  boundary changed", and `cargo test -p sovereign-cli` passes.
+
+- [ ] **P2 | `crates/vault/` | Decide and record whether v1 entry blobs stay unbound to their entry name.** `needs:fable`
+  `encrypt` (src/lib.rs:173-185) passes no associated data, so a `*.enc` blob
+  carries nothing binding it to its entry name, vault root, or format version:
+  anyone able to write the vault directory can substitute
+  `owner_approval_key.enc` with another entry's blob, or an older copy of the
+  same one, and it decrypts cleanly (those entries are created at
+  `apps/cli/src/workspace/kernel_exec.rs`:125,160,211,258). Adding AAD would
+  change the exact on-disk format that RFC 0005 Program 1A freezes and whose
+  importer must read byte-exactly (Program 1A plan
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
+  lines 1125-1129), so the likely answer is "freeze v1 and fix it in v2" — but
+  that must be a recorded decision, not an oversight. Done when: either a test
+  asserts a cross-entry ciphertext swap is rejected, or `THREAT_MODEL.md`
+  states the v1 swap/rollback gap explicitly and a test pins the current blob
+  format so a silent format change fails.
+
+- [ ] **P2 | `rfcs/` | Amend RFC 0005 to name the exact SQLCipher release that unblocks Program 1B0.** `needs:fable`
+  Program 1B0 — the filtered encrypted backup, the first work that could ever
+  support an "encrypted backup" claim — cannot start on the pinned SQLCipher
+  4.14.0 profile because of its fixed `sqlcipher_export` defensive-mode bypass;
+  the plan requires an RFC amendment naming exactly 4.17.0 or a later release
+  (Program 1A plan
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
+  lines 1445-1451). Done when: `rfcs/0005-dual-root-vault-and-recovery.md`
+  carries an amendment section naming one exact release plus its verification
+  method, keeps `sqlcipher_export`, `ATTACH`, and database-copy APIs forbidden,
+  and records the status change. No code lands in this round.
+
+- [ ] **P2 | `rfcs/` | Move RFC 0005 from Draft to a decided status with its required review evidence.** `needs:fable`
+  RFC 0005 is `Status: Draft; approved implementation target` with
+  `Security impact: Critical` (`rfcs/0005-dual-root-vault-and-recovery.md`:3-6),
+  while ROADMAP.md:508-518 requires security-sensitive RFCs to carry a
+  threat-model delta, an adversarial test plan, migration/rollback analysis, and
+  independent review when a release gate calls for it. Program 1A code is about
+  to be written against it. Done when: RFC 0005 either reaches `Accepted` with
+  those four sections present and linked, or states explicitly which gate is
+  outstanding and what must not be built until it closes.
+
+- [ ] **P2 | `crates/vault-v2-engine/` | Add the single unsafe FFI module that opens SQLCipher and keys it first.**
+  RFC 0005 Program 1A Task 1's core, and the first entry in this crate that
+  touches cryptography. `src/engine/ffi.rs` owns `sqlite3_open_v2`, calls
+  `sqlite3_key` as the first post-open database operation, then disables both
+  extension routes via `sqlite3_enable_load_extension(handle, 0)` and
+  `sqlite3_db_config(handle, SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, 0, &out)`
+  (Program 1A plan
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
+  lines 273-283). The raw key lives in a non-clone, non-formatting, zeroizing
+  holder in `src/engine/secret.rs` (same plan, lines 288-291) and must never
+  reach SQL text, a `String`, argv, the environment, or logs. Cipher profile
+  and resource limits belong to the next entry, not this one. Done when: tests
+  `wrong_dbk_fails_without_schema_or_plaintext`,
+  `raw_dbk_never_reaches_sql_text_logs_or_environment`, and
+  `database_header_and_journal_do_not_contain_plaintext_canary` pass from
+  `cargo test -p sovereign-vault-v2-engine`, and no `unsafe` block exists
+  outside `src/engine/ffi.rs` and `src/engine/process.rs`.
+
+- [ ] **P2 | `crates/vault-v2-engine/` | Pin and verify the exact SQLCipher connection profile and resource limits.**
+  Apply the fixed profile — compatibility 4, 4096-byte pages, AES-256-CBC,
+  HMAC-SHA512, encrypted header, `cipher_memory_security=ON`, memory-only temp,
+  rollback journal, `synchronous=FULL`, foreign keys, trusted schema off,
+  defensive mode — plus every fixed `sqlite3_limit` before first page access
+  (Program 1A plan
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
+  lines 269-272 and 353-378). Read every setting back through the real engine
+  rather than trusting an observed profile transcript. Done when: tests
+  `sqlcipher_runtime_is_exactly_4_14_0_for_released_profile`,
+  `connection_profile_matches_every_required_pragma`,
+  `extensions_attach_writable_schema_and_dynamic_sql_are_denied`,
+  `oversized_values_and_sql_fail_at_fixed_limits`, and
+  `page_2_ciphertext_bitflip_is_detected_cryptographically` pass, each limit has
+  boundary and boundary-plus-one coverage, and `./scripts/check-file-size.sh`
+  stays green.
+
+- [ ] **P2 | `crates/vault-v2-engine/` | Add the syn AST gate proving the FFI boundary is exact.** `needs:fable`
+  `recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact` starts
+  from `build.rs`, every explicit Cargo target, and `tests/ui.rs`, then parses
+  the complete recursive closure of inline and external modules to prove the
+  plaintext-header setter, arbitrary SQL, a raw-handle escape, backup/export/
+  copy calls, and extra project-authored OpenSSL/SQLite unsafe calls are absent
+  (Program 1A plan
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
+  lines 503-512). Ship it with exactly the five named trybuild fixtures from
+  that same plan, lines 449-458. Design-heavy and easy to get subtly wrong.
+  Done when: the AST test and all five compile-fail fixtures pass from
+  `cargo test -p sovereign-vault-v2-engine`, and the test fails if a raw-handle
+  accessor is added anywhere in the closure.
+
+- [ ] **P2 | `.github/workflows/`, `scripts/` | Add the vault-v2 qualification entry point and its evidence ledger.**
+  RFC 0005 Program 1A Task 1's tail: `scripts/qualify-vault-v2.sh` as the sole
+  sanitized Cargo qualification entry point, the mandatory native-store and
+  durability job, and `docs/security/vault-v2-verification.md` as an honest
+  readiness ledger that claims no product protection (Program 1A plan
+  `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
+  lines 424-426 and 1325-1424). The new script must run on bash 3.2 — see the
+  `scripts/` P1 above; do not repeat the `declare -A` mistake. Done when:
+  `./scripts/qualify-vault-v2.sh` runs green locally or its unavailability is
+  recorded with inspected CI evidence, CI invokes it, and the evidence document
+  contains no "encrypted at rest", "E2EE", "recovery-complete", or
+  "production-ready" claim.
 
 - [ ] **P3 | `crates/sandbox/` | Surface the swallowed quarantine-rename failure.**
   `compiled_cache.rs` (~219, ~266) discards quarantine rename errors with
