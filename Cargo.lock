@@ -1564,6 +1564,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-vault-v2-engine"
+version = "0.1.0"
+
+[[package]]
 name = "sovereign-workflow"
 version = "0.1.0"
 dependencies = [
