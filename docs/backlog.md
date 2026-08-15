@@ -26,6 +26,12 @@ repo audit; every entry below points at verified, real state of the code.
   fails it the second time tags it `needs:fable` and releases it instead of
   retrying. Tagged items are consumed by a human-driven session on a larger
   model (`/model`), which removes the tag when the item lands.
+- **Big-model sessions should re-slice before they implement.** A session
+  consuming a `needs:fable` item has two valid outcomes: land it, or split it
+  into untagged single-round items (its diagnoses tell you where the real
+  boundary is) and let nightly small-model rounds do the typing. Re-slicing
+  is usually the cheaper outcome — spend big-model tokens on decomposition
+  and judgment, not on keystrokes a small model can gate-check.
 
 ## Queue
 
