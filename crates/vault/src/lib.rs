@@ -12,7 +12,10 @@ const NONCE_LEN: usize = 12;
 
 #[derive(Debug, Error)]
 pub enum VaultError {
-    #[error("vault not initialized")]
+    /// The root holds encrypted entries but `vault.key` is gone. Opening it
+    /// would mean minting a new key and orphaning that data, so the vault
+    /// refuses: restore the key from a backup rather than re-initializing.
+    #[error("vault holds encrypted entries but its key file is missing — restore vault.key from a backup; re-initializing would orphan the existing data")]
     NotInitialized,
     #[error("decryption failed")]
     DecryptionFailed,
@@ -52,6 +55,12 @@ impl Vault {
         let key_path = root.join("vault.key");
         let key = if key_path.exists() {
             load_key(&key_path)?
+        } else if root_holds_encrypted_data(&root)? {
+            // Minting a fresh key here would leave every existing entry
+            // permanently undecryptable while the vault opened and reported
+            // success — the alternative RFC 0004 explicitly rejects. Refuse,
+            // so a lost key is discovered now, while a backup may still exist.
+            return Err(VaultError::NotInitialized);
         } else {
             let key = generate_key();
             save_key(&key_path, &key)?;
@@ -134,6 +143,32 @@ fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
         let _ = std::fs::remove_file(&temp_path);
     }
     result
+}
+
+/// Whether this root already holds something only the master key can read.
+///
+/// Both signals count, and neither is trusted to stand for the other: the
+/// manifest can be stale or hand-edited, and an `*.enc` blob can outlive the
+/// manifest entry that named it. Either one means a new key would orphan data.
+fn root_holds_encrypted_data(root: &std::path::Path) -> Result<bool, VaultError> {
+    let manifest_path = root.join("manifest.json");
+    if manifest_path.exists() {
+        let bytes = std::fs::read(&manifest_path)?;
+        let manifest: VaultManifest = serde_json::from_slice(&bytes)?;
+        if !manifest.entries.is_empty() {
+            return Ok(true);
+        }
+    }
+    for entry in std::fs::read_dir(root)? {
+        if entry?
+            .path()
+            .extension()
+            .is_some_and(|extension| extension == "enc")
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn validate_entry_name(name: &str) -> Result<(), VaultError> {
@@ -232,6 +267,93 @@ mod tests {
             leftovers.is_empty(),
             "temp files left behind: {leftovers:?}"
         );
+    }
+
+    /// Key loss must be loud. RFC 0004 (rfcs/0004-data-sovereignty-boundaries.md,
+    /// "silently regenerate a missing key") rejects the alternative: a fresh key
+    /// turns every existing entry into permanently undecryptable bytes while the
+    /// vault still opens and reports success, so the owner learns about it only
+    /// when they next need the data — long after the backup window closed.
+    #[test]
+    fn init_refuses_to_mint_a_new_key_when_encrypted_entries_exist() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("company_profile", b"stealth startup").unwrap();
+        drop(vault);
+
+        std::fs::remove_file(dir.path().join("vault.key")).unwrap();
+
+        assert!(
+            matches!(Vault::init(dir.path()), Err(VaultError::NotInitialized)),
+            "a vault holding entries reopened without its key and would have \
+             silently orphaned them"
+        );
+        // The refusal must not have written a replacement key behind our back.
+        assert!(!dir.path().join("vault.key").exists());
+        // …nor damaged what is still there, so a restored key still works.
+        assert!(dir.path().join("company_profile.enc").exists());
+    }
+
+    #[test]
+    fn init_refuses_when_only_the_manifest_records_entries() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("entry", b"data").unwrap();
+        drop(vault);
+        std::fs::remove_file(dir.path().join("vault.key")).unwrap();
+        std::fs::remove_file(dir.path().join("entry.enc")).unwrap();
+
+        assert!(matches!(
+            Vault::init(dir.path()),
+            Err(VaultError::NotInitialized)
+        ));
+    }
+
+    #[test]
+    fn init_refuses_on_a_stray_entry_with_no_manifest() {
+        let dir = tempdir().unwrap();
+        std::fs::write(dir.path().join("orphan.enc"), b"{}").unwrap();
+
+        assert!(matches!(
+            Vault::init(dir.path()),
+            Err(VaultError::NotInitialized)
+        ));
+    }
+
+    #[test]
+    fn first_run_on_an_empty_root_still_initializes() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("fresh");
+        let vault = Vault::init(&root).unwrap();
+        assert!(vault.list().is_empty());
+        assert!(root.join("vault.key").exists());
+    }
+
+    #[test]
+    fn a_root_with_an_empty_manifest_and_no_entries_still_initializes() {
+        let dir = tempdir().unwrap();
+        let vault = Vault::init(dir.path()).unwrap();
+        drop(vault);
+        std::fs::remove_file(dir.path().join("vault.key")).unwrap();
+        std::fs::write(
+            dir.path().join("manifest.json"),
+            br#"{"version":1,"entries":[]}"#,
+        )
+        .unwrap();
+
+        // Nothing is encrypted yet, so a fresh key orphans nothing.
+        assert!(Vault::init(dir.path()).is_ok());
+    }
+
+    #[test]
+    fn a_vault_reopened_with_its_key_intact_still_reads_its_entries() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("entry", b"data").unwrap();
+        drop(vault);
+
+        let reopened = Vault::init(dir.path()).unwrap();
+        assert_eq!(reopened.get("entry").unwrap(), b"data");
     }
 
     #[test]

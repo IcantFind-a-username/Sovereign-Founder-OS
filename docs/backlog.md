@@ -99,7 +99,7 @@ repo audit; every entry below points at verified, real state of the code.
   from `address_space_enforcement()` instead of asserting a cap, and
   `cargo test -p sovereign-cli` covers both outcomes.
 
-- [ ] **P1 | `crates/vault/` | Fail closed when `vault.key` is missing but entries exist.** IN PROGRESS (2026-08-15)
+- [x] **P1 | `crates/vault/` | Fail closed when `vault.key` is missing but entries exist.**
   `Vault::init` (src/lib.rs:53-59) silently generates a fresh key whenever
   `vault.key` is absent, so a lost or deleted key file turns every existing
   `*.enc` entry into permanently undecryptable data while the vault still opens
@@ -139,14 +139,15 @@ repo audit; every entry below points at verified, real state of the code.
   (the full workspace suite stays red on macOS until the `crates/sandbox` P1
   above lands, so it cannot gate this entry).
 
-- [ ] **P2 | `crates/vault/` | Add tamper-detection and reopen tests; resolve the dead `NotInitialized` variant.**
+- [ ] **P2 | `crates/vault/` | Add tamper-detection tests.**
   Unlike sibling `audit-ledger` (which has `tamper_detection`), no vault test
-  flips a ciphertext byte or reopens an existing root. `VaultError::NotInitialized`
-  (src/lib.rs:16) is never constructed anywhere. Done when: a test asserts
-  `get()` returns `DecryptionFailed` after mutating one byte of a stored
-  `*.enc` blob; a test asserts `Vault::init` on an existing root preserves
-  the entry list; and `NotInitialized` is either constructed on a real path
-  with a test or deleted.
+  flips a ciphertext byte. The other two halves of this entry closed on
+  2026-08-15 with the missing-key P1 above: `VaultError::NotInitialized` is now
+  constructed on a real path with three tests, and
+  `a_vault_reopened_with_its_key_intact_still_reads_its_entries` covers the
+  reopen path. Done when: a test asserts `get()` returns `DecryptionFailed`
+  after mutating one byte of a stored `*.enc` blob, and one asserts the same
+  for a truncated blob.
 
 - [ ] **P2 | `crates/policy/` | Cover the V2 rejection paths in-crate.**
   All three existing tests target the legacy v1 `evaluate()`; the V2 surface
@@ -338,6 +339,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
 - 2026-08-15: split `physical_boundary.rs` (1192 lines) into `physical_boundary_manifest.rs` + `physical_boundary_source.rs`, with shared lexer/JSON-parser/fixture helpers moved to `tests/support/*.rs` and included per binary via `#[path]`. Same 8 tests pass, `check-file-size.sh`/clippy/fmt/full gate all green.
+- 2026-08-15: `Vault::init` no longer mints a fresh key over existing data. A root is treated as holding encrypted data if the manifest lists any entry **or** any `*.enc` file is present — neither signal stands in for the other, since a manifest can be stale or hand-edited and a blob can outlive its manifest entry — and in that case `init` returns `NotInitialized` rather than orphaning it, which is the alternative rfcs/0004 explicitly rejects. The variant's message was too dangerous as "vault not initialized" (an owner reading that after key loss might re-initialize and destroy the data), so it now names the missing key and says to restore it from a backup. Six new tests cover both refusal signals, a stray blob with no manifest, a first-run empty root, an empty-manifest root, and an intact reopen; that also constructs the previously dead `NotInitialized`, so the P2 vault entry above shrank to tamper-detection only. Gate ALL GREEN.
 - 2026-08-15: made the Security Center's compile-isolation check unable to pass on a worker that never ran. The check now requires independent positive evidence that the worker launches — the baseline execution, which compiles a known-good component through the same worker against a fresh cache directory — instead of inferring containment from a failure variant that a failed spawn also produces. Verdict and wording moved to the new `apps/cli/src/gauntlet_report.rs` (4 tests) so a security claim's phrasing is testable on its own, rather than growing `ui.rs`, which is already queued for a split. The detail string now reports the platform's real enforcement from `CompileWorker::address_space_enforcement()`: it names the ceiling in MiB where one is applied and says plainly that no ceiling is applied where it is not, instead of asserting "memory-limited" everywhere. Verified end to end against the running binary on macOS: `POST /api/gauntlet` reports `compile_isolation` as passing for the right reason and states that this platform applies no address-space ceiling. Full gate ALL GREEN across all six steps.
 - 2026-08-15: fixed the macOS compile worker. The queued hypothesis (dyld reserving more address space than the 1 GiB cap allows) was wrong: Darwin aliases `RLIMIT_AS` onto `RLIMIT_RSS` and rejects *every* finite value with `EINVAL` — verified outside any sandbox on macOS 26.5.2 arm64, where `ulimit -v`, `-m` and `-d` all fail at 1 GiB, 4 GiB, 8 GiB and 64 GiB. Because `setrlimit` is called from `pre_exec`, that error killed the child before `exec`, so `spawn` failed and **no artifact could be compiled at all on macOS** — `Vm::compile` (wasm.rs:311) has no in-process fallback once a worker is attached. So it was a production defect, not a test bug, exactly as the entry warned. No enforcement was relaxed: the `RLIMIT_AS` cap and its fail-closed `setrlimit` error handling are unchanged wherever the platform accepts them, and the `pre_exec` hook is simply not installed where the kernel rejects it — an unenforceable limit was costing the entire worker path. New `AddressSpaceEnforcement::{Enforced,Unavailable}` plus `CompileWorker::address_space_enforcement()` make the difference reportable instead of assumed, and the module doc no longer claims a cap "on Unix". Two new tests: one asserts the child actually reaches `exec` (it failed with `spawn: Invalid argument (os error 22)` before the fix), one pins the honest per-platform enforcement answer. `cargo test --workspace --locked` is now green on macOS (198 tests) and the gate reports ALL GREEN across all six steps. Filed the P1 above: on macOS the Security Center's compile-isolation check was reporting green *because* the worker could not start.
 - 2026-08-15: made both gate scripts bash-3.2-portable and incapable of a false green. `declare -A` is gone from `test_changed.sh` (space-delimited package list + `add_pkg`) and `check-file-size.sh` (a `case`-based `allowlist_limit`); both now refuse to run on bash < 3.2 with exit 3. Two new tripwires: an EXIT trap in `test_changed.sh` turns any exit before the completion marker into a nonzero exit (the old bug exited 0 having run nothing), and `check-file-size.sh` fails when it inspected zero files instead of printing OK. The always-on cheap gates now run even on a clean tree, so no path reaches exit 0 unchecked, and the success line names every step it ran. New `scripts/tests/gate_portability_test.sh` (9 checks, bash 3.2, runs as the gate's first step) pins all of it, including a positive control proving its own construct patterns match. Teeth verified by three temporary mutations, all caught and all reverted: a reintroduced `declare -A`, a commented-out EXIT trap, and a trap-detection pattern that matched its own comment. Gate now runs its five steps for real and stops at the one pre-existing red — `sovereign-sandbox`'s `parent_fails_closed_on_timeout_nonzero_and_garbage_output`, the next P1 — so it is honest but not yet green on macOS.
