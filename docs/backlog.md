@@ -268,6 +268,27 @@ repo audit; every entry below points at verified, real state of the code.
   contains no "encrypted at rest", "E2EE", "recovery-complete", or
   "production-ready" claim.
 
+- [ ] **P3 | `.github/workflows/` | Repin the four actions still targeting the Node 20 runtime.**
+  Every CI job carries a deprecation annotation. Run 31886107586 (green, commit
+  9277f27 on `feature/auto-iterate`) reports "Node.js 20 is deprecated … being
+  forced to run on Node.js 24" against `actions/checkout@34e1148` (all four
+  jobs — dependency-review, test, frontend-types, security),
+  `actions/dependency-review-action@2031cfc`,
+  `gitleaks/gitleaks-action@ff98106`, and `rustsec/audit-check@69366f3`.
+  Warnings only today — checks pass and the runner silently forces Node 24 —
+  which is why this is P3 **now**. It escalates to P1 the moment GitHub removes
+  the Node 20 runner: every workflow would fail at once, with no change on our
+  side. `actions/checkout` is pinned to the same SHA in both `ci.yml` (lines
+  15, 36, 55, 75) and `release.yml` (line 30), so a repin touches both files.
+  Newer majors exist for three of the four (checkout v7.0.1, dependency-review
+  v5.0.0, gitleaks v3.0.0 as of 2026-08-15); `rustsec/audit-check` v2.0.0 is
+  already the latest release, so that one likely resolves to a documented pin
+  rather than a bump. Keep the SHA-pin-plus-version-comment convention used
+  throughout both workflows. Done when: each of the four actions is pinned to a
+  release whose runtime is Node 24 or later, or its current pin is recorded in
+  the workflow comment as already the latest available, and a fresh run shows
+  no Node-version deprecation annotation under `gh run view <run-id>`.
+
 - [ ] **P3 | `crates/sandbox/` | Surface the swallowed quarantine-rename failure.**
   `compiled_cache.rs` (~219, ~266) discards quarantine rename errors with
   `let _ =` — a rejected cache blob can silently stay in the live cache dir.
