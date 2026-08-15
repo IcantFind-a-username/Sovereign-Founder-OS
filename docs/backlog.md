@@ -63,7 +63,7 @@ repo audit; every entry below points at verified, real state of the code.
   exit and an explicit "unsupported bash" message; plus a test or an exact
   command demonstrating that a gate that cannot run never exits 0.
 
-- [ ] **P1 | `crates/sandbox/` | `cargo test --workspace` is red on macOS: the compile worker's `RLIMIT_AS` blocks exec.**
+- [ ] **P1 | `crates/sandbox/` | `cargo test --workspace` is red on macOS: the compile worker's `RLIMIT_AS` blocks exec.** IN PROGRESS (2026-08-15)
   `compile_worker::tests::parent_fails_closed_on_timeout_nonzero_and_garbage_output`
   fails deterministically (3/3 runs) on macOS arm64 at src/compile_worker.rs:301:
   the `/bin/sleep 30` stand-in is expected to hit the 150 ms deadline and yield
