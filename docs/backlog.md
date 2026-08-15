@@ -43,13 +43,42 @@ repo audit; every entry below points at verified, real state of the code.
   ≤ ~800 lines, and `cargo test -p sovereign-consultant-playground` passes
   with the same test count as before the split.
 
-- [ ] **P1 | `crates/contracts/` | Add serialization-shape tests for the signed contract types.** — IN PROGRESS (2026-08-15)
+- [x] **P1 | `crates/contracts/` | Add serialization-shape tests for the signed contract types.**
   The crate has zero tests, yet `CapabilityTokenBody` is the canonical signed
   body whose serde shape is load-bearing for signature verification in
   `crates/capability` — today a field rename would silently invalidate
   tokens. Done when: a serde round-trip test plus a golden-JSON test pin the
   field names of `CapabilityTokenBody` and `PolicyDecision`, and renaming any
   field makes `cargo test -p sovereign-contracts` fail.
+
+- [ ] **P1 | `scripts/` | The quality gate exits 0 without running a single check on bash 3.2.**
+  `test_changed.sh` (line 78) and `check-file-size.sh` (line 12) both use
+  `declare -A`, a bash 4 feature. On stock macOS (`/usr/bin/env bash` =
+  bash 3.2.57) `test_changed.sh` prints `declare: -A: invalid option`, aborts
+  before any check runs, and still **exits 0** — a false green that the Stop
+  hook would accept as a passing session. Found 2026-08-15 during the contracts
+  round, which had to run the gate's four steps by hand instead. Done when: the
+  gate runs its checks on bash 3.2 (drop the associative arrays — both
+  allowlists are empty and a plain list works) or refuses to run with a nonzero
+  exit and an explicit "unsupported bash" message; plus a test or an exact
+  command demonstrating that a gate that cannot run never exits 0.
+
+- [ ] **P1 | `crates/sandbox/` | `cargo test --workspace` is red on macOS: the compile worker's `RLIMIT_AS` blocks exec.**
+  `compile_worker::tests::parent_fails_closed_on_timeout_nonzero_and_garbage_output`
+  fails deterministically (3/3 runs) on macOS arm64 at src/compile_worker.rs:301:
+  the `/bin/sleep 30` stand-in is expected to hit the 150 ms deadline and yield
+  `CompileWorkerTimeout`, but some other error arrives first. Hypothesis to check
+  first: `apply_rlimit` sets `RLIMIT_AS` to 1 GiB (src ~56) in `pre_exec`, and on
+  macOS dyld reserves far more address space at exec than on Linux, so exec fails
+  and `spawn` returns `CompileWorkerFailed("spawn: …")` before the deadline.
+  **If that is the cause it is not only a test bug** — the real out-of-process
+  compile worker would also fail to spawn on macOS, so check whether the
+  Security Center gauntlet's worker path actually works there before touching
+  the test. Found 2026-08-15 during the contracts round (pre-existing at
+  `feature/auto-iterate` HEAD, unrelated to that change; `crates/sandbox` was
+  untouched). Done when: the root cause is identified, the worker spawns under
+  its address-space cap on both macOS and Linux (or the cap is applied by a
+  portable mechanism), and `cargo test --workspace --locked` is green on macOS.
 
 - [ ] **P2 | `crates/vault/` | Add tamper-detection and reopen tests; resolve the dead `NotInitialized` variant.**
   Unlike sibling `audit-ledger` (which has `tamper_detection`), no vault test
@@ -91,3 +120,4 @@ repo audit; every entry below points at verified, real state of the code.
 
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
 - 2026-08-15: split `physical_boundary.rs` (1192 lines) into `physical_boundary_manifest.rs` + `physical_boundary_source.rs`, with shared lexer/JSON-parser/fixture helpers moved to `tests/support/*.rs` and included per binary via `#[path]`. Same 8 tests pass, `check-file-size.sh`/clippy/fmt/full gate all green.
+- 2026-08-15: pinned the signed wire shapes in `crates/contracts/tests/signed_shape.rs` (14 tests, first tests in the crate): byte-exact goldens for `CapabilityTokenBody`, `PolicyDecision`, and `AuditEventBody`, plus enum wire tokens, null-Option hashing, signature/hash exclusion, and no-silent-default checks. Teeth verified by two temporary mutations of `src/lib.rs`, both caught and both reverted: a `#[serde(rename)]` and a swap of two field declarations (the goldens are byte-exact because `serde_json::to_vec` emits declaration order, so ordering is signed too). Gate run by hand — `test_changed.sh` is unusable on this machine, filed as the new P1 `scripts/` item.

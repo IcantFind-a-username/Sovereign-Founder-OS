@@ -25,7 +25,11 @@ Developer Preview maturity.
   all other docs. `docs/INDEX.md` maps the rest.
 - `scripts/` — CI-enforced guardrails; `docs/backlog.md` — the task queue.
 
-## Verified commands (all green as of 2026-08-14)
+## Verified commands (green on Linux/CI as of 2026-08-14)
+
+On macOS both gate scripts abort unrun (bash 3.2) and `--workspace` has one
+failing sandbox test — see the two P1 entries in `docs/backlog.md` before
+trusting a local run.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
@@ -84,9 +88,11 @@ secret scanning. Toolchain is pinned: 1.97.0.
 2. Test files count toward the 1200-line god-file limit too
    (`check-file-size.sh` globs `crates/**/*.rs`) — split big test files
    per-concern before adding cases.
-3. Serde field names of signed types (`crates/contracts`) are load-bearing
-   for signature verification — renaming a field is a breaking change even
-   when the compiler is happy.
+3. Signed/hashed bodies (`crates/contracts`) are signed as
+   `serde_json::to_vec`, which emits fields in *declaration order* — so field
+   names AND their order are load-bearing, and reordering or renaming one
+   silently invalidates existing tokens and audit chains even though the
+   compiler is happy. `tests/signed_shape.rs` pins the exact bytes.
 4. Clippy runs with `-D warnings` including on test targets; even a
    scratch test with `assert!(false)` fails the gate at compile time.
 5. Trigger-fired cloud sessions start with an EMPTY container (no repo
@@ -99,3 +105,6 @@ secret scanning. Toolchain is pinned: 1.97.0.
    binary via `#[path = "support/x.rs"] mod x;` with `pub(crate)` items —
    include only what each binary actually calls, or unused helpers trip
    `dead_code` under clippy's `-D warnings`.
+7. Assert JSON *keys* structurally (parse, then `contains_key`), never with
+   `json.contains("key")` — a shorter key is a substring of a longer real one
+   (`event_hash` ⊂ `previous_event_hash`) and the assertion misfires.
