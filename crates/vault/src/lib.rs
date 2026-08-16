@@ -357,6 +357,46 @@ mod tests {
     }
 
     #[test]
+    fn get_fails_closed_after_a_ciphertext_byte_is_flipped() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("entry", b"stealth startup").unwrap();
+
+        let path = dir.path().join("entry.enc");
+        let bytes = std::fs::read(&path).unwrap();
+        let mut blob: EncryptedBlob = serde_json::from_slice(&bytes).unwrap();
+        let mut ciphertext = STANDARD.decode(&blob.ciphertext_b64).unwrap();
+        ciphertext[0] ^= 0x01;
+        blob.ciphertext_b64 = STANDARD.encode(ciphertext);
+        std::fs::write(&path, serde_json::to_vec_pretty(&blob).unwrap()).unwrap();
+
+        assert!(matches!(
+            vault.get("entry"),
+            Err(VaultError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
+    fn get_fails_closed_on_a_truncated_ciphertext() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("entry", b"stealth startup").unwrap();
+
+        let path = dir.path().join("entry.enc");
+        let bytes = std::fs::read(&path).unwrap();
+        let mut blob: EncryptedBlob = serde_json::from_slice(&bytes).unwrap();
+        let ciphertext = STANDARD.decode(&blob.ciphertext_b64).unwrap();
+        let truncated = &ciphertext[..ciphertext.len() - 1];
+        blob.ciphertext_b64 = STANDARD.encode(truncated);
+        std::fs::write(&path, serde_json::to_vec_pretty(&blob).unwrap()).unwrap();
+
+        assert!(matches!(
+            vault.get("entry"),
+            Err(VaultError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
     fn rejects_path_traversal_names() {
         let dir = tempdir().unwrap();
         let mut vault = Vault::init(dir.path().join("vault")).unwrap();
