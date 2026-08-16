@@ -139,7 +139,7 @@ repo audit; every entry below points at verified, real state of the code.
   (the full workspace suite stays red on macOS until the `crates/sandbox` P1
   above lands, so it cannot gate this entry).
 
-- [ ] **P2 | `crates/vault/` | Add tamper-detection tests.**
+- [ ] **P2 | `crates/vault/` | Add tamper-detection tests.** IN PROGRESS (2026-08-16)
   Unlike sibling `audit-ledger` (which has `tamper_detection`), no vault test
   flips a ciphertext byte. The other two halves of this entry closed on
   2026-08-15 with the missing-key P1 above: `VaultError::NotInitialized` is now
