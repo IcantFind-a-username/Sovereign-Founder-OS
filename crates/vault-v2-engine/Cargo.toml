@@ -1,0 +1,27 @@
+[package]
+name = "sovereign-vault-v2-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Never published: this crate will own the process that holds raw key material.
+publish = false
+# Every target is declared below. Auto-discovery is off so a file dropped into
+# src/bin or tests/ cannot silently become part of the FFI boundary that the
+# AST gate (a later queued item) is supposed to enumerate exhaustively.
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+build = "build.rs"
+
+[lib]
+name = "sovereign_vault_v2_engine"
+path = "src/lib.rs"
+
+[[test]]
+name = "build_gate"
+path = "tests/build_gate.rs"
+
+[dependencies]

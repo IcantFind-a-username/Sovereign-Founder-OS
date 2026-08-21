@@ -13,6 +13,7 @@ members = [
     "crates/capability",
     "crates/consultant-playground",
     "crates/vault",
+    "crates/vault-v2-engine",
     "crates/workflow",
     "crates/sandbox",
     "apps/cli",
@@ -39,6 +40,7 @@ sovereign-policy = { path = "crates/policy" }
 sovereign-capability = { path = "crates/capability" }
 sovereign-consultant-playground = { path = "crates/consultant-playground" }
 sovereign-vault = { path = "crates/vault" }
+sovereign-vault-v2-engine = { path = "crates/vault-v2-engine" }
 sovereign-workflow = { path = "crates/workflow" }
 sovereign-sandbox = { path = "crates/sandbox" }
 
