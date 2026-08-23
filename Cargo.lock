@@ -1521,8 +1521,10 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "serde_json_canonicalizer",
  "sovereign-artifact",
  "sovereign-contracts",
+ "sovereign-identity",
  "thiserror 2.0.18",
  "uuid",
 ]
