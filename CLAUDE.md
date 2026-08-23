@@ -116,3 +116,11 @@ secret scanning. Toolchain is pinned: 1.97.0.
    hook that fails aborts the child before `exec`, so a platform-unsupported
    limit surfaces as a spawn error — the same `CompileWorkerFailed` a safely
    contained hostile compile produces, and it read as a passing check.
+10. `PreparedInvocation` (`crates/artifact`) has no test-only shortcut
+    constructor — every crate that consumes one (`crates/capability`,
+    `crates/policy`, …) builds its own signed-manifest fixture in-crate via
+    `TypedSigner`/`RoleTrustStore`/`ArtifactVerifier::verify`, copying the
+    pattern in `crates/capability/tests/capability_v2.rs`. To get
+    `primary_resource() == None` for a rejection-path test, declare the
+    manifest operation's `resource_bindings` as `[]` (an empty array is
+    valid) and pass no grants — `prepare_grants` then never sets it.
