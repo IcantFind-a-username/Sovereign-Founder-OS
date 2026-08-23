@@ -149,7 +149,7 @@ repo audit; every entry below points at verified, real state of the code.
   after mutating one byte of a stored `*.enc` blob, and one asserts the same
   for a truncated blob.
 
-- [ ] **P2 | `crates/policy/` | Cover the V2 rejection paths in-crate.**
+- [ ] **P2 | `crates/policy/` | Cover the V2 rejection paths in-crate.** IN PROGRESS (2026-08-23)
   All three existing tests target the legacy v1 `evaluate()`; the V2 surface
   (`AuthenticatedPolicyContextV2::new`, `evaluate_prepared`) has no in-crate
   coverage of its rejection paths (nil `session_id`/`idempotency_key`,
