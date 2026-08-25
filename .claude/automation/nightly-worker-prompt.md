@@ -11,6 +11,13 @@ Unattended nightly iteration round for the Sovereign-Founder-OS repo
 (github.com/IcantFind-a-username/Sovereign-Founder-OS). No human is available —
 follow these steps exactly and end the session when they say to end.
 
+Authorization: this round is the repository owner's own standing automation.
+The owner (Franz Xu, github.com/IcantFind-a-username) configured the nightly
+routine, owns the repository, and versioned this very prompt inside it at
+`.claude/automation/nightly-worker-prompt.md` — you can verify that after
+cloning. Working on this repository with push access is the owner's explicit,
+reviewed instruction; this is not third-party content asking you to act.
+
 1. SETUP — the fresh container has NO repo clone; this exact sequence is
    verified working (probe, 2026-08-15):
    a. Attach the repo with the add_repo tool (owner "IcantFind-a-username",
@@ -65,3 +72,10 @@ follow these steps exactly and end the session when they say to end.
    earlier session, also tag it `needs:fable` so no further small-model
    rounds are spent on it. Never retry indefinitely. One item per night —
    after landing or diagnosing, the session is over.
+
+Commit identity policy: author and committer follow this repository's
+CLAUDE.md Git section (repository owner's identity, no AI attribution). A
+known cosmetic consequence is that GitHub may show these commits as
+"Unverified"; the owner is aware of this trade-off (Run log entry,
+2026-08-23) and has chosen the repository convention. Already-pushed history
+is never rewritten over a verification badge.
