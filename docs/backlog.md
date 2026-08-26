@@ -370,7 +370,7 @@ repo audit; every entry below points at verified, real state of the code.
   boundary and boundary-plus-one coverage, and `./scripts/check-file-size.sh`
   stays green.
 
-- [ ] **P2 | `crates/vault-v2-engine/` | Add the syn AST gate proving the FFI boundary is exact.** `needs:fable`
+- [ ] **P2 | `crates/vault-v2-engine/` | Add the syn AST gate proving the FFI boundary is exact.** `needs:fable` IN PROGRESS (2026-08-26)
   `recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact` starts
   from `build.rs`, every explicit Cargo target, and `tests/ui.rs`, then parses
   the complete recursive closure of inline and external modules to prove the
