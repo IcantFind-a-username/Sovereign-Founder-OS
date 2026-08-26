@@ -528,7 +528,7 @@ repo audit; every entry below points at verified, real state of the code.
   apps/cli/assets/tsconfig.json` is green, and `./scripts/test_changed.sh`
   prints ALL GREEN.
 
-- [ ] **P2 | `crates/identity/` | Add a public-API integration test boundary.**
+- [ ] **P2 | `crates/identity/` | Add a public-API integration test boundary.** IN PROGRESS (2026-08-26)
   All 12 tests live in `src/tests.rs` and reach private internals; nothing
   validates the crate through `sovereign_identity::…` re-exports. Done when:
   `crates/identity/tests/public_api.rs` exercises key lifecycle through the
