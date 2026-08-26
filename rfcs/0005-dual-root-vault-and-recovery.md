@@ -1,11 +1,58 @@
 # RFC 0005: Transactional Dual-Root Vault and Recovery
 
-**Status:** Draft; approved implementation target; Amendment 1 applied
-2026-08-26 (exact SQLCipher release selection for Program 1B0 — see
-Amendments)
+**Status:** Draft (decided 2026-08-26 — see Design status and acceptance
+gates); approved implementation target; Amendment 1 applied 2026-08-26 (exact
+SQLCipher release selection for Program 1B0 — see Amendments)
 **Implementation:** None
 **Maturity:** Target design; no current protection claim
 **Security impact:** Critical
+
+## Design status and acceptance gates
+
+The design status of this RFC remains **`Draft`** under roadmap governance
+(`Draft` / `Accepted` / `Rejected` / `Superseded` — there is no intermediate
+status): a security-sensitive RFC reaches `Accepted` only with a threat-model
+delta, an adversarial test plan, migration/rollback analysis, independent
+review where a release gate calls for it, and the maintainer's recorded
+acceptance rationale. This section records, as a decision rather than an
+oversight, which of those gates are satisfied and which remain open
+(recorded 2026-08-26).
+
+Evidence present and linked:
+
+- **Threat-model delta:** the boundary this design changes is stated in
+  [Threat model and trust boundary](#threat-model-and-trust-boundary), and
+  `THREAT_MODEL.md` T10 carries the matching current-limitation and target
+  entries for vault, backup, key compromise, and rollback.
+- **Adversarial test plan:**
+  [Required tests and release gates](#required-tests-and-release-gates).
+- **Migration/rollback analysis:**
+  [Real legacy migration](#real-legacy-migration) and
+  [Rollback and residual leakage](#rollback-and-residual-leakage).
+
+Gates outstanding:
+
+1. **Independent review.** None exists.
+   `docs/security/open-source-security-cross-validation.md` is a maintainer
+   research note cross-checking upstream mechanisms; it states itself that it
+   is not a third-party audit and does not satisfy this gate.
+2. **Recorded maintainer acceptance.** Accepting a `Security impact: Critical`
+   RFC requires the maintainer's recorded rationale (CONTRIBUTING.md); no such
+   record exists yet.
+
+What the `Draft` status licenses and withholds:
+
+- **May be built now:** Program 1A's internal, non-product engine
+  (`crates/vault-v2-engine`), its fixtures, native adapters, recovery
+  read-only path, and side-by-side legacy importer — non-activated, claiming
+  no protection, reachable from no product UI, with no dependency edge from
+  the shipped CLI. This is what "approved implementation target" in the
+  status line licenses, and nothing more.
+- **Must not be built until `Accepted`** (in addition to each program's own
+  gates, including Amendment 1's binding admission): Program 1B0 backup
+  mechanics, product enrollment, workspace migration, v2 selection, a product
+  dependency edge to the engine, and any user-facing "encrypted", "backup",
+  "recovery", or protection claim derived from this design.
 
 ## Summary
 
