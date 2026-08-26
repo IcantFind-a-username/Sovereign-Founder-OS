@@ -222,7 +222,7 @@ repo audit; every entry below points at verified, real state of the code.
   token/approval is rejected through `authorize_and_consume_approved` with
   the typed error, and `cargo test -p sovereign-capability` passes.
 
-- [ ] **P1 | `rfcs/`, `docs/` | Pin the 1C0 mechanism design: admitted owner authenticator, single session, one-use approval issuer.** `needs:fable`
+- [ ] **P1 | `rfcs/`, `docs/` | Pin the 1C0 mechanism design: admitted owner authenticator, single session, one-use approval issuer.** `needs:fable` IN PROGRESS (2026-08-26)
   ROADMAP v0.1's largest un-designed block (ROADMAP.md:106, 184-186; exit
   criterion 2 at :196-200). The requirements exist but are scattered:
   rfcs/0005:937-945 (issuer bound to workspace ID, operation, commitments,
