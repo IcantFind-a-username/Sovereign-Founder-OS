@@ -239,7 +239,7 @@ repo audit; every entry below points at verified, real state of the code.
   `vault/`, and `artifacts/admissions/` are unchanged. May reuse the `--root`
   plumbing from the P3 below, but must not depend on the owner passing it.
 
-- [ ] **P2 | `crates/vault/` | Decide and record whether v1 entry blobs stay unbound to their entry name.** `needs:fable`
+- [ ] **P2 | `crates/vault/` | Decide and record whether v1 entry blobs stay unbound to their entry name.** `needs:fable` IN PROGRESS (2026-08-26)
   `encrypt` (src/lib.rs:173-185) passes no associated data, so a `*.enc` blob
   carries nothing binding it to its entry name, vault root, or format version:
   anyone able to write the vault directory can substitute
