@@ -157,7 +157,7 @@ repo audit; every entry below points at verified, real state of the code.
   Done when: table-driven tests assert each `PolicyV2Error` variant from
   `cargo test -p sovereign-policy`.
 
-- [ ] **P1 | `rfcs/` | Amend RFC 0003 with the authorization-consumption transaction and durable revocation design.** `needs:fable`
+- [ ] **P1 | `rfcs/` | Amend RFC 0003 with the authorization-consumption transaction and durable revocation design.** `needs:fable` IN PROGRESS (2026-08-26)
   First slice of ROADMAP v0.1's "make authorization claims transactional and
   revocable" (ROADMAP.md:182-191; MANIFESTO principle 2's "revocable"). The
   gap is admitted in two places: rfcs/0003-signed-approval-evidence.md:103-120
