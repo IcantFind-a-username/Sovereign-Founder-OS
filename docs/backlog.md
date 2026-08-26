@@ -171,8 +171,8 @@ repo audit; every entry below points at verified, real state of the code.
   `crates/identity/src/fs.rs`:189-223 creates 0600 with `O_EXCL|O_NOFOLLOW` and
   re-verifies after rename (fs.rs:306-328). Defense in depth only, hence P2: the
   key still sits beside its ciphertext by design at this stage. The on-disk
-  format must not change — only file modes. Four `crates/vault/` entries are
-  now queued; claim at most one of them per round. Done when: a
+  format must not change — only file modes. Multiple `crates/vault/` entries
+  may be queued at once; claim at most one of them per round. Done when: a
   `#[cfg(unix)]` test asserts `vault.key`, `manifest.json`, and `<name>.enc` are
   mode 0600 and the vault root is 0700 after `Vault::init` followed by `put`,
   and `cargo test -p sovereign-vault` passes.
@@ -239,7 +239,7 @@ repo audit; every entry below points at verified, real state of the code.
   `vault/`, and `artifacts/admissions/` are unchanged. May reuse the `--root`
   plumbing from the P3 below, but must not depend on the owner passing it.
 
-- [ ] **P2 | `crates/vault/` | Decide and record whether v1 entry blobs stay unbound to their entry name.** `needs:fable` IN PROGRESS (2026-08-26)
+- [x] **P2 | `crates/vault/` | Decide and record whether v1 entry blobs stay unbound to their entry name.**
   `encrypt` (src/lib.rs:173-185) passes no associated data, so a `*.enc` blob
   carries nothing binding it to its entry name, vault root, or format version:
   anyone able to write the vault directory can substitute
@@ -254,6 +254,64 @@ repo audit; every entry below points at verified, real state of the code.
   asserts a cross-entry ciphertext swap is rejected, or `THREAT_MODEL.md`
   states the v1 swap/rollback gap explicitly and a test pins the current blob
   format so a silent format change fails.
+  Decided 2026-08-26: **freeze v1 as-is; the fix is structural and belongs to
+  v2.** Adding AAD would (a) break decryption of every existing vault or force
+  a migration of the exact on-disk format Program 1A's legacy importer must
+  read byte-exactly, (b) still not detect same-entry rollback — an older copy
+  of the same entry carries the same associated data — and (c) defend against
+  a directory writer who, in v1's co-located-key model, can already read
+  `vault.key` sitting beside the ciphertext, so the marginal gain does not buy
+  the migration risk. The recording and format-pinning work is re-sliced into
+  the two untagged entries directly below; the decision itself is settled and
+  must not be re-opened by the rounds that type it in.
+
+- [ ] **P2 | `THREAT_MODEL.md` | State the v1 entry swap/rollback gap and its freeze decision under T10.**
+  Typing for the decided item above — the wording is settled; do not re-open
+  the decision. Insert the following bullet into T10's Mitigations list,
+  directly after the existing "Current limitation" bullet (re-wrap lines to
+  match the file's style; keep the text otherwise verbatim):
+  "**Current limitation (recorded decision, 2026-08-26):** v1 entry blobs are
+  encrypted with no associated data, so nothing binds a `*.enc` blob to its
+  entry name, vault root, or format version: an attacker who can write the
+  vault directory can substitute one entry's blob for another's, or roll a
+  single entry back to an older copy of itself, and it decrypts cleanly. The
+  v1 format is deliberately frozen rather than amended: adding AAD would break
+  every existing vault or force a migration of the exact on-disk format RFC
+  0005 Program 1A's legacy importer must read byte-exactly, would still not
+  detect same-entry rollback, and defends against a directory writer who can
+  already read the co-located `vault.key`. Per-entry swap and rollback are
+  accepted residual risks of the legacy format until v2's transactional
+  SQLCipher format and context-bound wrappers (targets above) replace it."
+  Done when: the bullet is present under T10, no file outside `THREAT_MODEL.md`
+  changes, and `./scripts/test_changed.sh` prints ALL GREEN.
+
+- [ ] **P2 | `crates/vault/` | Pin the frozen v1 blob format and its accepted swap/rollback behavior with tests.**
+  Typing for the decided item above; land the `THREAT_MODEL.md` entry first so
+  doc comments can cite it. Four tests, no production code changes:
+  1. `v1_blob_shape_is_frozen`: after `put`, parse the written `*.enc` as
+     `serde_json::Value`; assert the object has exactly the keys `nonce_b64`
+     and `ciphertext_b64`, that `nonce_b64` decodes to 12 bytes, and that
+     `ciphertext_b64` decodes to plaintext length + 16 (the GCM tag).
+  2. `v1_golden_blob_still_decrypts`: write a fixed base64 32-byte key to
+     `vault.key`, write a golden `entry.enc` JSON literal, `Vault::init`, and
+     assert `get("entry")` returns the known plaintext — this pins the cipher
+     (AES-256-GCM), key-file encoding, and blob layout, so swapping any of
+     them fails loudly. Generate the golden once: temporarily add an
+     `#[ignore]`d test that writes the fixed key, calls
+     `put("entry", b"golden plaintext v1")`, and prints the `entry.enc`
+     contents; run it with `--ignored --nocapture`, paste both literals into
+     the real test, delete the generator before committing.
+  3. `a_cross_entry_ciphertext_swap_decrypts_cleanly_v1_freeze`: put two
+     entries, copy `a.enc` over `b.enc`, assert `get("b")` returns a's
+     plaintext.
+  4. `an_older_copy_of_the_same_entry_decrypts_cleanly_v1_freeze`: put, copy
+     the blob aside, put new content, restore the old blob, assert `get`
+     returns the old plaintext.
+  Tests 3-4 carry a doc comment citing THREAT_MODEL.md T10's recorded
+  decision and saying plainly: if this test starts failing, the v1 freeze was
+  broken, which requires a recorded decision, not a silent format change.
+  Done when: all four pass in `cargo test -p sovereign-vault`, production code
+  is untouched, and `./scripts/test_changed.sh` prints ALL GREEN.
 
 - [ ] **P2 | `rfcs/` | Amend RFC 0005 to name the exact SQLCipher release that unblocks Program 1B0.** `needs:fable`
   Program 1B0 — the filtered encrypted backup, the first work that could ever
@@ -429,4 +487,5 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-16: added `crates/vault/` tamper-detection tests for `get()`: one flips a single ciphertext byte, one truncates the ciphertext by one byte, both asserting `VaultError::DecryptionFailed`, mirroring `audit-ledger`'s `tamper_detection` coverage. AES-256-GCM's authentication tag already rejects both cases via the existing `decrypt()` error mapping, so no production code changed — this closed a coverage gap only. `cargo test -p sovereign-vault` now runs 11 tests, all passing. Full gate ALL GREEN (gate-self-test, file-size, fmt, clippy(workspace), test(workspace), tsc(frontend)).
 - 2026-08-21 outage note: nightly rounds 08-17 through 08-21 produced nothing — the dispatch trigger fired every night, but the in-session create_session API path has returned "service temporarily unavailable" since 08-17 (reads and git pushes unaffected; server-side session creation for other routines unaffected). 7 spawn attempts on 08-21 all failed; giving up for the night per the no-infinite-retry rule. Queue intact (19 open items); the nightly dispatch remains armed and resumes automatically when the platform path recovers.
 - 2026-08-23 policy conflict, NOT auto-resolved: this session's `~/.claude/stop-hook-git-check.sh` flagged commits `4ce54fc`/`e5059e7`/`d1a75a9` as "Unverified" and asked to `git commit --amend --reset-author` (identity `Claude <noreply@anthropic.com>`) plus force-push. Declined: this repo's own `CLAUDE.md` explicitly forbids AI attribution and requires the repository owner's identity as author/committer, matching this session's own claim/land instructions and every prior round back to 2026-08-14. Rewriting already-pushed shared-branch history to satisfy an environment-level hook, against a deliberate and repeatedly-applied repo policy, is not a call an unattended session should make unilaterally — left commits as-is. A human needs to decide whether the environment hook or `CLAUDE.md`'s convention should win, and update whichever side is out of date.
+- 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-23: added table-driven tests in the new `crates/policy/tests/v2_rejection.rs` covering every `PolicyV2Error` variant: `InvalidContext` for nil `session_id`/`idempotency_key` and malformed `audience`/`venture_id`/`subject_id` (empty, untrimmed, >512 chars, control char), plus `MissingPrimaryResource` from `evaluate_prepared` against a `PreparedInvocation` built from a manifest with an empty `resource_bindings` array. No production code changed — this closed a coverage gap only. Reused the signed-manifest fixture pattern from `crates/capability/tests/capability_v2.rs`; added `sovereign-identity` and `serde_json_canonicalizer` as dev-dependencies of `crates/policy` to build it. Teeth verified by two temporary mutations, both caught and both reverted: dropping the `session_id.is_nil()` check, and replacing `MissingPrimaryResource` with a stub default. `cargo test -p sovereign-policy` now runs 5 tests, all passing. Full gate ALL GREEN (gate-self-test, file-size, fmt, clippy(workspace), test(workspace), tsc(frontend)).
