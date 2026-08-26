@@ -313,7 +313,7 @@ repo audit; every entry below points at verified, real state of the code.
   Done when: all four pass in `cargo test -p sovereign-vault`, production code
   is untouched, and `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [ ] **P2 | `rfcs/` | Amend RFC 0005 to name the exact SQLCipher release that unblocks Program 1B0.** `needs:fable`
+- [ ] **P2 | `rfcs/` | Amend RFC 0005 to name the exact SQLCipher release that unblocks Program 1B0.** `needs:fable` IN PROGRESS (2026-08-26)
   Program 1B0 — the filtered encrypted backup, the first work that could ever
   support an "encrypted backup" claim — cannot start on the pinned SQLCipher
   4.14.0 profile because of its fixed `sqlcipher_export` defensive-mode bypass;
