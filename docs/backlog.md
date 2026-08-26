@@ -185,6 +185,11 @@ repo audit; every entry below points at verified, real state of the code.
   Phase C cross-references it, and no code lands in the round.
 
 - [ ] **P1 | `crates/authority/` | Make bundle consumption one recoverable transaction.**
+  Scope note (2026-08-26): this transactionalizes the CURRENT filesystem
+  store for the v0.1 legacy product path. The owner-session fixture program
+  (plan 2026-08-14, Task 10) later moves the authority plane into a
+  broker-owned redb store — both stand; different stores, different release
+  gates (see run log).
   Blocked until the RFC 0003 amendment above is checked off; implement
   exactly its protocol — an ambiguity found mid-round is a diagnosis for the
   queue, not a license to improvise. Today a crash between the three separate
@@ -222,7 +227,7 @@ repo audit; every entry below points at verified, real state of the code.
   token/approval is rejected through `authorize_and_consume_approved` with
   the typed error, and `cargo test -p sovereign-capability` passes.
 
-- [ ] **P1 | `rfcs/`, `docs/` | Pin the 1C0 mechanism design: admitted owner authenticator, single session, one-use approval issuer.** `needs:fable` IN PROGRESS (2026-08-26)
+- [x] **P1 | `rfcs/`, `docs/` | Pin the 1C0 mechanism design: admitted owner authenticator, single session, one-use approval issuer.**
   ROADMAP v0.1's largest un-designed block (ROADMAP.md:106, 184-186; exit
   criterion 2 at :196-200). The requirements exist but are scattered:
   rfcs/0005:937-945 (issuer bound to workspace ID, operation, commitments,
@@ -254,6 +259,64 @@ repo audit; every entry below points at verified, real state of the code.
   loopback; (4) re-slice the implementation into single-round entries here
   in dependency order. Done when: the design lands in the governed place,
   the implementation entries are queued, and no code lands in the round.
+  Closed 2026-08-26 by reconciliation rather than new design: the governed
+  place already exists — the in-repo plan
+  `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md`
+  (16 tasks, exact test names, global constraints, honest security boundary)
+  designates **RFC 0006** (fixture-only contract, its Task 1) as the
+  normative home; authoring a competing consolidation would fork it. The
+  plan covers every mechanism topic this entry listed, at synthetic-fixture
+  level, and explicitly makes no owner-admission or 1C0-complete claim —
+  product admission stays conjunctively gated on 1B1 + 1C1 + 1D `ActiveV2` +
+  a protected-payload review. Two entries below queue the next actionable
+  steps (Task 1; Task 2 verification); Tasks 3-16 enter the queue one at a
+  time as predecessors land — bulk-queueing them would duplicate the plan.
+  Reconciliation with RFC 0003 Amendment 1 recorded in the run log: the
+  amendment transactionalizes the CURRENT filesystem store for the v0.1
+  legacy product path; plan Task 10 later moves the authority plane into the
+  broker/redb store for the fixture program — both stand, different stores,
+  different release gates.
+
+- [ ] **P1 | `rfcs/`, `scripts/`, `docs/` | Author RFC 0006 and the owner-effect test-manifest contract (owner-session plan Task 1).** `needs:fable`
+  First implementation step of the owner-session/exact-effect program — the
+  fixture-only contract every later task consumes. Follow
+  `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md`
+  Task 1 exactly, RED first: `scripts/check-owner-effect-rfc.sh` must fail
+  with its missing-RFC diagnostic before the RFC exists. Deliverables: RFC
+  0006 stating every Global Constraint, no product activation transition,
+  the conjunctive future gates (1B1 + 1C1 + 1D `ActiveV2` + protected-payload
+  review), and the honest non-claims (hostile native valid-UV can win
+  empty-registry enrollment; the hidden broker mode and pipe key are not an
+  admission anchor; cross-port credential replacement is an accepted
+  destructive-DoS residual); the fixed synthetic corpus; the mechanism
+  matrix doc (virtual rows allowed; an empty real matrix leaves the
+  mechanism unqualified); `scripts/owner-effect-tests.tsv` plus both checked
+  runners with their shell self-tests; and the doc links. Two recorded
+  deviations from the plan's letter, both standing session rules: the
+  ROADMAP.md edit is prepared as a diff for owner approval instead of landed
+  directly, and the round may split into 2-3 commits (RFC + checker;
+  preflight + matrix; manifest runners) provided RED-first order holds and
+  the gate is green at each commit. Done when:
+  `./scripts/check-owner-effect-rfc.sh` is green, the origin preflight runs
+  `--virtual` green on Linux, both runner self-tests pass, and
+  `./scripts/test_changed.sh` prints ALL GREEN.
+
+- [ ] **P2 | `crates/capability/`, `crates/authority/`, `docs/` | Verify owner-session plan Task 2 (approval retention) already landed and reconcile its test names.**
+  RFC 0002's Authorization-and-Replay current-state text and RFC 0003's
+  "Replay and Durability" both state approval claims already retain the
+  signed approval's own expiry, with exactly the coverage plan Task 2
+  demands — the fix likely landed before the plan was written. Done when:
+  the behavior is confirmed against the code (the durable approval claim
+  carries the approval's own expiry; purge uses per-kind expiry), the
+  plan's exact test names exist and pass
+  (`durable_approval_survives_token_expiry_purge_until_approval_expiry`,
+  `expired_approval_purges_at_approval_expiry`,
+  `purge_uses_each_claim_kind_expiry`) — added as thin renames/wrappers of
+  the existing coverage where names differ, using plain `cargo test` (the
+  plan's TSV runner does not exist until Task 1 lands) — and Task 2's
+  checkboxes in the plan are ticked with a dated note. If the behavior is
+  NOT present, stop and release with a diagnosis instead of implementing —
+  that would be the authority entries' scope.
 
 - [ ] **P2 | `apps/cli/src/` | Stand up an HTTP-layer test boundary for the loopback API and pin today's posture.**
   There are no HTTP tests at all — ui.rs has no `#[test]` and no
@@ -824,6 +887,7 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
+- 2026-08-26: closed the 1C0 design item by reconciliation. The design already exists: `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md` is a complete 16-task fixture-v1 plan whose Task 1 authors **RFC 0006** as the fixture-only governed contract — so the round's job became absorb-not-fork. Queued Task 1 (`needs:fable`, with two recorded deviations: ROADMAP edit goes to the owner as a diff; 2-3 commits allowed) and a Task 2 verification entry (RFC 0002/0003 current-state text says approval retention already landed — confirm and reconcile the plan's exact test names, else release with a diagnosis). Tasks 3-16 enter the queue one at a time as predecessors land. Conflict check done and recorded: RFC 0003 Amendment 1 (filesystem-store bundle transaction, v0.1 legacy path) vs plan Task 10 (broker/redb authority plane, fixture program) — both stand, different stores and gates; a scope note on the authority transaction entry says so. Flagged to the owner (not edited): ROADMAP v0.1 remaining-work wording "deliver 1C0's admitted owner authenticator" vs the plan's explicit not-1C0/no-admission scope is a real tension only the owner can resolve (reword v0.1, or accept mechanism-proof as the v0.1 deliverable). No code landed.
 - 2026-08-26: planning round — scoped v0.1's 1C0 block after two scout passes. Load-bearing facts: any local process can obtain a signed owner approval with one unauthenticated POST (ui.rs:4-6 documents "no authentication" as policy; kernel_exec.rs:331 mints `owner_approval_key` for any workspace-directory reader); there is no session/cookie/nonce and ZERO HTTP-layer tests; 1C0 requirements are scattered across five docs with no mechanism-level design anywhere (WebAuthn/passkey is the only named mechanism, Target); an owner-session v1 plan (2026-08-14, synthetic-fixture, explicitly not 1C0) and a `feature/owner-session-exact-effect` branch already exist and must be reconciled, not forked. Queued two entries: the 1C0 mechanism-design item (`needs:fable`, P1 — consolidate, decide the governed place, re-slice implementation) and an untagged HTTP test-boundary item pinning today's posture (including the unauthenticated-approve hole as a named 1c0-pin test). Implementation slicing deliberately deferred until the design round lands. Planning only, no code.
 - 2026-08-26: planning round — sliced v0.1's "correct stale UI/docs claims" (the model-gateway portion plus a full sweep) into three entries after a scout pass. Load-bearing facts: `data_class` is caller-declared and provider trust self-reported with zero verification (crates/model/src/lib.rs:52-60, 118-123); the only routing gate is the Red-with-non-Local skip (:215); removing that legacy route is RFC 0004 / v0.2 work, so v0.1's job is stopping the false claims only. Stale claims found: "Red data never leaves the device" (crate doc + `model-check` output + a factually wrong Amber comment in ops.rs), UI disclosure presenting `stayed_local` self-report as fact with a hard-coded "amber" literal, UI vault copy claiming "encrypted at rest" without the co-located-key caveat the README already states, and "the AI can never skip you" while the approve endpoint is unauthenticated (1C0 is the fix). The adversarial `red_data_cannot_reach_cloud_tools…` test proves a *policy-engine* deny, not gateway routing — the new crates/model entry pins the actual hole with a mislabeled-prompt test. README/ARCHITECTURE/ROADMAP were checked and are already honest. Planning only, no code.
 - 2026-08-26: /plan-feature round — sliced ROADMAP v0.1's "process-kill, concurrency, and filesystem-fault tests" into eight dependency-ordered entries (shared `crates/fault-testing` dev crate first; then vault/audit-ledger/effects write-failure injection; execution-journal reconciliation on open; checkpoint-gap double-burn pin; real-subprocess SIGKILL soak; two-process decide race). Scouted via two subagents; load-bearing facts: the whole workspace has ONE thread-race test (authority) and ZERO multi-process tests; no test anywhere injects a failing write (all fs-fault tests are post-hoc corruption or permission checks); `ExecutionJournal::recover` is never called by product code, so Indeterminate records accumulate silently — filed as a product-defect entry, not just a test gap; a kill between outbox write and checkpoint double-burns authority (fail-closed, but unpinned). New lesson recorded in CLAUDE.md: chmod-based write denial is a no-op under root (dev containers and nightly CI run as root) — inject unavailability with the file-where-a-directory-belongs idiom instead. Planning only, no code.
