@@ -249,6 +249,125 @@ repo audit; every entry below points at verified, real state of the code.
   pass in `cargo test -p sovereign-adversarial-tests` and the honesty texts
   match the tested reality.
 
+- [ ] **P2 | `crates/fault-testing/` | Stand up the shared fault-injection dev crate.**
+  First slice of ROADMAP v0.1's "add process-kill, concurrency, and
+  filesystem-fault tests" (ROADMAP.md:190-191). Today every crate hand-rolls
+  corruption helpers, no test injects a *failing write*, and only
+  `crates/sandbox` kills a real child. New `publish = false` workspace member
+  `sovereign-fault-testing`, dev-dependency only (no production crate may
+  depend on it), with exactly three primitives and their own tests:
+  (1) `BlockedPath` guard — makes a path unavailable by replacing the
+  directory (or expected-directory location) with a regular file, restoring
+  the original on `Drop`; this is the repo's portable unavailability idiom
+  (`crates/authority/src/lib.rs:354`) and works under root, where chmod-based
+  denial silently no-ops (this container and nightly CI run as root — a
+  chmod-based guard would false-green); (2) `corrupt_byte(path, offset)` and
+  `truncate_by(path, n)` mirroring `crates/artifact`'s
+  `corrupt_stored_file`; (3) `respawn_self(worker_test_name, env)` — spawns
+  `std::env::current_exe()` with `--exact <name> --test-threads=1 --ignored
+  --nocapture` plus a marker env var, returns the `Child` so callers can kill
+  it at a stdout marker; the worker side is an `#[ignore]`d test that runs
+  only when the marker env var is set. Done when:
+  `cargo test -p sovereign-fault-testing` proves each primitive (including
+  that `BlockedPath` actually makes writes fail while running as root), and
+  `cargo build --workspace --locked` shows no production dependency edge to
+  the new crate.
+
+- [ ] **P2 | `crates/vault/` | Inject write failures and pin the entry/manifest tear semantics.**
+  Blocked on the `crates/fault-testing` entry above. `put` performs two
+  separate atomic renames (`<name>.enc` then `manifest.json`,
+  src/lib.rs:86-97, 114-119), and no test makes a vault write fail. Done
+  when: `put_fails_closed_when_the_vault_root_is_unavailable` blocks the root
+  via `BlockedPath`, asserts `put` errors, no `.tmp` file exists anywhere,
+  and previously stored entries still decrypt after restore; and
+  `a_torn_entry_absent_from_the_manifest_stays_readable_and_heals_on_next_put`
+  constructs the tear (copy `a.enc` to `b.enc` beside a manifest that lists
+  only `a`), reopens, asserts `list()` omits `b`, `get("b")` still decrypts,
+  and a later `put("b", …)` re-lists it; `cargo test -p sovereign-vault`
+  passes.
+
+- [ ] **P2 | `crates/audit-ledger/` | Inject append failures and prove the chain survives.**
+  Blocked on the `crates/fault-testing` entry above. No test today makes an
+  append fail (`src/lib.rs:188` is only checked on the success path). Done
+  when: `append_fails_closed_when_the_ledger_directory_is_unavailable`
+  blocks the ledger directory, asserts the append errors, the existing chain
+  still verifies end-to-end after restore, and no temp file remains; and
+  `a_stale_temp_file_is_ignored_and_replaced_on_the_next_append` seeds a
+  stale `.tmp` beside the ledger and asserts the next append succeeds and
+  removes or replaces it; `cargo test -p sovereign-audit-ledger` passes.
+
+- [ ] **P2 | `crates/effects/` | Inject outbox write failures and surface revoke failures.**
+  Blocked on the `crates/fault-testing` entry above. `write_exclusive_atomic`
+  (src/lib.rs:218-238) has no failing-write coverage, and `revoke`
+  (src/lib.rs:155-176) must be checked for swallowed removal errors — if it
+  can report success without removing the file, fix it to return the error
+  (same shape as the queued `crates/sandbox` quarantine-rename P3). Done
+  when: `write_message_fails_closed_when_the_outbox_is_unavailable` asserts
+  the write errors leaving no partial `.eml` and no temp;
+  `revoke_reports_failure_when_the_outbox_is_unavailable` asserts a blocked
+  removal surfaces an error and the file remains listed as present; and
+  `cargo test -p sovereign-effects` passes.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Reconcile the execution journal on open and surface Indeterminate records.**
+  Product defect found 2026-08-26: `ExecutionJournal::recover`
+  (crates/execution/src/lib.rs:149) is never called by product code, so a
+  kill between journal intent and the terminal record (the 4→5 gap in the
+  send chain) accumulates Indeterminate records silently. RFC 0002:386
+  requires Indeterminate to be surfaced and forbids automatic retry. Wire
+  recovery into workspace open (or `integrity_check`,
+  reporting.rs:234-273 — pick the surface that the UI already renders) as a
+  warning that names the interrupted invocation; never re-execute anything.
+  Done when: `indeterminate_execution_records_are_surfaced_on_open` seeds an
+  intent-only journal record, opens the workspace, and asserts the warning
+  appears while the outbox and authority store are untouched;
+  `recover_is_a_no_op_on_a_clean_journal` passes; and
+  `cargo test -p sovereign-cli` passes.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Pin the checkpoint-gap double-burn as recorded behavior.**
+  A kill between the outbox write and the checkpoint persist (steps 9-11 of
+  the send chain) makes the resumed run re-execute the whole step with fresh
+  ids (kernel_exec.rs:57-58): one `.eml` (the orphan pre-clean at
+  send_workflow.rs:163-168 removes the first), but a second
+  capability/approval is consumed and a second journal record written, and
+  nothing detects the duplicate burn. That is the fail-closed direction —
+  burning extra authority is safe, double-sending is not — but it must be
+  pinned, not accidental. Use the existing partial-runner idiom
+  (workspace/tests.rs:374) — no new harness. Done when:
+  `a_kill_between_outbox_write_and_checkpoint_burns_fresh_authority_but_never_double_sends`
+  drives step 1 without the checkpoint, re-runs the workflow, and asserts
+  exactly one `.eml`, a consistent delivery record, and exactly two consumed
+  token records (the pin: a doc comment says plainly that if this count
+  changes, the double-burn behavior changed and needs a recorded decision);
+  `cargo test -p sovereign-cli` passes.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Kill a real send subprocess and prove the workspace reopens fail-closed.**
+  Blocked on the `crates/fault-testing` entry above; the first real
+  process-kill test outside `crates/sandbox`. Add a `#[ignore]`d worker test
+  in `workspace/tests.rs` that (given the marker env var) builds a seeded
+  workspace at the root named by the env var, prints `READY`, then runs one
+  full approved send via the existing `ready_to_send`/`decide` fixtures. The
+  driver test uses `respawn_self`, waits for `READY`, sleeps a random 0-N ms,
+  SIGKILLs the child, then reopens the root in-process and asserts the
+  fail-closed invariants post-mortem: reopen succeeds; `integrity_check`
+  passes or reports only documented warnings (interrupted-op, Indeterminate);
+  at most one `.eml` exists and it is complete (parses as the expected
+  message) or absent — never truncated; and a subsequent full send on the
+  same root completes. Repeat for a handful of random delays in one test
+  (soak, but bounded — keep total runtime under ~20s). Done when:
+  `a_sigkilled_send_leaves_a_fail_closed_workspace_that_reopens_clean` passes
+  in `cargo test -p sovereign-cli`, and the worker test is a no-op when its
+  env var is absent. Split `tests.rs` first if the addition would cross the
+  file-size limit.
+
+- [ ] **P3 | `apps/cli/src/workspace/` | Race two real processes over one delivery.**
+  Blocked on the subprocess-kill entry above (reuses its worker pattern).
+  Two respawned workers attempt `decide` on the same seeded delivery against
+  the same root; assert exactly one `.eml` results, the loser fails closed
+  with an ordinary error (no panic, no partial state), and the workspace
+  passes `integrity_check` afterwards. Done when:
+  `two_processes_deciding_the_same_delivery_produce_exactly_one_effect`
+  passes in `cargo test -p sovereign-cli`.
+
 - [ ] **P2 | `crates/identity/` | Add a public-API integration test boundary.**
   All 12 tests live in `src/tests.rs` and reach private internals; nothing
   validates the crate through `sovereign_identity::…` re-exports. Done when:
@@ -608,6 +727,7 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
+- 2026-08-26: /plan-feature round — sliced ROADMAP v0.1's "process-kill, concurrency, and filesystem-fault tests" into eight dependency-ordered entries (shared `crates/fault-testing` dev crate first; then vault/audit-ledger/effects write-failure injection; execution-journal reconciliation on open; checkpoint-gap double-burn pin; real-subprocess SIGKILL soak; two-process decide race). Scouted via two subagents; load-bearing facts: the whole workspace has ONE thread-race test (authority) and ZERO multi-process tests; no test anywhere injects a failing write (all fs-fault tests are post-hoc corruption or permission checks); `ExecutionJournal::recover` is never called by product code, so Indeterminate records accumulate silently — filed as a product-defect entry, not just a test gap; a kill between outbox write and checkpoint double-burns authority (fail-closed, but unpinned). New lesson recorded in CLAUDE.md: chmod-based write denial is a no-op under root (dev containers and nightly CI run as root) — inject unavailability with the file-where-a-directory-belongs idiom instead. Planning only, no code.
 - 2026-08-26: RFC 0003 Amendment 1 applied — pins the transactional-consumption and revocation protocol for the authority store. Core design: a **deterministic bundle id** (SHA-256 over token/approval/idempotency ids + invocation fingerprint) makes every step idempotent for the owning bundle, so recovery is **roll-forward only** — a crashed consumer retries with the same inputs and completes instead of dying on its own earlier claims, and no release/delete recovery path exists to race against. Commit is a `.committed` marker via the store's existing exclusive-publish primitive (exactly one Authorized per bundle); revocation is durable exclusive-create records checked pre-claim and re-checked at commit (the serialization point), with a three-way outcome (`Revoked`/`AlreadyRevoked`/`RevokedAfterConsumption`) and corrupt-record-fails-closed. Accepted cost stated in the amendment: a partial bundle whose token expires leaves the still-valid approval denied until its own expiry (fail-closed, matches today; fix is a fresh approval, never claim takeover). Conformance test names for all four implementation entries are pinned in part (e); the two authority entries now point at them. RFC 0002's Authorization-and-Replay and Phase C sections cross-reference the amendment. Docs-only, no code. Gate ALL GREEN.
 - 2026-08-26: /plan-feature round — sliced ROADMAP v0.1's "make authorization claims transactional and revocable" into six dependency-ordered entries (RFC 0003 amendment first, `needs:fable`; then authority transaction, authority revocation, capability wiring, workspace revocation+purge, adversarial invariants). Scouted first via two subagents; load-bearing facts: `crates/authority` is already a durable hard-link consumption ledger with single-claim atomicity, but bundle consumption is three separate claims and both RFC 0003 (:103-120) and the code (v2.rs:747-767) admit partial failure burns earlier claims; NO authority/approval revocation exists anywhere (`revoke_delivery` only removes the outbox file; identity trust revocation is in-memory only); `purge_expired` is never called in product. RFC 0002:339-346/Phase C already mandates the target design, so the amendment pins a protocol rather than opening a new direction. Out of scope, explicitly: 1C0 owner authenticator/session/issuer, opaque grant recipient/content binding, full real-subprocess validator race coverage (sibling v0.1 items, not queued here). Planning only, no code.
 - 2026-08-26: landed source-closure gate v1 for `crates/vault-v2-engine` (the tagged AST-gate item, re-sliced): new `tests/gate.rs` machinery + `tests/ast_gate.rs` config/teeth, dev-dep pins syn `=2.0.118` / proc-macro2 `=1.0.106` (both already in the lock). The real-crate test pins the exact six-file closure and passes; 20 teeth tests prove every rejection fires against fixture crates in tempdirs (orphan, `#[path]`, unadmitted include, unsafe hidden in macro tokens, `macro_rules!`, unsafe/extern outside the boundary, ambiguous/missing/cfg-disabled modules, denied attribute/derive/macro, smuggled `#[path …]` in token trees, raw identifiers, symlinks) plus the positive `FFI_BOUNDARY_FILES` admission path the FFI item will use. Teeth additionally verified by a real-tree mutation: an orphan `src/stray.rs` — invisible to the compiler with all auto-discovery off — failed the gate, and removal restored green. The exactly-two-entry-points proof, five `tests/ui/` fixtures, and macro-definition mutation tests need the engine API to exist, so they became a follow-up `needs:fable` entry ordered after the FFI/profile items, whose entries now carry the FFI_BOUNDARY_FILES/ROOTS coupling instructions. Gate ALL GREEN.

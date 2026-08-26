@@ -116,7 +116,13 @@ secret scanning. Toolchain is pinned: 1.97.0.
    hook that fails aborts the child before `exec`, so a platform-unsupported
    limit surfaces as a spawn error — the same `CompileWorkerFailed` a safely
    contained hostile compile produces, and it read as a passing check.
-10. `PreparedInvocation` (`crates/artifact`) has no test-only shortcut
+10. chmod-based fault injection is a silent no-op under root, and both the
+    cloud dev containers and nightly CI run as root — a test that "denies"
+    writes with permissions false-greens there. Inject unavailability by
+    replacing the directory with a regular file instead
+    (`crates/authority`'s `unavailable_store_fails_closed` idiom); it fails
+    writes for every uid.
+11. `PreparedInvocation` (`crates/artifact`) has no test-only shortcut
     constructor — every crate that consumes one (`crates/capability`,
     `crates/policy`, …) builds its own signed-manifest fixture in-crate via
     `TypedSigner`/`RoleTrustStore`/`ArtifactVerifier::verify`, copying the
