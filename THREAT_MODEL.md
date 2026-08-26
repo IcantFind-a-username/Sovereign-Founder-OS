@@ -135,6 +135,15 @@ boundary, closed broker, or exact recipient authorization.
 - **Current:** device-signed event hash chain with internal-consistency checks;
   whole-file replacement, prefix truncation, and rollback require an external
   trusted head to detect
+- **Current (conditional), RFC 0007:** a separately stored, device-signed
+  freshness anchor (`ledger.head`, over `{device binding, event_count,
+  last_event_hash}`) and an open-time check reject a rewound or forked ledger
+  **when the anchor is protected independently of the ledger**. Under the v0.1
+  co-located-key layout it detects accidental rollback and any actor with
+  ledger-write but not device-key-read access; it does not defend a
+  directory-writer who can also re-sign the anchor. It leaves the signed
+  `AuditEventBody` shape unchanged and gains full force when the device key
+  moves into a protector (RFC 0005 / Program 1C1)
 - **Current primitive / migration pending:** a role-separated Audit COSE signer exists; the ledger still uses its legacy device-signature encoding
 - **Target:** periodic external or owner-device head anchoring when the deployment requires rollback completeness
 - **Target:** an Auditor role that cannot execute external actions
