@@ -24,4 +24,16 @@ path = "src/lib.rs"
 name = "build_gate"
 path = "tests/build_gate.rs"
 
+[[test]]
+name = "ast_gate"
+path = "tests/ast_gate.rs"
+
 [dependencies]
+
+[dev-dependencies]
+# Exact pins per the Program 1A plan: the source-closure gate classifies
+# tokens through these crates, so their versions are part of the reviewed
+# gate, not a floating detail. Both match the workspace lock.
+syn = { version = "=2.0.118", default-features = false, features = ["full", "parsing", "visit"] }
+proc-macro2 = { version = "=1.0.106", default-features = false }
+tempfile = "3"

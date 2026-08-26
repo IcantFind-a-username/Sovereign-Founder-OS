@@ -351,7 +351,12 @@ repo audit; every entry below points at verified, real state of the code.
   `raw_dbk_never_reaches_sql_text_logs_or_environment`, and
   `database_header_and_journal_do_not_contain_plaintext_canary` pass from
   `cargo test -p sovereign-vault-v2-engine`, and no `unsafe` block exists
-  outside `src/engine/ffi.rs` and `src/engine/process.rs`.
+  outside `src/engine/ffi.rs` and `src/engine/process.rs`. Note (2026-08-26):
+  the standing source-closure gate (`tests/ast_gate.rs`) rejects unsafe
+  everywhere by default — when creating those two files, add them and nothing
+  else to its `FFI_BOUNDARY_FILES` list, and add any new explicit Cargo target
+  to its `ROOTS` in the same change (auto-discovery is off; the gate pins the
+  closure).
 
 - [ ] **P2 | `crates/vault-v2-engine/` | Pin and verify the exact SQLCipher connection profile and resource limits.**
   Apply the fixed profile — compatibility 4, 4096-byte pages, AES-256-CBC,
@@ -368,20 +373,41 @@ repo audit; every entry below points at verified, real state of the code.
   `oversized_values_and_sql_fail_at_fixed_limits`, and
   `page_2_ciphertext_bitflip_is_detected_cryptographically` pass, each limit has
   boundary and boundary-plus-one coverage, and `./scripts/check-file-size.sh`
-  stays green.
+  stays green. Note (2026-08-26): any new test target (for example
+  `tests/public.rs`) needs an explicit `[[test]]` entry in `Cargo.toml` AND a
+  matching entry in `ROOTS` in `tests/ast_gate.rs`, in the same change.
 
-- [ ] **P2 | `crates/vault-v2-engine/` | Add the syn AST gate proving the FFI boundary is exact.** `needs:fable` IN PROGRESS (2026-08-26)
-  `recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact` starts
-  from `build.rs`, every explicit Cargo target, and `tests/ui.rs`, then parses
-  the complete recursive closure of inline and external modules to prove the
-  plaintext-header setter, arbitrary SQL, a raw-handle escape, backup/export/
-  copy calls, and extra project-authored OpenSSL/SQLite unsafe calls are absent
-  (Program 1A plan
+- [x] **P2 | `crates/vault-v2-engine/` | Add the syn AST gate proving the FFI boundary is exact.**
+  Landed 2026-08-26 as **gate v1** (`tests/gate.rs` machinery +
+  `tests/ast_gate.rs` config and teeth):
+  `recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact` runs
+  against the real crate, pins the exact six-file closure, and rejects
+  orphans, `#[path]`, unadmitted `include!`, symlinks, escapes, ambiguous or
+  missing modules, project macro definitions, non-allowlisted
+  macros/attributes/derives, denied identifiers and smuggled attributes inside
+  macro token trees (structural `proc_macro2::TokenTree` walk), and
+  unsafe/extern outside a declarative `FFI_BOUNDARY_FILES` list that is empty
+  today. The plan-speced remainder needs the engine API to exist first and is
+  the follow-up `needs:fable` entry below, ordered after the FFI and profile
+  items.
+
+- [ ] **P2 | `crates/vault-v2-engine/` | Tighten the source-closure gate to the exact FFI boundary: two entry points, five ui fixtures, macro mutation coverage.** `needs:fable`
+  Second half of the AST-gate item above; blocked until the FFI-module and
+  connection-profile entries land the engine API. Then: (a) prove exactly two
+  project-authored production unsafe FFI entry points plus the single
+  test-only OpenSSL LOAD_CONFIG negative control, with separate production and
+  `cfg(test)` allowlists detecting direct and aliased paths, glob imports, and
+  raw symbol declarations and calls; (b) ship exactly the five trybuild
+  fixtures `cannot_name_db_key`, `cannot_call_raw_key_shim`,
+  `cannot_reach_raw_handle`, `cannot_construct_create_mode`, and
+  `cannot_select_cipher_profile` under `tests/ui/` with a `tests/ui.rs`
+  harness root, admitting exactly those five files as the gate's auxiliary
+  roots; (c) add the two required mutation tests hiding a third unsafe/FFI
+  declaration first in a macro definition and then in macro invocation tokens,
+  both failing the gate (Program 1A plan
   `docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
-  lines 503-512). Ship it with exactly the five named trybuild fixtures from
-  that same plan, lines 449-458. Design-heavy and easy to get subtly wrong.
-  Done when: the AST test and all five compile-fail fixtures pass from
-  `cargo test -p sovereign-vault-v2-engine`, and the test fails if a raw-handle
+  lines 503-512 and 524-548). Done when: all of the above pass from
+  `cargo test -p sovereign-vault-v2-engine` and the gate fails if a raw-handle
   accessor is added anywhere in the closure.
 
 - [ ] **P2 | `.github/workflows/`, `scripts/`, `crates/vault-v2-engine/` | Confirm the vault-v2 build gate does not trip on a clean CI runner.**
@@ -490,4 +516,5 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
+- 2026-08-26: landed source-closure gate v1 for `crates/vault-v2-engine` (the tagged AST-gate item, re-sliced): new `tests/gate.rs` machinery + `tests/ast_gate.rs` config/teeth, dev-dep pins syn `=2.0.118` / proc-macro2 `=1.0.106` (both already in the lock). The real-crate test pins the exact six-file closure and passes; 20 teeth tests prove every rejection fires against fixture crates in tempdirs (orphan, `#[path]`, unadmitted include, unsafe hidden in macro tokens, `macro_rules!`, unsafe/extern outside the boundary, ambiguous/missing/cfg-disabled modules, denied attribute/derive/macro, smuggled `#[path …]` in token trees, raw identifiers, symlinks) plus the positive `FFI_BOUNDARY_FILES` admission path the FFI item will use. Teeth additionally verified by a real-tree mutation: an orphan `src/stray.rs` — invisible to the compiler with all auto-discovery off — failed the gate, and removal restored green. The exactly-two-entry-points proof, five `tests/ui/` fixtures, and macro-definition mutation tests need the engine API to exist, so they became a follow-up `needs:fable` entry ordered after the FFI/profile items, whose entries now carry the FFI_BOUNDARY_FILES/ROOTS coupling instructions. Gate ALL GREEN.
 - 2026-08-23: added table-driven tests in the new `crates/policy/tests/v2_rejection.rs` covering every `PolicyV2Error` variant: `InvalidContext` for nil `session_id`/`idempotency_key` and malformed `audience`/`venture_id`/`subject_id` (empty, untrimmed, >512 chars, control char), plus `MissingPrimaryResource` from `evaluate_prepared` against a `PreparedInvocation` built from a manifest with an empty `resource_bindings` array. No production code changed — this closed a coverage gap only. Reused the signed-manifest fixture pattern from `crates/capability/tests/capability_v2.rs`; added `sovereign-identity` and `serde_json_canonicalizer` as dev-dependencies of `crates/policy` to build it. Teeth verified by two temporary mutations, both caught and both reverted: dropping the `session_id.is_nil()` check, and replacing `MissingPrimaryResource` with a stub default. `cargo test -p sovereign-policy` now runs 5 tests, all passing. Full gate ALL GREEN (gate-self-test, file-size, fmt, clippy(workspace), test(workspace), tsc(frontend)).

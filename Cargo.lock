@@ -1568,6 +1568,11 @@ dependencies = [
 [[package]]
 name = "sovereign-vault-v2-engine"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "syn",
+ "tempfile",
+]
 
 [[package]]
 name = "sovereign-workflow"
