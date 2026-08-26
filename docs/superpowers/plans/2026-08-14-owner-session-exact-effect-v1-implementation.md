@@ -126,6 +126,18 @@ For every task: register only the named tests and their exact package/target/fea
 
 ## Task 1: Accept the fixture-only RFC and freeze the mechanism matrix/origin
 
+> **PARTIALLY LANDED (2026-08-26).** The judgment-dense half is done: RFC 0006
+> and its RED-first freeze gate `scripts/check-owner-effect-rfc.sh` exist and
+> are green (34 checks; teeth verified by dropping a required anchor and
+> injecting a forbidden activation claim, both caught). `docs/INDEX.md` links
+> the RFC. The remaining mechanical scaffolding — the origin preflight harness,
+> the mechanism-matrix doc, and the two checked test-manifest runners with
+> their self-tests — is re-sliced into untagged single-round backlog entries
+> for the nightly pipeline; see `docs/backlog.md`. The `ROADMAP.md` edit this
+> task lists is held as an owner-approval diff per the session's roadmap-
+> governance rule, not landed here. RED-first order held: the gate failed with
+> `missing rfcs/0006-...` before the RFC existed.
+
 **Files:**
 
 - Create: `rfcs/0006-synthetic-owner-session-exact-effect-fixture.md`

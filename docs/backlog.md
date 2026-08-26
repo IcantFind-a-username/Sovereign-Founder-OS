@@ -277,7 +277,7 @@ repo audit; every entry below points at verified, real state of the code.
   broker/redb store for the fixture program — both stand, different stores,
   different release gates.
 
-- [ ] **P1 | `rfcs/`, `scripts/`, `docs/` | Author RFC 0006 and the owner-effect test-manifest contract (owner-session plan Task 1).** `needs:fable` IN PROGRESS (2026-08-26)
+- [x] **P1 | `rfcs/`, `scripts/`, `docs/` | Author RFC 0006 and the owner-effect test-manifest contract (owner-session plan Task 1) — RFC + freeze gate.**
   First implementation step of the owner-session/exact-effect program — the
   fixture-only contract every later task consumes. Follow
   `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md`
@@ -317,6 +317,45 @@ repo audit; every entry below points at verified, real state of the code.
   checkboxes in the plan are ticked with a dated note. If the behavior is
   NOT present, stop and release with a diagnosis instead of implementing —
   that would be the authority entries' scope.
+
+- [ ] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: the checked test-manifest runners and their self-tests.**
+  RFC 0006 and its freeze gate landed 2026-08-26; this is the mechanical
+  scaffolding re-sliced out of plan Task 1. Follow
+  `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md`
+  Task 1's runner bullets exactly, RED-first via each runner's shell self-test.
+  Deliver `scripts/owner-effect-tests.tsv` (columns
+  `task,package,target,profile,test_name`), `scripts/run-owner-effect-tests.sh`
+  and `scripts/run-owner-effect-regression.sh`, and their self-tests
+  `scripts/tests/run-owner-effect-tests.sh` /
+  `scripts/tests/run-owner-effect-regression.sh`. Each runner must own no
+  inferred defaults, verify the literal cargo command carries the matching
+  `--no-default-features`/`--features`, reject feature/target diagnostics and
+  zero/skipped/fully-filtered output, require the task-specific RED diagnostic
+  on nonzero exit, and on GREEN list-then-execute every registered row; the
+  self-tests feed success, zero-test, skipped-required-feature, wrong-diagnostic,
+  filtered-output, and incomplete-profile-set transcripts and require only the
+  real nonzero run to pass. Bash 3.2, EXIT-trap completion marker, zero-inputs
+  fails (backlog lesson 8; mirror `scripts/check-owner-effect-rfc.sh`). Done
+  when: both self-tests pass, the TSV seeds at least the RFC-gate row, and
+  `./scripts/test_changed.sh` prints ALL GREEN.
+
+- [ ] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: origin preflight harness and mechanism-matrix doc.**
+  Blocked on nothing but pairs with the runners entry above. Deliver
+  `scripts/owner-auth-origin-preflight.sh` plus a zero-dependency
+  `scripts/owner-auth-origin-preflight.mjs` that binds only `127.0.0.1:7787`,
+  serves embedded same-origin preflight JS, sets and re-verifies the exact
+  `__Host-sfo_fixture_session` cookie, drives WebAuthn create/get, and emits
+  canonical value-free JSON with exact OS/browser/authenticator/origin ids; it
+  also starts a malicious second-port server to demonstrate host-wide cookie
+  receipt/overwrite and characterize same-user-handle credential replacement,
+  proving any such assertion is rejected at port 7787 for wrong origin. Plus
+  `docs/security/owner-auth-mechanism-matrix.md` with the frozen entry schema
+  (virtual rows `protocol_fixture_only`, real rows `mechanism_qualified_only`,
+  an empty real matrix allowed and leaving the mechanism unqualified). No
+  production owner/session code and no remote script. Done when:
+  `./scripts/owner-auth-origin-preflight.sh --virtual` runs green on Linux, the
+  matrix doc exists with the schema and an honest empty-real-matrix note, and
+  `./scripts/test_changed.sh` prints ALL GREEN.
 
 - [ ] **P2 | `apps/cli/src/` | Stand up an HTTP-layer test boundary for the loopback API and pin today's posture.**
   There are no HTTP tests at all — ui.rs has no `#[test]` and no
@@ -889,6 +928,7 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
 - 2026-08-26: added `crates/identity/tests/public_api.rs` (17 tests) exercising the key lifecycle through `sovereign_identity::` re-exports only: device save/load round-trip, device-id-from-public-key derivation, legacy sign/verify + tamper rejection, deterministic `from_secret_bytes`, and the full `RoleTrustStore` verify lifecycle (trusted verify exposing the bound payload, tamper, unknown key, issuer mismatch, validity-window boundaries with exclusive upper bound, revoke/restore, duplicate key, inverted-interval rejection). Two security properties pinned at the public boundary: role-domain separation (an AuthorityRole signature is `UnknownKeyId` under an ApprovalRole store built from the same 32 secret bytes, and verifies under the correct role's store) and the device→audit-signer bridge preserving the device-id binding. Added `tempfile` as an identity dev-dependency. No production code changed — coverage-only. `cargo test -p sovereign-identity` and the full gate are ALL GREEN.
 - 2026-08-26: verified owner-session plan Task 2 is already satisfied — no code needed. All three exact test names the plan demands already exist and pass: `durable_approval_survives_token_expiry_purge_until_approval_expiry` and `expired_approval_purges_at_approval_expiry` (crates/capability/tests/approval_v2.rs:555,609) and `purge_uses_each_claim_kind_expiry` (crates/authority/src/lib.rs:389). The durable approval claim already retains the approval's own expiry, and `purge_expired` uses each claim kind's expiry independently — the exact semantics Task 2 specifies, landed in the 2026-08-15 missing-key round before this plan was written. Ran the three tests green with plain `cargo test` (the plan's TSV runners do not exist until Task 1). Ticked Task 2's five checkboxes in the plan with a VERIFIED-ALREADY-LANDED note. No production change.
+- 2026-08-26: authored RFC 0006 (synthetic owner-session / exact-effect fixture) and its RED-first freeze gate `scripts/check-owner-effect-rfc.sh` — plan Task 1's judgment-dense half. The RFC freezes all 23 Global Constraints (G1-G23), the honest security boundary, and the change-control rule, at Fixture maturity with no product claim. The gate (bash 3.2, EXIT-trap marker, zero-inputs-fails, grep -F fixed strings per lesson 8) requires 34 load-bearing anchors present and five affirmative-activation phrases absent; RED confirmed (`missing rfcs/0006-...` before the RFC), GREEN after, teeth verified by two mutations (drop a required anchor, inject `production-ready`), both caught and reverted. `docs/INDEX.md` links the RFC. Re-sliced the mechanical remainder of Task 1 (TSV + two runners + self-tests; origin preflight harness + mechanism-matrix doc) into two untagged nightly entries rather than typing it here. ROADMAP edit held as an owner diff (governance). Ticked the plan's Task 1 RFC/gate progress with a PARTIALLY-LANDED note. Gate ALL GREEN.
 - 2026-08-26: closed the 1C0 design item by reconciliation. The design already exists: `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md` is a complete 16-task fixture-v1 plan whose Task 1 authors **RFC 0006** as the fixture-only governed contract — so the round's job became absorb-not-fork. Queued Task 1 (`needs:fable`, with two recorded deviations: ROADMAP edit goes to the owner as a diff; 2-3 commits allowed) and a Task 2 verification entry (RFC 0002/0003 current-state text says approval retention already landed — confirm and reconcile the plan's exact test names, else release with a diagnosis). Tasks 3-16 enter the queue one at a time as predecessors land. Conflict check done and recorded: RFC 0003 Amendment 1 (filesystem-store bundle transaction, v0.1 legacy path) vs plan Task 10 (broker/redb authority plane, fixture program) — both stand, different stores and gates; a scope note on the authority transaction entry says so. Flagged to the owner (not edited): ROADMAP v0.1 remaining-work wording "deliver 1C0's admitted owner authenticator" vs the plan's explicit not-1C0/no-admission scope is a real tension only the owner can resolve (reword v0.1, or accept mechanism-proof as the v0.1 deliverable). No code landed.
 - 2026-08-26: planning round — scoped v0.1's 1C0 block after two scout passes. Load-bearing facts: any local process can obtain a signed owner approval with one unauthenticated POST (ui.rs:4-6 documents "no authentication" as policy; kernel_exec.rs:331 mints `owner_approval_key` for any workspace-directory reader); there is no session/cookie/nonce and ZERO HTTP-layer tests; 1C0 requirements are scattered across five docs with no mechanism-level design anywhere (WebAuthn/passkey is the only named mechanism, Target); an owner-session v1 plan (2026-08-14, synthetic-fixture, explicitly not 1C0) and a `feature/owner-session-exact-effect` branch already exist and must be reconciled, not forked. Queued two entries: the 1C0 mechanism-design item (`needs:fable`, P1 — consolidate, decide the governed place, re-slice implementation) and an untagged HTTP test-boundary item pinning today's posture (including the unauthenticated-approve hole as a named 1c0-pin test). Implementation slicing deliberately deferred until the design round lands. Planning only, no code.
 - 2026-08-26: planning round — sliced v0.1's "correct stale UI/docs claims" (the model-gateway portion plus a full sweep) into three entries after a scout pass. Load-bearing facts: `data_class` is caller-declared and provider trust self-reported with zero verification (crates/model/src/lib.rs:52-60, 118-123); the only routing gate is the Red-with-non-Local skip (:215); removing that legacy route is RFC 0004 / v0.2 work, so v0.1's job is stopping the false claims only. Stale claims found: "Red data never leaves the device" (crate doc + `model-check` output + a factually wrong Amber comment in ops.rs), UI disclosure presenting `stayed_local` self-report as fact with a hard-coded "amber" literal, UI vault copy claiming "encrypted at rest" without the co-located-key caveat the README already states, and "the AI can never skip you" while the approve endpoint is unauthenticated (1C0 is the fix). The adversarial `red_data_cannot_reach_cloud_tools…` test proves a *policy-engine* deny, not gateway routing — the new crates/model entry pins the actual hole with a mislabeled-prompt test. README/ARCHITECTURE/ROADMAP were checked and are already honest. Planning only, no code.
