@@ -325,7 +325,7 @@ repo audit; every entry below points at verified, real state of the code.
   method, keeps `sqlcipher_export`, `ATTACH`, and database-copy APIs forbidden,
   and records the status change. No code lands in this round.
 
-- [ ] **P2 | `rfcs/` | Move RFC 0005 from Draft to a decided status with its required review evidence.** `needs:fable`
+- [ ] **P2 | `rfcs/` | Move RFC 0005 from Draft to a decided status with its required review evidence.** `needs:fable` IN PROGRESS (2026-08-26)
   RFC 0005 is `Status: Draft; approved implementation target` with
   `Security impact: Critical` (`rfcs/0005-dual-root-vault-and-recovery.md`:3-6),
   while ROADMAP.md:508-518 requires security-sensitive RFCs to carry a
