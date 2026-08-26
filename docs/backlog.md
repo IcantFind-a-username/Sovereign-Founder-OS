@@ -157,6 +157,95 @@ repo audit; every entry below points at verified, real state of the code.
   Done when: table-driven tests assert each `PolicyV2Error` variant from
   `cargo test -p sovereign-policy`.
 
+- [ ] **P1 | `rfcs/` | Amend RFC 0003 with the authorization-consumption transaction and durable revocation design.** `needs:fable`
+  First slice of ROADMAP v0.1's "make authorization claims transactional and
+  revocable" (ROADMAP.md:182-191; MANIFESTO principle 2's "revocable"). The
+  gap is admitted in two places: rfcs/0003-signed-approval-evidence.md:103-120
+  calls the three consumption claims "ordered filesystem operations, not one
+  recoverable transaction; partial failure burns earlier claims" (the code
+  agrees at crates/capability/src/v2.rs:747-767), and no authority/approval
+  revocation exists anywhere in the workspace. Governance requires an RFC for
+  authority/persistent-state changes (ROADMAP.md:508-511), and RFC 0002
+  already names the target ("validation and reservation/consumption form one
+  recoverable transaction across processes … tracks token status, uses,
+  expiry, revocation", rfcs/0002:339-346, Phase C at :480-491), so this is an
+  amendment pinning a protocol, not a new design direction. The amendment
+  must specify exactly: (a) the on-disk bundle-transaction protocol over the
+  existing hard-link store in `crates/authority` (intent record, claim order,
+  commit marker, fsync points, file modes); (b) deterministic crash recovery
+  on reopen for every interruption point, and why a released bundle can never
+  have authorized an effect; (c) durable revocation records for token
+  fingerprints and approval ids (layout, exclusive-create, check ordering
+  inside the transaction, revoke-after-consume reporting, retention vs.
+  `purge_expired`); (d) the concurrency contract (exactly one winner among
+  racing consumers; revoke-vs-consume ends in one durable outcome); (e) named
+  conformance tests for the four implementation entries below. Done when: the
+  amendment section exists in `rfcs/0003-signed-approval-evidence.md` with
+  all five parts, the honesty text at :103-120 points to it, RFC 0002's
+  Phase C cross-references it, and no code lands in the round.
+
+- [ ] **P1 | `crates/authority/` | Make bundle consumption one recoverable transaction.**
+  Blocked until the RFC 0003 amendment above is checked off; implement
+  exactly its protocol — an ambiguity found mid-round is a diagnosis for the
+  queue, not a license to improvise. Today a crash between the three separate
+  claims burns the earlier ones. Add the amendment's bundle API to
+  `AuthorityStore` beside the existing single-claim methods (which stay, so
+  the capability crate migrates in its own round). Done when: crash-recovery
+  tests cover every interruption point the amendment names (simulated by
+  driving the protocol's step functions directly), a multi-thread race test
+  proves exactly one bundle winner, reopen after any partial state recovers
+  deterministically, the burned-claims scenario is a named regression test,
+  and `cargo test -p sovereign-authority` passes.
+
+- [ ] **P1 | `crates/authority/` | Add durable, fail-closed revocation records.**
+  Blocked until the amendment lands; claim only after the transaction entry
+  above is checked off. Per amendment part (c): `revoke_*` APIs write
+  exclusive-create records under the store root; consumption checks
+  revocation inside the bundle transaction and fails closed with a dedicated
+  error variant; revoking an already-consumed claim is recorded and reported
+  distinctly; a corrupt revocation record fails closed. Done when:
+  revoke-then-consume fails closed across a store reopen, consume-then-revoke
+  reports the distinct outcome, a revoke-vs-consume race ends in exactly one
+  durable outcome, and `cargo test -p sovereign-authority` covers each.
+
+- [ ] **P1 | `crates/capability/` | Consume through the bundle transaction and surface revocation as a typed rejection.**
+  Blocked on the two `crates/authority` entries above.
+  `authorize_and_consume_approved` (v2.rs:602) switches from three sequential
+  claims to the bundle API; the in-memory mirrors (v2.rs:530-533) remain only
+  as no-store-attached defense and say so; revocation maps to a new typed
+  error variant; the honesty comment at v2.rs:747-749 is updated to describe
+  the transaction. Done when: a regression test proves an interrupted bundle
+  no longer burns earlier claims through the public capability API, a revoked
+  token/approval is rejected through `authorize_and_consume_approved` with
+  the typed error, and `cargo test -p sovereign-capability` passes.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Tie delivery revocation to authority revocation and purge expired claims on open.**
+  Blocked on the `crates/capability` entry above. Today `revoke_delivery`
+  (ops.rs:336) removes the outbox file while the underlying capability and
+  approval stay consumable, and `purge_expired` is never called in product
+  code. Wire: revoking a delivery also revokes its capability fingerprint and
+  approval id in the workspace authority store (attached at
+  kernel_exec.rs:281-284) and appends an audit event; workspace open calls
+  `purge_expired` under the amendment's retention rules. Done when: a test
+  revokes a pending delivery and a subsequent dispatch attempt through
+  `execute_in_sandbox` fails closed with the revocation error, a test proves
+  expired records are purged on open, and `cargo test -p sovereign-cli`
+  passes.
+
+- [ ] **P2 | `tests/adversarial/` | Pin the transactional/revocation security invariants cross-crate.**
+  Blocked on everything above. Two invariants as adversarial tests, driven
+  through the workspace-level path rather than authority internals: (1) no
+  interruption point of the consumption bundle leaves a state where the
+  effect executed while a claim survived unconsumed, or a claim was burned
+  while the effect was refused; (2) a revoked approval/token never reaches
+  the outbox, including under a revoke-vs-dispatch race. In the same round —
+  only if both tests pass — update the now-stale honesty texts in
+  ARCHITECTURE.md (:84-95) and THREAT_MODEL.md verification items (:247-248);
+  ROADMAP.md's current-state lines (71-76, 84) are NOT edited here — propose
+  a diff to the owner instead (roadmap governance). Done when: both tests
+  pass in `cargo test -p sovereign-adversarial-tests` and the honesty texts
+  match the tested reality.
+
 - [ ] **P2 | `crates/identity/` | Add a public-API integration test boundary.**
   All 12 tests live in `src/tests.rs` and reach private internals; nothing
   validates the crate through `sovereign_identity::…` re-exports. Done when:
@@ -516,5 +605,6 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
+- 2026-08-26: /plan-feature round — sliced ROADMAP v0.1's "make authorization claims transactional and revocable" into six dependency-ordered entries (RFC 0003 amendment first, `needs:fable`; then authority transaction, authority revocation, capability wiring, workspace revocation+purge, adversarial invariants). Scouted first via two subagents; load-bearing facts: `crates/authority` is already a durable hard-link consumption ledger with single-claim atomicity, but bundle consumption is three separate claims and both RFC 0003 (:103-120) and the code (v2.rs:747-767) admit partial failure burns earlier claims; NO authority/approval revocation exists anywhere (`revoke_delivery` only removes the outbox file; identity trust revocation is in-memory only); `purge_expired` is never called in product. RFC 0002:339-346/Phase C already mandates the target design, so the amendment pins a protocol rather than opening a new direction. Out of scope, explicitly: 1C0 owner authenticator/session/issuer, opaque grant recipient/content binding, full real-subprocess validator race coverage (sibling v0.1 items, not queued here). Planning only, no code.
 - 2026-08-26: landed source-closure gate v1 for `crates/vault-v2-engine` (the tagged AST-gate item, re-sliced): new `tests/gate.rs` machinery + `tests/ast_gate.rs` config/teeth, dev-dep pins syn `=2.0.118` / proc-macro2 `=1.0.106` (both already in the lock). The real-crate test pins the exact six-file closure and passes; 20 teeth tests prove every rejection fires against fixture crates in tempdirs (orphan, `#[path]`, unadmitted include, unsafe hidden in macro tokens, `macro_rules!`, unsafe/extern outside the boundary, ambiguous/missing/cfg-disabled modules, denied attribute/derive/macro, smuggled `#[path …]` in token trees, raw identifiers, symlinks) plus the positive `FFI_BOUNDARY_FILES` admission path the FFI item will use. Teeth additionally verified by a real-tree mutation: an orphan `src/stray.rs` — invisible to the compiler with all auto-discovery off — failed the gate, and removal restored green. The exactly-two-entry-points proof, five `tests/ui/` fixtures, and macro-definition mutation tests need the engine API to exist, so they became a follow-up `needs:fable` entry ordered after the FFI/profile items, whose entries now carry the FFI_BOUNDARY_FILES/ROOTS coupling instructions. Gate ALL GREEN.
 - 2026-08-23: added table-driven tests in the new `crates/policy/tests/v2_rejection.rs` covering every `PolicyV2Error` variant: `InvalidContext` for nil `session_id`/`idempotency_key` and malformed `audience`/`venture_id`/`subject_id` (empty, untrimmed, >512 chars, control char), plus `MissingPrimaryResource` from `evaluate_prepared` against a `PreparedInvocation` built from a manifest with an empty `resource_bindings` array. No production code changed — this closed a coverage gap only. Reused the signed-manifest fixture pattern from `crates/capability/tests/capability_v2.rs`; added `sovereign-identity` and `serde_json_canonicalizer` as dev-dependencies of `crates/policy` to build it. Teeth verified by two temporary mutations, both caught and both reverted: dropping the `session_id.is_nil()` check, and replacing `MissingPrimaryResource` with a stub default. `cargo test -p sovereign-policy` now runs 5 tests, all passing. Full gate ALL GREEN (gate-self-test, file-size, fmt, clippy(workspace), test(workspace), tsc(frontend)).
