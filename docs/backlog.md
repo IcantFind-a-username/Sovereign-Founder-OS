@@ -368,6 +368,54 @@ repo audit; every entry below points at verified, real state of the code.
   `two_processes_deciding_the_same_delivery_produce_exactly_one_effect`
   passes in `cargo test -p sovereign-cli`.
 
+- [ ] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.**
+  v0.1 "correct stale UI/docs claims" (ROADMAP.md:182). The crate doc claims
+  "Red data never leaves the device" (src/lib.rs:14-16), but `data_class` is
+  caller-declared (:52-60), provider trust is self-reported (:118-123), and
+  the only gate is the Red-with-non-Local skip in `classify` (:215) — nothing
+  verifies either value. ROADMAP.md:86 and rfcs/0004:30-38 name this as the
+  unsafe legacy route that RFC 0004 removes in v0.2; no routing behavior
+  changes in this round. Done when: the module doc states the boundary in one
+  honest paragraph (caller-declared class, self-reported trust, unverified,
+  RFC 0004 target), `grep -n "Red data never leaves" crates/model/src/lib.rs`
+  matches nothing, and a new test
+  `the_gateway_trusts_caller_labels_a_mislabeled_prompt_routes_to_cloud`
+  pins the hole by asserting a prompt whose content is sensitive but whose
+  label is Green is offered a cloud provider — with a doc comment saying that
+  if this test starts failing, the RFC 0004 boundary landed and the test must
+  be inverted, not deleted. `cargo test -p sovereign-model` passes.
+
+- [ ] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.**
+  `model-check` prints "Red data stays local" (main.rs:295), and
+  `draft_assistant` carries a comment that Amber "would never be routed to a
+  cloud provider" (ops.rs:122-123) — false: Amber routes to cloud by design
+  (crates/model/src/lib.rs:376-388) — while `stayed_local` (ops.rs:145) and
+  the literal `"amber"` data class (ops.rs:146,163) are self-reports
+  presented as facts. Reword the output and comments to name self-reporting
+  (for example "provider self-reports Local; labels are not verified"); keep
+  JSON field names unchanged — the frontend reads them and has its own entry
+  below. Done when: `grep -rn "stays local" apps/cli/src` matches nothing
+  unqualified, the ops.rs comment is corrected, and
+  `cargo test -p sovereign-cli` passes.
+
+- [ ] **P2 | `apps/cli/assets/` | Correct the three overstated UI claims (disclosure, vault, approval).**
+  Frontend honesty pass — update the en and zh blocks together (i18n.js
+  holds both): (1) the disclosure wording "whether the data stayed on this
+  machine" (i18n.js:107) and the `stayed_local` badge (app.js:337) must say
+  "as reported by the provider", and the Data-class column (:109) must not
+  imply a derived classification (it renders a hard-coded literal);
+  (2) "local encrypted vault" (:6) and `vault_meta` "encrypted at rest
+  (AES-256-GCM)" (:99) gain the co-located-key caveat the README already
+  states (README.md:213), and `footer_limits` (:130) names it; (3) "the AI
+  can never skip you" (:82) and "only you approve" (:29) become claims the
+  code can back — approval happens on this device in this app, and the
+  current preview does not yet authenticate who clicked (1C0 is the fix,
+  tracked in ROADMAP v0.1). Done when: both language blocks carry the new
+  wording, `grep -n "stayed on this machine\|never skip" apps/cli/assets`
+  matches nothing, `npx -y -p typescript@5.5.4 tsc -p
+  apps/cli/assets/tsconfig.json` is green, and `./scripts/test_changed.sh`
+  prints ALL GREEN.
+
 - [ ] **P2 | `crates/identity/` | Add a public-API integration test boundary.**
   All 12 tests live in `src/tests.rs` and reach private internals; nothing
   validates the crate through `sovereign_identity::…` re-exports. Done when:
@@ -727,6 +775,7 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
+- 2026-08-26: planning round — sliced v0.1's "correct stale UI/docs claims" (the model-gateway portion plus a full sweep) into three entries after a scout pass. Load-bearing facts: `data_class` is caller-declared and provider trust self-reported with zero verification (crates/model/src/lib.rs:52-60, 118-123); the only routing gate is the Red-with-non-Local skip (:215); removing that legacy route is RFC 0004 / v0.2 work, so v0.1's job is stopping the false claims only. Stale claims found: "Red data never leaves the device" (crate doc + `model-check` output + a factually wrong Amber comment in ops.rs), UI disclosure presenting `stayed_local` self-report as fact with a hard-coded "amber" literal, UI vault copy claiming "encrypted at rest" without the co-located-key caveat the README already states, and "the AI can never skip you" while the approve endpoint is unauthenticated (1C0 is the fix). The adversarial `red_data_cannot_reach_cloud_tools…` test proves a *policy-engine* deny, not gateway routing — the new crates/model entry pins the actual hole with a mislabeled-prompt test. README/ARCHITECTURE/ROADMAP were checked and are already honest. Planning only, no code.
 - 2026-08-26: /plan-feature round — sliced ROADMAP v0.1's "process-kill, concurrency, and filesystem-fault tests" into eight dependency-ordered entries (shared `crates/fault-testing` dev crate first; then vault/audit-ledger/effects write-failure injection; execution-journal reconciliation on open; checkpoint-gap double-burn pin; real-subprocess SIGKILL soak; two-process decide race). Scouted via two subagents; load-bearing facts: the whole workspace has ONE thread-race test (authority) and ZERO multi-process tests; no test anywhere injects a failing write (all fs-fault tests are post-hoc corruption or permission checks); `ExecutionJournal::recover` is never called by product code, so Indeterminate records accumulate silently — filed as a product-defect entry, not just a test gap; a kill between outbox write and checkpoint double-burns authority (fail-closed, but unpinned). New lesson recorded in CLAUDE.md: chmod-based write denial is a no-op under root (dev containers and nightly CI run as root) — inject unavailability with the file-where-a-directory-belongs idiom instead. Planning only, no code.
 - 2026-08-26: RFC 0003 Amendment 1 applied — pins the transactional-consumption and revocation protocol for the authority store. Core design: a **deterministic bundle id** (SHA-256 over token/approval/idempotency ids + invocation fingerprint) makes every step idempotent for the owning bundle, so recovery is **roll-forward only** — a crashed consumer retries with the same inputs and completes instead of dying on its own earlier claims, and no release/delete recovery path exists to race against. Commit is a `.committed` marker via the store's existing exclusive-publish primitive (exactly one Authorized per bundle); revocation is durable exclusive-create records checked pre-claim and re-checked at commit (the serialization point), with a three-way outcome (`Revoked`/`AlreadyRevoked`/`RevokedAfterConsumption`) and corrupt-record-fails-closed. Accepted cost stated in the amendment: a partial bundle whose token expires leaves the still-valid approval denied until its own expiry (fail-closed, matches today; fix is a fresh approval, never claim takeover). Conformance test names for all four implementation entries are pinned in part (e); the two authority entries now point at them. RFC 0002's Authorization-and-Replay and Phase C sections cross-reference the amendment. Docs-only, no code. Gate ALL GREEN.
 - 2026-08-26: /plan-feature round — sliced ROADMAP v0.1's "make authorization claims transactional and revocable" into six dependency-ordered entries (RFC 0003 amendment first, `needs:fable`; then authority transaction, authority revocation, capability wiring, workspace revocation+purge, adversarial invariants). Scouted first via two subagents; load-bearing facts: `crates/authority` is already a durable hard-link consumption ledger with single-claim atomicity, but bundle consumption is three separate claims and both RFC 0003 (:103-120) and the code (v2.rs:747-767) admit partial failure burns earlier claims; NO authority/approval revocation exists anywhere (`revoke_delivery` only removes the outbox file; identity trust revocation is in-memory only); `purge_expired` is never called in product. RFC 0002:339-346/Phase C already mandates the target design, so the amendment pins a protocol rather than opening a new direction. Out of scope, explicitly: 1C0 owner authenticator/session/issuer, opaque grant recipient/content binding, full real-subprocess validator race coverage (sibling v0.1 items, not queued here). Planning only, no code.
