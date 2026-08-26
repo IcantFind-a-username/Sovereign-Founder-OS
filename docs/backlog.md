@@ -301,7 +301,7 @@ repo audit; every entry below points at verified, real state of the code.
   `--virtual` green on Linux, both runner self-tests pass, and
   `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [ ] **P2 | `crates/capability/`, `crates/authority/`, `docs/` | Verify owner-session plan Task 2 (approval retention) already landed and reconcile its test names.**
+- [ ] **P2 | `crates/capability/`, `crates/authority/`, `docs/` | Verify owner-session plan Task 2 (approval retention) already landed and reconcile its test names.** IN PROGRESS (2026-08-26)
   RFC 0002's Authorization-and-Replay current-state text and RFC 0003's
   "Replay and Durability" both state approval claims already retain the
   signed approval's own expiry, with exactly the coverage plan Task 2
