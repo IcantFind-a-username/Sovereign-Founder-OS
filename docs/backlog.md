@@ -184,7 +184,7 @@ repo audit; every entry below points at verified, real state of the code.
   all five parts, the honesty text at :103-120 points to it, RFC 0002's
   Phase C cross-references it, and no code lands in the round.
 
-- [ ] **P1 | `crates/authority/` | Make bundle consumption one recoverable transaction.**
+- [ ] **P1 | `crates/authority/` | Make bundle consumption one recoverable transaction.** IN PROGRESS (2026-08-26)
   Scope note (2026-08-26): this transactionalizes the CURRENT filesystem
   store for the v0.1 legacy product path. The owner-session fixture program
   (plan 2026-08-14, Task 10) later moves the authority plane into a
