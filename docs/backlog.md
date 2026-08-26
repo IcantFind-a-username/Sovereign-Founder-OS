@@ -277,7 +277,7 @@ repo audit; every entry below points at verified, real state of the code.
   broker/redb store for the fixture program — both stand, different stores,
   different release gates.
 
-- [ ] **P1 | `rfcs/`, `scripts/`, `docs/` | Author RFC 0006 and the owner-effect test-manifest contract (owner-session plan Task 1).** `needs:fable`
+- [ ] **P1 | `rfcs/`, `scripts/`, `docs/` | Author RFC 0006 and the owner-effect test-manifest contract (owner-session plan Task 1).** `needs:fable` IN PROGRESS (2026-08-26)
   First implementation step of the owner-session/exact-effect program — the
   fixture-only contract every later task consumes. Follow
   `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md`
