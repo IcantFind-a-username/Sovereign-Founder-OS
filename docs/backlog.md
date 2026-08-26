@@ -519,6 +519,61 @@ repo audit; every entry below points at verified, real state of the code.
   `two_processes_deciding_the_same_delivery_produce_exactly_one_effect`
   passes in `cargo test -p sovereign-cli`.
 
+- [ ] **P2 | `rfcs/`, `THREAT_MODEL.md` | Design the audit-ledger freshness anchor and its governed home (rollback-anchoring v0.1 slice).** `needs:fable`
+  The last un-queued v0.1 remaining-work block (ROADMAP.md:187-188, "upgrade
+  audit/effect ordering and rollback anchoring"). Scouted 2026-08-26: the
+  audit/effect **ordering** half is already fully queued (append-injection,
+  journal recover-on-open, checkpoint double-burn); the un-queued half is
+  **rollback anchoring**, and only its non-deferred slice —
+  workspace-relative freshness / old-prefix restore rejection
+  (THREAT_MODEL.md:258 Verification Requirement, T10:254 Target; RFC 0005 also
+  names "workspace-relative freshness" as a Target mitigation). Today
+  `crates/audit-ledger` has no sequence numbers and no persisted head:
+  `verify_chain` proves internal consistency + device binding only, so an
+  attacker who swaps `ledger.json` for an older, validly-signed **prefix**
+  passes it (THREAT_MODEL.md:36). Governance requires an RFC for
+  persistent-state/security changes (ROADMAP.md:508-511), and adding a field
+  to the signed `AuditEventBody` would invalidate every existing chain
+  (lesson 3), so the design must be recorded, not improvised. The round must
+  decide and pin: (1) the governed home — new RFC vs. an RFC 0005 amendment vs.
+  a THREAT_MODEL-recorded v0.1 mechanism (record why); (2) the anchor shape —
+  strongly prefer a **separately stored, device-signed head commitment** over
+  `{event_count, last_event_hash, workspace_id}` that does NOT change the
+  signed `AuditEventBody` wire shape; (3) the open-time freshness check
+  (recompute head, reject a regressed count / a non-anchored head / a strict
+  older prefix); (4) the exact meaning of "protected device state survives" —
+  the honest v0.1 claim is detection of a ledger reverted while its anchor did
+  not, and the design MUST state plainly it does NOT defend a directory-writer
+  who rewrites both anchor and ledger (that is whole-device rollback, T10:195,
+  Research-deferred and out of scope); (5) the threat-model delta and the
+  explicit non-claim; (6) re-slice implementation into the two untagged
+  entries below. Done when: the design lands in the governed place, the
+  entries are queued, and no code lands in the round.
+
+- [ ] **P2 | `crates/audit-ledger/` | Persist and verify a device-signed ledger head anchor.**
+  Blocked until the freshness-anchor design above is checked off; implement
+  exactly its shape — an ambiguity found mid-round is a diagnosis for the
+  queue, not a license to improvise. Write the signed head anchor alongside
+  the ledger on `save`, and add a `verify_freshness` that recomputes the head
+  and rejects a rewind. Not the same as the queued append-injection entry
+  (that survives a failed write; this detects a rewind). Done when: named
+  tests cover an old-prefix ledger rejected against a current anchor, a forked
+  chain rejected, a matching head accepted, and a missing anchor over a
+  non-empty ledger failing closed; `cargo test -p sovereign-audit-ledger`
+  passes; and the signed shape of `AuditEventBody` is unchanged (verify the
+  existing `crates/contracts` golden-shape tests still pass).
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Reject an old-prefix ledger restore at workspace open.**
+  Blocked on the audit-ledger anchor entry above. Wire the freshness check
+  into workspace open (or `integrity_check`, reporting.rs) so a reverted
+  ledger is refused with a clear error, never a silent pass. Done when: a test
+  seeds a workspace, captures the anchor, appends more events, restores the
+  earlier ledger while the anchor is current, and asserts open/integrity fails
+  closed; a second test documents the honest boundary — a whole-directory
+  rollback that reverts anchor and ledger together is NOT detected (named so
+  its intent is unmistakable, citing the Research-deferred whole-device
+  rollback limit); and `cargo test -p sovereign-cli` passes.
+
 - [ ] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.**
   v0.1 "correct stale UI/docs claims" (ROADMAP.md:182). The crate doc claims
   "Red data never leaves the device" (src/lib.rs:14-16), but `data_class` is
@@ -928,6 +983,7 @@ repo audit; every entry below points at verified, real state of the code.
 - 2026-08-26: decided RFC 0005's status question via the item's second exit: status **stays `Draft`** (governance allows no intermediate status, and `Accepted` would misstate the evidence — no independent review exists; the cross-validation doc is a maintainer research note that disclaims being a third-party audit, and no recorded maintainer acceptance exists). Added a "Design status and acceptance gates" section right after the header: links the three evidences that DO exist (threat-model delta → RFC threat-model section + THREAT_MODEL T10; adversarial test plan → required-tests section; migration/rollback analysis → legacy-migration + rollback sections), names the two outstanding gates (independent review, recorded maintainer acceptance), and pins what `Draft` licenses (Program 1A non-product engine only) vs. withholds until `Accepted` (1B0 mechanics, enrollment, migration, v2 selection, product dependency edge, any protection claim). Accepting the RFC is now an explicit owner action with a checklist, not a queue item. Docs-only, gate ALL GREEN.
 - 2026-08-26: added `crates/identity/tests/public_api.rs` (17 tests) exercising the key lifecycle through `sovereign_identity::` re-exports only: device save/load round-trip, device-id-from-public-key derivation, legacy sign/verify + tamper rejection, deterministic `from_secret_bytes`, and the full `RoleTrustStore` verify lifecycle (trusted verify exposing the bound payload, tamper, unknown key, issuer mismatch, validity-window boundaries with exclusive upper bound, revoke/restore, duplicate key, inverted-interval rejection). Two security properties pinned at the public boundary: role-domain separation (an AuthorityRole signature is `UnknownKeyId` under an ApprovalRole store built from the same 32 secret bytes, and verifies under the correct role's store) and the device→audit-signer bridge preserving the device-id binding. Added `tempfile` as an identity dev-dependency. No production code changed — coverage-only. `cargo test -p sovereign-identity` and the full gate are ALL GREEN.
 - 2026-08-26: verified owner-session plan Task 2 is already satisfied — no code needed. All three exact test names the plan demands already exist and pass: `durable_approval_survives_token_expiry_purge_until_approval_expiry` and `expired_approval_purges_at_approval_expiry` (crates/capability/tests/approval_v2.rs:555,609) and `purge_uses_each_claim_kind_expiry` (crates/authority/src/lib.rs:389). The durable approval claim already retains the approval's own expiry, and `purge_expired` uses each claim kind's expiry independently — the exact semantics Task 2 specifies, landed in the 2026-08-15 missing-key round before this plan was written. Ran the three tests green with plain `cargo test` (the plan's TSV runners do not exist until Task 1). Ticked Task 2's five checkboxes in the plan with a VERIFIED-ALREADY-LANDED note. No production change.
+- 2026-08-26: /plan-feature round — decomposed the last un-queued v0.1 remaining-work block, "upgrade audit/effect ordering and rollback anchoring", after a focused scout. Finding: the **ordering** half is already fully queued (append-injection, journal recover-on-open, checkpoint double-burn) — decomposing it would double-queue, so left alone. The un-queued half is **rollback anchoring**, and only its non-deferred slice: workspace-relative freshness / old-prefix restore rejection (THREAT_MODEL:258/T10 Target; RFC 0005 names it too). Root fact: the audit ledger has no sequence numbers and no persisted head, so an older validly-signed prefix passes `verify_chain` (proves internal consistency + device binding only). Queued 3 dependency-ordered entries: a `needs:fable` design item (decide governed home; pin a separately-stored device-signed head commitment that does NOT touch the signed `AuditEventBody` wire shape per lesson 3; define "protected device state survives"; state the whole-device-rollback non-claim, which stays Research-deferred) and two untagged implementation entries (audit-ledger anchor + verify; workspace open-time rejection with an honest whole-directory-rollback boundary test). This block was the last un-queued v0.1 functional area — with it decomposed, v0.1 remaining work is fully represented in the queue. Planning only, no code.
 - 2026-08-26: authored RFC 0006 (synthetic owner-session / exact-effect fixture) and its RED-first freeze gate `scripts/check-owner-effect-rfc.sh` — plan Task 1's judgment-dense half. The RFC freezes all 23 Global Constraints (G1-G23), the honest security boundary, and the change-control rule, at Fixture maturity with no product claim. The gate (bash 3.2, EXIT-trap marker, zero-inputs-fails, grep -F fixed strings per lesson 8) requires 34 load-bearing anchors present and five affirmative-activation phrases absent; RED confirmed (`missing rfcs/0006-...` before the RFC), GREEN after, teeth verified by two mutations (drop a required anchor, inject `production-ready`), both caught and reverted. `docs/INDEX.md` links the RFC. Re-sliced the mechanical remainder of Task 1 (TSV + two runners + self-tests; origin preflight harness + mechanism-matrix doc) into two untagged nightly entries rather than typing it here. ROADMAP edit held as an owner diff (governance). Ticked the plan's Task 1 RFC/gate progress with a PARTIALLY-LANDED note. Gate ALL GREEN.
 - 2026-08-26: closed the 1C0 design item by reconciliation. The design already exists: `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md` is a complete 16-task fixture-v1 plan whose Task 1 authors **RFC 0006** as the fixture-only governed contract — so the round's job became absorb-not-fork. Queued Task 1 (`needs:fable`, with two recorded deviations: ROADMAP edit goes to the owner as a diff; 2-3 commits allowed) and a Task 2 verification entry (RFC 0002/0003 current-state text says approval retention already landed — confirm and reconcile the plan's exact test names, else release with a diagnosis). Tasks 3-16 enter the queue one at a time as predecessors land. Conflict check done and recorded: RFC 0003 Amendment 1 (filesystem-store bundle transaction, v0.1 legacy path) vs plan Task 10 (broker/redb authority plane, fixture program) — both stand, different stores and gates; a scope note on the authority transaction entry says so. Flagged to the owner (not edited): ROADMAP v0.1 remaining-work wording "deliver 1C0's admitted owner authenticator" vs the plan's explicit not-1C0/no-admission scope is a real tension only the owner can resolve (reword v0.1, or accept mechanism-proof as the v0.1 deliverable). No code landed.
 - 2026-08-26: planning round — scoped v0.1's 1C0 block after two scout passes. Load-bearing facts: any local process can obtain a signed owner approval with one unauthenticated POST (ui.rs:4-6 documents "no authentication" as policy; kernel_exec.rs:331 mints `owner_approval_key` for any workspace-directory reader); there is no session/cookie/nonce and ZERO HTTP-layer tests; 1C0 requirements are scattered across five docs with no mechanism-level design anywhere (WebAuthn/passkey is the only named mechanism, Target); an owner-session v1 plan (2026-08-14, synthetic-fixture, explicitly not 1C0) and a `feature/owner-session-exact-effect` branch already exist and must be reconciled, not forked. Queued two entries: the 1C0 mechanism-design item (`needs:fable`, P1 — consolidate, decide the governed place, re-slice implementation) and an untagged HTTP test-boundary item pinning today's posture (including the unauthenticated-approve hole as a named 1c0-pin test). Implementation slicing deliberately deferred until the design round lands. Planning only, no code.
