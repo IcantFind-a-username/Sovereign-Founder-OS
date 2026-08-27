@@ -1,42 +1,51 @@
-# Trademark Policy
+# Trademark and Source-Identification Policy
 
-## Protected Marks
+This policy helps readers distinguish the official Sovereign Founder OS
+project from forks, derivatives, and unrelated products. It does not change or
+withdraw permissions granted by the Apache License, Version 2.0.
 
-The following names and phrases are trademarks of the Sovereign Founder OS project:
+## Project Identifiers
+
+The project uses the following names as source identifiers:
 
 - **Sovereign Founder OS**
 - **Sovereign Runtime**
-- **Mutually Constrained Autonomy** (as used in this project's security architecture)
-- **Agent Security Gauntlet** (as used in this project's benchmark suite)
+- **Mutually Constrained Autonomy**, when identifying this project's security
+  architecture
+- **Agent Security Gauntlet**, when identifying this project's benchmark work
+- associated project logos, when published
 
-Associated logos and visual identity, when published, are also protected.
+No registration is claimed. Whether and to what extent a name is legally
+protectable depends on actual use and applicable law.
 
-## Permitted Uses
+## Permitted References
 
-You may use the project name to:
+You may truthfully:
 
-- Refer to the project in truthful, non-misleading descriptions
-- Indicate that your software is based on or compatible with Sovereign Founder OS
-- Link to the official repository: https://github.com/IcantFind-a-username/Sovereign-Founder-OS
+- refer to the official project and link to its repository;
+- describe software as based on, forked from, or compatible with the project;
+- retain notices and historical references required by the Apache-2.0 license;
+- make nominative references that do not imply endorsement or official status.
 
-## Prohibited Uses
+## Avoiding Confusion
 
-You may not:
+Do not use a project identifier in a way likely to mislead readers into
+believing that an independent project, release, service, or organization is
+officially produced, sponsored, approved, or supported by this project.
 
-- Use the marks in a way that implies official endorsement, sponsorship, or affiliation without written permission
-- Use the marks as part of your own product name in a confusingly similar manner
-- Remove or alter copyright, license, or attribution notices from project materials
-- Claim ownership of the project's architecture documents, threat models, or design specifications
+An independent fork should use a distinct primary name, state that it is
+independent, identify the upstream project truthfully, and avoid presenting
+modified logos or release artifacts as official. For example, "Acme Runtime,
+based on Sovereign Founder OS" clearly separates source from product name.
 
-## Forks and Derivatives
+## Copyright and Attribution Are Separate
 
-Forks and derivative works must:
-
-- Clearly state they are independent from the official project
-- Not use the official marks in their project name
-- Retain Apache 2.0 license and attribution requirements
-- Use a distinct name (e.g., "Acme Runtime based on Sovereign Founder OS")
+This policy cannot be used to prohibit copying, modification, or distribution
+that Apache-2.0 permits. Copyright, license, and NOTICE obligations are governed
+by [LICENSE](LICENSE) and [NOTICE](NOTICE). Repository chronology is documented
+in [PROVENANCE.md](PROVENANCE.md).
 
 ## Questions
 
-For trademark permission requests, open an issue in the official repository.
+For a proposed use that may imply official endorsement, open an issue in the
+official repository before publication.

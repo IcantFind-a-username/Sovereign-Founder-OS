@@ -28,9 +28,8 @@ Include:
 
 | Version | Supported |
 | --- | --- |
-| Latest release | Yes |
-| Previous minor | Security fixes only |
-| Pre-Alpha / main branch | Best effort |
+| Published product release | None yet |
+| Developer Preview / main branch | Best effort |
 
 ## Security Requirements for Contributors
 
@@ -54,14 +53,16 @@ Changes to these paths require dual review once the team grows beyond one mainta
 
 ## Supply Chain Security
 
-Releases include:
+Future SemVer product releases must satisfy the checksums, dependency-scoped
+SBOM, signature, build-provenance, source-reference, and verification gates in
+[GOVERNANCE.md](GOVERNANCE.md) before publication. Those are release gates, not
+claims about the current branch.
 
-- SHA-256 checksums
-- SBOM (Software Bill of Materials)
-- Signed binaries and containers (Sigstore)
-- Build provenance (SLSA-aligned)
-- Source commit reference
-- Reproducible build instructions
+Provenance snapshots are a separate source/history evidence class. A completed
+snapshot will state its exact asset and signature scope in its manifest and
+verification guide. Until a signed snapshot is published, CI output is an
+unsigned dry run and must not be described as release evidence or security
+certification. See [PROVENANCE.md](PROVENANCE.md).
 
 ## Security Testing
 
