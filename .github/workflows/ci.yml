@@ -12,7 +12,17 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test provenance validators
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Validate provenance records
+        run: python3 scripts/validate-provenance.py
+      - name: Validate citation metadata schema
+        uses: citation-file-format/cffconvert-github-action@4cf11baa70a673bfdf9dad0acc7ee33b3f4b6084 # 2.0.0
+        with:
+          args: "--validate"
+      - name: Lint GitHub Actions workflows
+        run: ./scripts/check-workflows.sh
       - uses: dtolnay/rust-toolchain@1a3a6d54512beeaffd394f8d516ca16f2c506a20 # 1.97.0
         with:
           components: rustfmt, clippy
@@ -33,7 +43,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Type-check the zero-dependency frontend: JSDoc types + `tsc --checkJs`
       # (configured in apps/cli/assets/tsconfig.json). Check-only — noEmit, so
       # nothing produced here ever reaches the shipped binary. The TypeScript
@@ -52,7 +62,7 @@ jobs:
       checks: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Audit Rust dependencies
@@ -72,7 +82,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Review dependency changes
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
         with:

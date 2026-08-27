@@ -11,12 +11,14 @@ abstract: >-
   An early-stage, open-source, local-first AI operating system for
   founder-controlled business workflows, backed by a Rust runtime for
   policy-enforced execution, scoped capabilities, sandboxing, auditability,
-  and recovery.
+  and recovery. Repository chronology and the maintainer's authorship
+  representation are documented in PROVENANCE.md.
 keywords:
   - agentic AI
   - AI security
   - capability-based security
   - local-first software
+  - software provenance
   - Rust
 repository-code: https://github.com/IcantFind-a-username/Sovereign-Founder-OS
 url: https://github.com/IcantFind-a-username/Sovereign-Founder-OS

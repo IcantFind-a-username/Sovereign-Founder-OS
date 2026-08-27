@@ -1,0 +1,100 @@
+name: Provenance Evidence Dry Run
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "CITATION.cff"
+      - "PROVENANCE.md"
+      - "Cargo.lock"
+      - "docs/release/**"
+      - "scripts/**"
+      - ".github/workflows/provenance-dry-run.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Test evidence tooling
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Materialize the explicit event ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA:0:12}"
+          git check-ref-format "$GITHUB_REF"
+          if git show-ref --verify --quiet "$GITHUB_REF"; then
+            test "$(git rev-parse "$GITHUB_REF^{commit}")" = "$GITHUB_SHA"
+          else
+            git update-ref "$GITHUB_REF" "$GITHUB_SHA"
+          fi
+          echo "EVIDENCE_REF=$GITHUB_REF" >> "$GITHUB_ENV"
+          echo "SNAPSHOT_ID=provenance-dry-run-$short_sha" >> "$GITHUB_ENV"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/provenance-evidence" >> "$GITHUB_ENV"
+          echo "CARGO_LOCK_PATH=$RUNNER_TEMP/provenance-material/Cargo.lock" >> "$GITHUB_ENV"
+          echo "SBOM_PATH=$RUNNER_TEMP/provenance-sbom.spdx.json" >> "$GITHUB_ENV"
+      - name: Build deterministic Git evidence
+        run: |
+          python3 scripts/build-provenance-evidence.py \
+            --repository . \
+            --ref "$EVIDENCE_REF" \
+            --snapshot-id "$SNAPSHOT_ID" \
+            --output-dir "$EVIDENCE_DIR" \
+            --mode dry-run \
+            --repository-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --workflow-ref "$GITHUB_WORKFLOW_REF" \
+            --workflow-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Materialize the recorded Cargo.lock blob
+        run: |
+          python3 scripts/materialize-provenance-cargo-lock.py \
+            --repository . \
+            --metadata "$EVIDENCE_DIR/build-metadata.json" \
+            --output "$CARGO_LOCK_PATH"
+      - name: Generate Cargo.lock SBOM with digest-pinned Syft
+        run: ./scripts/generate-provenance-sbom.sh "$CARGO_LOCK_PATH" "$SBOM_PATH"
+      - name: Finalize and verify unsigned evidence
+        run: |
+          python3 scripts/finalize-provenance-evidence.py \
+            --evidence-dir "$EVIDENCE_DIR" \
+            --sbom "$SBOM_PATH" \
+            --sbom-generator syft \
+            --sbom-generator-version 1.51.0 \
+            --sbom-generator-source sha256:2a2e837a2c8d59ec9af5472ee22d3b04ee463c4e44476ecf993fd1e5ab6ebc7f
+          python3 scripts/verify-provenance-evidence.py \
+            --evidence-dir "$EVIDENCE_DIR"
+      - name: Upload unsigned dry-run artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: UNSIGNED-DRY-RUN-${{ github.sha }}
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 14
+
+  attest-manual-dry-run:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: evidence
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Download unsigned dry-run artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: UNSIGNED-DRY-RUN-${{ github.sha }}
+          path: evidence
+      - name: Attest each dry-run evidence file
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: evidence/*

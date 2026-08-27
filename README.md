@@ -114,6 +114,14 @@ Read the **[Sovereign Founder OS Manifesto →](MANIFESTO.md)** for the principl
 
 Specialist designs, product drafts, positioning, and historical documents live under [`docs/`](docs/INDEX.md). They provide context; the core documents and accepted RFCs are authoritative when material conflicts.
 
+### Provenance and Design Chronology
+
+The [project provenance record](PROVENANCE.md) identifies exact commits, trees,
+and paths containing the project's documented core concepts and states Franz
+Xu's maintainership declaration. It makes chronology and attribution claims
+testable; it is not an independent finding of originality and does not claim
+exclusive rights over abstract ideas.
+
 ## Tech Stack (Planned)
 
 | Layer | Technology |
@@ -233,9 +241,13 @@ Report security issues via [SECURITY.md](SECURITY.md) — do not open public iss
 
 - **Code and documentation:** [Apache License 2.0](LICENSE)
 - **Attribution:** [NOTICE](NOTICE)
-- **Trademarks:** [TRADEMARK.md](TRADEMARK.md) — "Sovereign Founder OS" and related marks are protected
+- **Design chronology:** [PROVENANCE.md](PROVENANCE.md)
+- **Source identification:** [TRADEMARK.md](TRADEMARK.md)
 
-You are free to use, modify, and distribute this project under Apache 2.0 terms. Forks must retain license and attribution notices. Trademark use requires compliance with our trademark policy.
+You are free to use, modify, and distribute this project under Apache 2.0
+terms. Forks must retain notices required by that license. The trademark policy
+addresses confusing source or endorsement claims and does not withdraw those
+copyright permissions.
 
 ## Links
 
