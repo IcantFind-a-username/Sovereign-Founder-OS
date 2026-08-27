@@ -10,8 +10,10 @@
 //! - the parent sends the module bytes together with their expected digest;
 //!   the worker rehashes before compiling, so a byte substitution in transit
 //!   is detected as substitution, not treated as a cache miss;
-//! - on Unix the worker runs under an address-space rlimit, so a
-//!   compile-time memory blow-up kills the worker, not the parent;
+//! - where the platform can enforce it, the worker runs under an
+//!   address-space rlimit, so a compile-time memory blow-up kills the worker
+//!   rather than the parent. Darwin cannot: see [`AddressSpaceEnforcement`].
+//!   Containment in a separate process holds on both; the *cap* does not;
 //! - the parent enforces a wall-clock deadline and kills the worker if it is
 //!   exceeded; a crashed, killed, non-zero, or malformed worker fails closed.
 //!
@@ -45,6 +47,38 @@ pub struct CompileWorker {
     timeout: Duration,
 }
 
+/// What the running platform can actually enforce on the worker's address
+/// space. Reported rather than assumed, because a ceiling that is silently
+/// not applied is worse than no ceiling: it invites claims the system cannot
+/// back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressSpaceEnforcement {
+    /// The worker runs under a hard `RLIMIT_AS` of this many bytes; exceeding
+    /// it kills the worker, not the parent.
+    Enforced(u64),
+    /// This platform has no settable per-process address-space ceiling. The
+    /// worker is bounded only by the parent's wall-clock deadline and kill,
+    /// and by process isolation — a compile-time memory blow-up is contained
+    /// in the child but is not capped.
+    Unavailable,
+}
+
+/// Whether `setrlimit(RLIMIT_AS, …)` can be applied to the worker at all.
+///
+/// Darwin aliases `RLIMIT_AS` onto `RLIMIT_RSS` and its kernel rejects every
+/// finite value with `EINVAL` (verified on macOS 26.5.2 arm64: any
+/// `ulimit -v`/`-m`/`-d` returns "Invalid argument"). Because the call is made
+/// from `pre_exec`, that error aborts the child *before* `exec`, so `spawn`
+/// fails and no artifact can be compiled at all. Skipping the call there is
+/// therefore not a relaxation of an enforceable limit — the limit was never
+/// enforceable on that platform, and pretending otherwise cost the whole
+/// worker path. `address_space_enforcement` reports which case applies so the
+/// difference stays visible instead of being assumed.
+#[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+const ADDRESS_SPACE_LIMIT_SETTABLE: bool = true;
+#[cfg(not(all(unix, not(any(target_os = "macos", target_os = "ios")))))]
+const ADDRESS_SPACE_LIMIT_SETTABLE: bool = false;
+
 impl CompileWorker {
     /// A worker launched as `program args...`. The invoked program must read a
     /// compile request on stdin and write the serialized module to stdout via
@@ -66,6 +100,17 @@ impl CompileWorker {
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
+    }
+
+    /// What this build will actually apply to the worker's address space.
+    /// Callers that report on isolation must use this rather than assume the
+    /// configured ceiling took effect.
+    pub fn address_space_enforcement(&self) -> AddressSpaceEnforcement {
+        if ADDRESS_SPACE_LIMIT_SETTABLE {
+            AddressSpaceEnforcement::Enforced(self.address_space_limit_bytes)
+        } else {
+            AddressSpaceEnforcement::Unavailable
+        }
     }
 
     /// Compile `bytes` in the worker and deserialize the result with `engine`.
@@ -169,6 +214,11 @@ impl CompileWorker {
     #[cfg(unix)]
     fn apply_rlimit(&self, command: &mut Command) {
         use std::os::unix::process::CommandExt;
+        // Nothing to install where the limit is not settable: a `pre_exec`
+        // hook that always fails is a broken worker, not a stricter one.
+        if !ADDRESS_SPACE_LIMIT_SETTABLE {
+            return;
+        }
         let limit = self.address_space_limit_bytes;
         // SAFETY: pre_exec runs in the forked child before exec; setrlimit is
         // async-signal-safe and touches only the child's own limits.
@@ -284,6 +334,48 @@ mod tests {
         let mut out2 = Vec::new();
         assert_eq!(run_compile_worker(Cursor::new(input), &mut out2), 5);
         assert!(out2.is_empty());
+    }
+
+    /// The worker child must actually reach `exec` on this platform.
+    ///
+    /// This is not a nicety: `Vm::compile` has no in-process fallback once a
+    /// worker is attached, so a worker that cannot start turns every cache
+    /// miss into a failure. It is also invisible from the outside — a failed
+    /// spawn surfaces as `CompileWorkerFailed`, the same variant a *contained*
+    /// hostile compilation produces, so a broken worker reads as a working
+    /// one. That is exactly what a too-aggressive `pre_exec` limit caused on
+    /// macOS (see `apply_rlimit`).
+    #[cfg(unix)]
+    #[test]
+    fn the_worker_child_reaches_exec_under_the_platform_address_space_policy() {
+        let engine = Engine::new(&compile_engine_config()).unwrap();
+        let module = valid_module();
+
+        let stand_in = CompileWorker::new("/bin/echo", vec!["not-a-module".into()]);
+        if let Err(SandboxError::CompileWorkerFailed(detail)) = stand_in.compile(&engine, &module) {
+            assert!(
+                !detail.starts_with("spawn:"),
+                "the worker process never started, so nothing is compiled in it \
+                 and every compile fails closed for the wrong reason: {detail}"
+            );
+        }
+    }
+
+    /// Whatever this platform can enforce, it must say so rather than imply a
+    /// ceiling it does not apply.
+    #[test]
+    fn the_address_space_ceiling_is_reported_honestly_for_this_platform() {
+        let worker = CompileWorker::new("/bin/true", vec![]);
+        #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios"))))]
+        assert_eq!(
+            worker.address_space_enforcement(),
+            AddressSpaceEnforcement::Enforced(1024 * 1024 * 1024)
+        );
+        #[cfg(any(target_os = "macos", target_os = "ios", not(unix)))]
+        assert_eq!(
+            worker.address_space_enforcement(),
+            AddressSpaceEnforcement::Unavailable
+        );
     }
 
     // Parent-side fail-closed plumbing, using stand-in programs so no real

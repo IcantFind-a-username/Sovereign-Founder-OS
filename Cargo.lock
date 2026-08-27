@@ -1398,6 +1398,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.18",
  "uuid",
@@ -1502,6 +1503,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror 2.0.18",
 ]
 
@@ -1521,8 +1523,10 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "serde_json_canonicalizer",
  "sovereign-artifact",
  "sovereign-contracts",
+ "sovereign-identity",
  "thiserror 2.0.18",
  "uuid",
 ]
@@ -1561,6 +1565,15 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "sovereign-vault-v2-engine"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "syn",
+ "tempfile",
 ]
 
 [[package]]

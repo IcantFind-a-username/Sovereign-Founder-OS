@@ -18,7 +18,7 @@ use sovereign_policy::PolicyAuthorizationV2;
 use thiserror::Error;
 use uuid::Uuid;
 
-pub use compile_worker::{run_compile_worker, CompileWorker};
+pub use compile_worker::{run_compile_worker, AddressSpaceEnforcement, CompileWorker};
 pub use compiled_cache::{CompiledCache, COMPILED_CACHE_ENGINE_IDENTITY};
 pub use wasm::{WasmExecutionResult, WasmSandbox, WasmSandboxLimits, DEFAULT_ENTRYPOINT};
 

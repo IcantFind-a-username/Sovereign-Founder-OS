@@ -364,6 +364,9 @@ Any future RFC 0002 exact-effect profile amendment starts from this Current
 approval-retention fact. It must not plan to fix retention again; its remaining
 authorization work is the one-transaction reservation, revocation, complete
 race/restart evidence, exact effect binding, and owner-authority integration.
+RFC 0003 Amendment 1 (2026-08-26) pins the one-transaction reservation and
+revocation protocol for the current filesystem store; the other three items
+remain unpinned.
 
 Production time comes from a trusted runtime clock. An untrusted caller cannot provide the validation timestamp.
 
@@ -479,7 +482,8 @@ pass.
 
 ### Phase C — Durable Authorization and Evidence
 
-- Transactional Authority Store with revocation and cross-process replay defense.
+- Transactional Authority Store with revocation and cross-process replay
+  defense (protocol pinned by RFC 0003 Amendment 1).
 - Crash-safe audit intent/result ordering.
 - Execution receipts and stable error taxonomy.
 

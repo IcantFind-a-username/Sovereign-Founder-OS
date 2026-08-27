@@ -1,0 +1,39 @@
+[package]
+name = "sovereign-vault-v2-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Never published: this crate will own the process that holds raw key material.
+publish = false
+# Every target is declared below. Auto-discovery is off so a file dropped into
+# src/bin or tests/ cannot silently become part of the FFI boundary that the
+# AST gate (a later queued item) is supposed to enumerate exhaustively.
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+build = "build.rs"
+
+[lib]
+name = "sovereign_vault_v2_engine"
+path = "src/lib.rs"
+
+[[test]]
+name = "build_gate"
+path = "tests/build_gate.rs"
+
+[[test]]
+name = "ast_gate"
+path = "tests/ast_gate.rs"
+
+[dependencies]
+
+[dev-dependencies]
+# Exact pins per the Program 1A plan: the source-closure gate classifies
+# tokens through these crates, so their versions are part of the reviewed
+# gate, not a floating detail. Both match the workspace lock.
+syn = { version = "=2.0.118", default-features = false, features = ["full", "parsing", "visit"] }
+proc-macro2 = { version = "=1.0.106", default-features = false }
+tempfile = "3"
