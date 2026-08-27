@@ -1,19 +1,24 @@
 Sovereign Founder OS
-Copyright 2026 The Sovereign Founder OS Authors
+Copyright 2026 Franz Xu
 
 This product includes software developed as part of the Sovereign Founder OS
 open source project (https://github.com/IcantFind-a-username/Sovereign-Founder-OS).
 
-The project documentation, architecture specifications, threat models, and
-design materials in this repository are original works of the project authors
-and are licensed under the Apache License, Version 2.0.
+Franz Xu declares that he is the original project author and current
+maintainer of the project-authored materials introduced in the initial
+repository history. The scope, chronology, and limits of that declaration are
+recorded in PROVENANCE.md. This declaration is not an independent legal
+finding and does not assign future contributors' rights to Franz Xu.
+
+Project-authored code and documentation are licensed under the Apache License,
+Version 2.0. Copyright notices and third-party attribution for later
+contributions remain with their respective authors and sources.
 
 Trademark Notice
 ----------------
-"Sovereign Founder OS", "Sovereign Runtime", "Mutually Constrained
-Autonomy", and associated logos are trademarks of the Sovereign Founder OS
-project. Use of these marks requires compliance with the project's trademark
-policy (see TRADEMARK.md).
+Project names and source identifiers are addressed by the project's trademark
+policy (see TRADEMARK.md). The policy prevents misleading source or endorsement
+claims; it does not narrow the Apache-2.0 permissions for copyrighted material.
 
 Third-Party References
 ----------------------

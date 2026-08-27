@@ -32,16 +32,31 @@ Require RFC process (see [CONTRIBUTING.md](CONTRIBUTING.md)):
 - Security advisories coordinated through [SECURITY.md](SECURITY.md) process
 - No security fixes behind paywalls
 
-## Release Process
+## Publication Classes
 
-1. All tests and security scans pass
-2. SBOM and provenance generated
-3. Binaries and containers signed
-4. CHANGELOG updated
-5. Git tag with semantic version
-6. GitHub Release with checksums and verification instructions
+### SemVer product releases
 
-Pre-Alpha releases use `0.x.y` versioning.
+Product releases use semantic versions and ship supported product artifacts.
+Their release gate remains unmet until an implementation enforces all tests and
+security scans, changelog review, checksums, dependency-scoped SBOMs, signed
+artifacts, build provenance, and verification instructions. Pre-Alpha product
+versions will use `0.x.y`; a workspace package version is not by itself a
+published release.
+
+Automatic `v*` publication is disabled until that separate product-release
+workflow exists and the applicable [roadmap](ROADMAP.md) gates pass.
+
+### Provenance snapshots
+
+Provenance snapshots use `provenance-YYYY.MM.DD.N`. They preserve one exact
+source tree, selected history, metadata, and verification assets as evidence of
+repository chronology. They contain no product binaries, do not satisfy or
+waive product-release gates, and do not imply production readiness or security
+certification.
+
+The publication design and current status are recorded in
+[PROVENANCE.md](PROVENANCE.md). An unsigned CI dry run is not a published
+snapshot.
 
 ## Verified Jurisdiction Packs
 

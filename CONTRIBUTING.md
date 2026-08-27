@@ -27,8 +27,24 @@ Open an issue before beginning a large feature or architectural change. This let
 1. Fork the repository
 2. Create a feature branch from `main`
 3. Make focused changes with tests
-4. Ensure CI passes (when configured)
-5. Open a pull request with a clear description
+4. Sign off every commit as described below
+5. Ensure CI passes (when configured)
+6. Open a pull request with a clear description
+
+### Developer Certificate of Origin
+
+All new contributions must certify the [Developer Certificate of Origin
+1.1](DCO). Add a `Signed-off-by` trailer using your real name and an email
+address you control:
+
+```bash
+git commit --signoff
+```
+
+The sign-off certifies your authority to submit that contribution under the
+project license. It is prospective, does not rewrite historical commits, does
+not assign your copyright, and does not claim ownership of abstract ideas.
+Preserve applicable third-party license and attribution notices.
 
 ### Documentation
 
@@ -97,7 +113,8 @@ All contributors must follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE).
+By contributing and signing off, you certify your contribution under the
+[Apache License 2.0](LICENSE) according to the DCO.
 
 ## Questions
 
