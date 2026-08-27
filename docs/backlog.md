@@ -204,7 +204,7 @@ repo audit; every entry below points at verified, real state of the code.
   Amendment 1 part (e) in `rfcs/0003-signed-approval-evidence.md` — use them
   verbatim.
 
-- [ ] **P1 | `crates/authority/` | Add durable, fail-closed revocation records.**
+- [ ] **P1 | `crates/authority/` | Add durable, fail-closed revocation records. IN PROGRESS (2026-08-27)**
   Blocked until the amendment lands; claim only after the transaction entry
   above is checked off. Per amendment part (c): `revoke_*` APIs write
   exclusive-create records under the store root; consumption checks
