@@ -130,3 +130,11 @@ secret scanning. Toolchain is pinned: 1.97.0.
     `primary_resource() == None` for a rejection-path test, declare the
     manifest operation's `resource_bindings` as `[]` (an empty array is
     valid) and pass no grants — `prepare_grants` then never sets it.
+12. To split an inline `#[cfg(test)] mod tests { … }` out of a growing `.rs`
+    file, move the body verbatim into a sibling file and declare
+    `#[cfg(test)] mod tests;` — Rust module privacy follows the module tree,
+    not file location, so the moved tests keep exactly the same access to
+    the parent module's private items. Do this pure-move first, confirm
+    `cargo test` is unchanged, before adding the new code that motivated the
+    split; `cargo fmt --all` reformats the split files for the new nesting
+    depth (expect a large reflow diff with no logic change).

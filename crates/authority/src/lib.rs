@@ -31,10 +31,23 @@
 //! earlier claims or colliding with a stranger's. Only a durable
 //! `.committed` marker authorizes proceeding to the effect; recovery is
 //! roll-forward only, so nothing is ever deleted to recover. Consumption
-//! also fails closed on a durably revoked token or approval, but this crate
-//! does not yet publish revocation records itself — `revoke_token` and
-//! `revoke_approval` land in a follow-up entry, at which point today's
-//! checks start observing real revocations.
+//! also fails closed on a durably revoked token or approval.
+//!
+//! ## Durable revocation (RFC 0003 Amendment 1, part c)
+//!
+//! `revoke_token` and `revoke_approval` publish a durable record under
+//! `revoked-tokens/` or `revoked-approvals/` using the same exclusive
+//! publish-and-link primitive as every other claim. `consume_bundle` checks
+//! both directories before claiming (step 2) and again immediately before
+//! committing (step 6); the legacy single-claim methods check before
+//! claiming too, as defense in depth. A revocation reports which of three
+//! durable outcomes occurred: `Revoked` (the subject was not yet authorized),
+//! `AlreadyRevoked` (a revocation record already existed), or
+//! `RevokedAfterConsumption` (the subject was already authorized — a legacy
+//! claim, or a bundle whose `.committed` marker already existed — so the
+//! revocation is recorded anyway, for audit, but denies nothing that already
+//! ran). An unparsable revocation record is `CorruptRecord` and fails
+//! consumption closed, never open.
 //!
 //! ## Honest limits
 //!
@@ -152,11 +165,12 @@ impl Expiring for BundleExpiry {
 /// state.
 #[derive(Debug)]
 pub struct AuthorityStore {
-    root: PathBuf,
     tokens: PathBuf,
     approvals: PathBuf,
     idempotency: PathBuf,
     bundles: PathBuf,
+    revoked_tokens: PathBuf,
+    revoked_approvals: PathBuf,
 }
 
 impl AuthorityStore {
@@ -166,15 +180,25 @@ impl AuthorityStore {
         let approvals = root.join(APPROVALS_DIR);
         let idempotency = root.join(IDEMPOTENCY_DIR);
         let bundles = root.join(BUNDLES_DIR);
-        for directory in [&tokens, &approvals, &idempotency, &bundles] {
+        let revoked_tokens = root.join(REVOKED_TOKENS_DIR);
+        let revoked_approvals = root.join(REVOKED_APPROVALS_DIR);
+        for directory in [
+            &tokens,
+            &approvals,
+            &idempotency,
+            &bundles,
+            &revoked_tokens,
+            &revoked_approvals,
+        ] {
             std::fs::create_dir_all(directory).map_err(unavailable)?;
         }
         Ok(Self {
-            root,
             tokens,
             approvals,
             idempotency,
             bundles,
+            revoked_tokens,
+            revoked_approvals,
         })
     }
 
@@ -186,6 +210,7 @@ impl AuthorityStore {
         now_unix: i64,
         expires_at_unix: i64,
     ) -> Result<(), AuthorityError> {
+        check_not_revoked(&self.revoked_tokens, token_id)?;
         self.claim(
             &self.tokens,
             token_id,
@@ -210,6 +235,7 @@ impl AuthorityStore {
         now_unix: i64,
         expires_at_unix: i64,
     ) -> Result<(), AuthorityError> {
+        check_not_revoked(&self.revoked_approvals, approval_id)?;
         self.claim(
             &self.approvals,
             approval_id,
@@ -340,27 +366,15 @@ impl AuthorityStore {
     }
 
     /// Steps 2 and 6: fail closed if either subject has a durable
-    /// revocation record. Nothing publishes into `revoked-tokens/` or
-    /// `revoked-approvals/` yet (that is the follow-up revocation entry),
-    /// so this check is a no-op until then.
+    /// revocation record, and fail closed (not open) if a revocation record
+    /// exists but does not parse.
     fn bundle_check_revocation(
         &self,
         token_id: Uuid,
         approval_id: Uuid,
     ) -> Result<(), AuthorityError> {
-        let revoked = self
-            .root
-            .join(REVOKED_TOKENS_DIR)
-            .join(token_id.to_string())
-            .exists()
-            || self
-                .root
-                .join(REVOKED_APPROVALS_DIR)
-                .join(approval_id.to_string())
-                .exists();
-        if revoked {
-            return Err(AuthorityError::Revoked);
-        }
+        check_not_revoked(&self.revoked_tokens, token_id)?;
+        check_not_revoked(&self.revoked_approvals, approval_id)?;
         Ok(())
     }
 
@@ -489,11 +503,106 @@ impl AuthorityStore {
     /// because fresh ids produce a fresh bundle id.
     pub fn purge_expired(&self, now_unix: i64) -> Result<usize, AuthorityError> {
         let mut removed = 0;
-        for directory in [&self.tokens, &self.approvals, &self.idempotency] {
+        for directory in [
+            &self.tokens,
+            &self.approvals,
+            &self.idempotency,
+            &self.revoked_tokens,
+            &self.revoked_approvals,
+        ] {
             removed += purge_directory::<AuthorityRecord>(directory, now_unix)?;
         }
         removed += purge_directory::<BundleExpiry>(&self.bundles, now_unix)?;
         Ok(removed)
+    }
+
+    /// Durably revoke a token id (RFC 0003 Amendment 1, part c). `caller`
+    /// supplies `expires_at_unix` (the token's own expiry) so the revocation
+    /// record purges on the same rule as everything else.
+    pub fn revoke_token(
+        &self,
+        token_id: Uuid,
+        now_unix: i64,
+        expires_at_unix: i64,
+    ) -> Result<RevocationOutcome, AuthorityError> {
+        self.revoke(
+            &self.revoked_tokens,
+            &self.tokens,
+            "revoked-token",
+            token_id,
+            now_unix,
+            expires_at_unix,
+        )
+    }
+
+    /// Durably revoke an approval id (RFC 0003 Amendment 1, part c).
+    pub fn revoke_approval(
+        &self,
+        approval_id: Uuid,
+        now_unix: i64,
+        expires_at_unix: i64,
+    ) -> Result<RevocationOutcome, AuthorityError> {
+        self.revoke(
+            &self.revoked_approvals,
+            &self.approvals,
+            "revoked-approval",
+            approval_id,
+            now_unix,
+            expires_at_unix,
+        )
+    }
+
+    fn revoke(
+        &self,
+        revocation_dir: &Path,
+        consumption_dir: &Path,
+        kind: &str,
+        id: Uuid,
+        now_unix: i64,
+        expires_at_unix: i64,
+    ) -> Result<RevocationOutcome, AuthorityError> {
+        let record = AuthorityRecord {
+            kind: kind.into(),
+            fingerprint_hex: None,
+            bundle_hex: None,
+            consumed_at_unix: now_unix,
+            expires_at_unix,
+        };
+        let final_path = revocation_dir.join(id.to_string());
+        match publish_record(revocation_dir, &final_path, &record)? {
+            Some(_existing) => Ok(RevocationOutcome::AlreadyRevoked),
+            None => {
+                if self.subject_is_authorized(consumption_dir, id)? {
+                    Ok(RevocationOutcome::RevokedAfterConsumption)
+                } else {
+                    Ok(RevocationOutcome::Revoked)
+                }
+            }
+        }
+    }
+
+    /// Whether `id`'s claim in `consumption_dir` (tokens/ or approvals/)
+    /// already represents an authorized effect: true for a legacy claim
+    /// (consumption is immediate), or for a bundle claim only once that
+    /// bundle's `.committed` marker exists — a token claimed by a bundle
+    /// that never committed was never actually authorized.
+    fn subject_is_authorized(
+        &self,
+        consumption_dir: &Path,
+        id: Uuid,
+    ) -> Result<bool, AuthorityError> {
+        let path = consumption_dir.join(id.to_string());
+        if !path.exists() {
+            return Ok(false);
+        }
+        let record: AuthorityRecord = read_record(&path)?;
+        match record.bundle_hex {
+            None => Ok(true),
+            Some(bundle_hex) => Ok(self
+                .bundles
+                .join(format!("{bundle_hex}.committed"))
+                .exists()),
+        }
     }
 
     fn claim(&self, directory: &Path, id: Uuid, record: AuthorityRecord) -> Result<(), ClaimError> {
@@ -503,6 +612,32 @@ impl AuthorityStore {
             Some(existing) => Err(ClaimError::Exists(existing)),
         }
     }
+}
+
+/// One durable outcome of a `revoke_token`/`revoke_approval` call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevocationOutcome {
+    /// The revocation record was published and the subject was not yet
+    /// authorized (no legacy claim, no committed bundle).
+    Revoked,
+    /// A revocation record already existed for this subject.
+    AlreadyRevoked,
+    /// The revocation record was published, but the subject was already
+    /// authorized (a legacy claim, or a bundle that already committed) — the
+    /// record is still durable and auditable, but nothing already run is
+    /// undone.
+    RevokedAfterConsumption,
+}
+
+/// Fail closed if `id` has a durable revocation record under `dir`; fail
+/// closed (never open) if a record exists but does not parse.
+fn check_not_revoked(dir: &Path, id: Uuid) -> Result<(), AuthorityError> {
+    let path = dir.join(id.to_string());
+    if !path.exists() {
+        return Ok(());
+    }
+    let _record: AuthorityRecord = read_record(&path)?;
+    Err(AuthorityError::Revoked)
 }
 
 enum ClaimError {
@@ -629,405 +764,4 @@ fn unavailable(error: impl std::fmt::Display) -> AuthorityError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    const NOW: i64 = 1_800_000_000;
-
-    #[test]
-    fn one_use_consumption_survives_reopen() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let token = Uuid::new_v4();
-        store.consume_token(token, NOW, NOW + 60).unwrap();
-        assert_eq!(
-            store.consume_token(token, NOW + 1, NOW + 60),
-            Err(AuthorityError::AlreadyConsumed)
-        );
-
-        // "Restart": a fresh instance over the same directory still refuses.
-        let reopened = AuthorityStore::open(dir.path()).unwrap();
-        assert_eq!(
-            reopened.consume_token(token, NOW + 2, NOW + 60),
-            Err(AuthorityError::AlreadyConsumed)
-        );
-        assert_eq!(
-            reopened.consume_approval(token, NOW, NOW + 60),
-            Ok(()),
-            "token and approval namespaces are separate"
-        );
-    }
-
-    #[test]
-    fn concurrent_racers_get_exactly_one_win() {
-        let dir = tempdir().unwrap();
-        let token = Uuid::new_v4();
-        let root = dir.path().to_path_buf();
-        let winners: usize = std::thread::scope(|scope| {
-            (0..16)
-                .map(|_| {
-                    let root = root.clone();
-                    scope.spawn(move || {
-                        let store = AuthorityStore::open(&root).unwrap();
-                        store.consume_token(token, NOW, NOW + 60).is_ok() as usize
-                    })
-                })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .map(|handle| handle.join().unwrap())
-                .sum()
-        });
-        assert_eq!(winners, 1);
-    }
-
-    #[test]
-    fn idempotency_distinguishes_replay_from_conflict() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let key = Uuid::new_v4();
-        let fingerprint_a = [0xAA_u8; 32];
-        let fingerprint_b = [0xBB_u8; 32];
-
-        store
-            .bind_idempotency(key, &fingerprint_a, NOW, NOW + 60)
-            .unwrap();
-        assert_eq!(
-            store.bind_idempotency(key, &fingerprint_a, NOW, NOW + 60),
-            Err(AuthorityError::IdempotencyReplay)
-        );
-        // Across a "restart" a different fingerprint is a conflict.
-        let reopened = AuthorityStore::open(dir.path()).unwrap();
-        assert_eq!(
-            reopened.bind_idempotency(key, &fingerprint_b, NOW, NOW + 60),
-            Err(AuthorityError::IdempotencyConflict)
-        );
-    }
-
-    #[test]
-    fn unavailable_store_fails_closed() {
-        let dir = tempdir().unwrap();
-        let file_path = dir.path().join("not-a-directory");
-        std::fs::write(&file_path, b"occupied").unwrap();
-        assert!(matches!(
-            AuthorityStore::open(&file_path),
-            Err(AuthorityError::Unavailable(_))
-        ));
-    }
-
-    #[test]
-    fn purge_removes_expired_and_keeps_live_records() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let expired = Uuid::new_v4();
-        let live = Uuid::new_v4();
-        store.consume_token(expired, NOW, NOW + 10).unwrap();
-        store.consume_token(live, NOW, NOW + 1_000).unwrap();
-        // Orphan temp file from a simulated crash is collected, never trusted.
-        std::fs::write(dir.path().join("tokens").join("tmp-orphan"), b"junk").unwrap();
-
-        let removed = store.purge_expired(NOW + 100).unwrap();
-        assert_eq!(removed, 1);
-        assert_eq!(
-            store.consume_token(live, NOW + 101, NOW + 1_000),
-            Err(AuthorityError::AlreadyConsumed),
-            "live record must survive the purge"
-        );
-        assert!(
-            store.consume_token(expired, NOW + 101, NOW + 200).is_ok(),
-            "purged ids are reclaimable; expiry checks upstream deny stale authorities"
-        );
-    }
-
-    #[test]
-    fn purge_uses_each_claim_kind_expiry() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let token = Uuid::new_v4();
-        let approval = Uuid::new_v4();
-        let idempotency = Uuid::new_v4();
-
-        store.consume_token(token, NOW, NOW + 30).unwrap();
-        store.consume_approval(approval, NOW, NOW + 120).unwrap();
-        store
-            .bind_idempotency(idempotency, &[0x01; 32], NOW, NOW + 30)
-            .unwrap();
-
-        assert_eq!(store.purge_expired(NOW + 31).unwrap(), 2);
-        assert_eq!(
-            store.consume_approval(approval, NOW + 31, NOW + 120),
-            Err(AuthorityError::AlreadyConsumed),
-            "the approval must retain its own later expiry"
-        );
-        assert_eq!(store.purge_expired(NOW + 120).unwrap(), 1);
-    }
-
-    #[test]
-    fn purged_idempotency_key_can_be_rebound_without_false_conflict() {
-        // An idempotency key that has expired and been purged must not haunt a
-        // later, unrelated invocation as a phantom conflict — otherwise expired
-        // keys would wedge new work forever. After purge, the same key rebinds
-        // to a different fingerprint cleanly.
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let key = Uuid::new_v4();
-        let first = [1u8; 32];
-        let second = [2u8; 32];
-
-        store.bind_idempotency(key, &first, NOW, NOW + 10).unwrap();
-        // While live, a different fingerprint is a real conflict.
-        assert_eq!(
-            store.bind_idempotency(key, &second, NOW + 1, NOW + 10),
-            Err(AuthorityError::IdempotencyConflict)
-        );
-
-        // After expiry + purge the record is gone, and the key is free again.
-        assert_eq!(store.purge_expired(NOW + 100).unwrap(), 1);
-        assert_eq!(
-            store.bind_idempotency(key, &second, NOW + 101, NOW + 200),
-            Ok(())
-        );
-        // And it is once more a live one-use binding.
-        assert_eq!(
-            store.bind_idempotency(key, &second, NOW + 102, NOW + 200),
-            Err(AuthorityError::IdempotencyReplay)
-        );
-    }
-
-    #[test]
-    fn corrupt_records_fail_closed() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let key = Uuid::new_v4();
-        std::fs::write(
-            dir.path().join("idempotency").join(key.to_string()),
-            b"garbage",
-        )
-        .unwrap();
-        assert_eq!(
-            store.bind_idempotency(key, &[0x01; 32], NOW, NOW + 60),
-            Err(AuthorityError::CorruptRecord)
-        );
-    }
-
-    fn part(expires_at_unix: i64) -> BundlePart {
-        BundlePart {
-            id: Uuid::new_v4(),
-            expires_at_unix,
-        }
-    }
-
-    #[test]
-    fn a_retried_bundle_after_any_interruption_completes_without_burning_claims() {
-        for stop_after_step in 0..=5 {
-            let dir = tempdir().unwrap();
-            let store = AuthorityStore::open(dir.path()).unwrap();
-            let token = part(NOW + 60);
-            let approval = part(NOW + 60);
-            let idempotency = part(NOW + 60);
-            let fingerprint = [0x42_u8; 32];
-            let bundle_hex =
-                compute_bundle_hex(token.id, approval.id, idempotency.id, &fingerprint);
-
-            if stop_after_step >= 1 {
-                store
-                    .bundle_publish_intent(
-                        &bundle_hex,
-                        token,
-                        approval,
-                        idempotency,
-                        &fingerprint,
-                        NOW,
-                    )
-                    .unwrap();
-            }
-            if stop_after_step >= 2 {
-                store
-                    .bundle_check_revocation(token.id, approval.id)
-                    .unwrap();
-            }
-            if stop_after_step >= 3 {
-                store.bundle_claim_token(&bundle_hex, token, NOW).unwrap();
-            }
-            if stop_after_step >= 4 {
-                store
-                    .bundle_bind_idempotency(&bundle_hex, idempotency, &fingerprint, NOW)
-                    .unwrap();
-            }
-            if stop_after_step >= 5 {
-                store
-                    .bundle_claim_approval(&bundle_hex, approval, NOW)
-                    .unwrap();
-            }
-
-            assert_eq!(
-                store.consume_bundle(token, approval, idempotency, &fingerprint, NOW + 1),
-                Ok(()),
-                "retry after stopping at step {stop_after_step} must complete, not burn"
-            );
-        }
-    }
-
-    #[test]
-    fn racing_bundles_over_the_same_token_have_exactly_one_winner() {
-        let dir = tempdir().unwrap();
-        let root = dir.path().to_path_buf();
-        let token_id = Uuid::new_v4();
-
-        let winners: usize = std::thread::scope(|scope| {
-            (0..16u8)
-                .map(|i| {
-                    let root = root.clone();
-                    scope.spawn(move || {
-                        let store = AuthorityStore::open(&root).unwrap();
-                        let token = BundlePart {
-                            id: token_id,
-                            expires_at_unix: NOW + 60,
-                        };
-                        let approval = part(NOW + 60);
-                        let idempotency = part(NOW + 60);
-                        let fingerprint = [i; 32];
-                        store
-                            .consume_bundle(token, approval, idempotency, &fingerprint, NOW)
-                            .is_ok() as usize
-                    })
-                })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .map(|handle| handle.join().unwrap())
-                .sum()
-        });
-        assert_eq!(winners, 1);
-    }
-
-    #[test]
-    fn racing_retries_of_the_same_bundle_authorize_exactly_once() {
-        let dir = tempdir().unwrap();
-        let root = dir.path().to_path_buf();
-        let token = part(NOW + 60);
-        let approval = part(NOW + 60);
-        let idempotency = part(NOW + 60);
-        let fingerprint = [0x77_u8; 32];
-
-        let authorized: usize = std::thread::scope(|scope| {
-            (0..16)
-                .map(|_| {
-                    let root = root.clone();
-                    scope.spawn(move || {
-                        let store = AuthorityStore::open(&root).unwrap();
-                        store
-                            .consume_bundle(token, approval, idempotency, &fingerprint, NOW)
-                            .is_ok() as usize
-                    })
-                })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .map(|handle| handle.join().unwrap())
-                .sum()
-        });
-        assert_eq!(authorized, 1);
-    }
-
-    #[test]
-    fn a_reopened_store_answers_a_partial_bundle_identically() {
-        let dir = tempdir().unwrap();
-        let token = part(NOW + 60);
-        let approval = part(NOW + 60);
-        let idempotency = part(NOW + 60);
-        let fingerprint = [0x11_u8; 32];
-        let bundle_hex = compute_bundle_hex(token.id, approval.id, idempotency.id, &fingerprint);
-
-        {
-            let store = AuthorityStore::open(dir.path()).unwrap();
-            store
-                .bundle_publish_intent(&bundle_hex, token, approval, idempotency, &fingerprint, NOW)
-                .unwrap();
-            store.bundle_claim_token(&bundle_hex, token, NOW).unwrap();
-            // "Crash" here: the store handle is dropped without committing.
-        }
-
-        let reopened = AuthorityStore::open(dir.path()).unwrap();
-
-        // A foreign bundle contending for the same token is denied on the
-        // reopened store exactly as it would have been on the original.
-        let foreign_approval = part(NOW + 60);
-        let foreign_idempotency = part(NOW + 60);
-        assert_eq!(
-            reopened.consume_bundle(
-                token,
-                foreign_approval,
-                foreign_idempotency,
-                &[0x22; 32],
-                NOW + 1
-            ),
-            Err(AuthorityError::AlreadyConsumed)
-        );
-
-        // The original consumer's own retry against the reopened store
-        // completes the bundle it had already partly claimed.
-        assert_eq!(
-            reopened.consume_bundle(token, approval, idempotency, &fingerprint, NOW + 2),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn a_foreign_uncommitted_bundle_denies_other_consumers() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let token = part(NOW + 60);
-        let approval_a = part(NOW + 60);
-        let idempotency_a = part(NOW + 60);
-        let fingerprint_a = [0x33_u8; 32];
-        let bundle_hex_a =
-            compute_bundle_hex(token.id, approval_a.id, idempotency_a.id, &fingerprint_a);
-
-        // Bundle A claims the token but never commits (simulated crash).
-        store
-            .bundle_publish_intent(
-                &bundle_hex_a,
-                token,
-                approval_a,
-                idempotency_a,
-                &fingerprint_a,
-                NOW,
-            )
-            .unwrap();
-        store.bundle_claim_token(&bundle_hex_a, token, NOW).unwrap();
-
-        // Bundle B, over the same token but otherwise unrelated, is denied
-        // even though bundle A never committed.
-        let approval_b = part(NOW + 60);
-        let idempotency_b = part(NOW + 60);
-        assert_eq!(
-            store.consume_bundle(token, approval_b, idempotency_b, &[0x44; 32], NOW + 1),
-            Err(AuthorityError::AlreadyConsumed)
-        );
-    }
-
-    #[test]
-    fn purge_removes_expired_bundles_and_their_claims() {
-        let dir = tempdir().unwrap();
-        let store = AuthorityStore::open(dir.path()).unwrap();
-        let token = part(NOW + 30);
-        let approval = part(NOW + 30);
-        let idempotency = part(NOW + 30);
-        let fingerprint = [0x55_u8; 32];
-
-        store
-            .consume_bundle(token, approval, idempotency, &fingerprint, NOW)
-            .unwrap();
-
-        let removed = store.purge_expired(NOW + 31).unwrap();
-        assert_eq!(
-            removed, 5,
-            "token, approval, and idempotency claims plus the bundle intent and committed marker"
-        );
-
-        // Everything purged: the exact same bundle can be authorized again.
-        assert_eq!(
-            store.consume_bundle(token, approval, idempotency, &fingerprint, NOW + 32),
-            Ok(())
-        );
-    }
-}
+mod tests;
