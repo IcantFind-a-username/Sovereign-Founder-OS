@@ -35,11 +35,13 @@ jobs:
           else
             git update-ref "$GITHUB_REF" "$GITHUB_SHA"
           fi
-          echo "EVIDENCE_REF=$GITHUB_REF" >> "$GITHUB_ENV"
-          echo "SNAPSHOT_ID=provenance-dry-run-$short_sha" >> "$GITHUB_ENV"
-          echo "EVIDENCE_DIR=$RUNNER_TEMP/provenance-evidence" >> "$GITHUB_ENV"
-          echo "CARGO_LOCK_PATH=$RUNNER_TEMP/provenance-material/Cargo.lock" >> "$GITHUB_ENV"
-          echo "SBOM_PATH=$RUNNER_TEMP/provenance-sbom.spdx.json" >> "$GITHUB_ENV"
+          {
+            echo "EVIDENCE_REF=$GITHUB_REF"
+            echo "SNAPSHOT_ID=provenance-dry-run-$short_sha"
+            echo "EVIDENCE_DIR=$RUNNER_TEMP/provenance-evidence"
+            echo "CARGO_LOCK_PATH=$RUNNER_TEMP/provenance-material/Cargo.lock"
+            echo "SBOM_PATH=$RUNNER_TEMP/provenance-sbom.spdx.json"
+          } >> "$GITHUB_ENV"
       - name: Build deterministic Git evidence
         run: |
           python3 scripts/build-provenance-evidence.py \
