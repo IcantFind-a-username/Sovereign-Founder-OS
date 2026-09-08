@@ -19,6 +19,7 @@
 | 任务是否进入队列、认领与完成 | [backlog](../../backlog.md) | 这里不维护第二份勾选清单。 |
 | 一张任务的范围、接口、验收、依赖 | [任务卡](#任务卡)；实现卡引用 contracts | backlog 仅保存 ID、优先级、链接、claim/诊断/完成；详细正文只在卡中修改。 |
 | 执行步骤、失败/阻塞/验收/恢复 | [protocol.md](protocol.md) | Prompt 和简报引用它；不得另写一套重试规则。 |
+| 主动精简上下文、恢复摘要、压缩后接续 | [protocol §9.5.1](protocol.md#context-continuity) | 摘要只引用已有规范与记录，不另建状态库。 |
 | S0 校验工具的数据形状与函数接口 | [contracts.md](contracts.md) | 任务卡只指向负责实现的接口与命名测试。 |
 | 模型、角色与 Goal 入口 | [models-and-goals.md](models-and-goals.md) | 用 worker/reviewer/fallback 角色名引用；运行报告记录实际模型证据。 |
 | 阶段方向与远期未冻结工作 | [milestones.md](milestones.md) | 索引性质；对应任务卡出现后，索引不再复制详细契约。 |
