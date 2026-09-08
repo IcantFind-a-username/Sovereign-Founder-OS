@@ -157,6 +157,9 @@ while the controller routes eligible design/review cards to the strong role.
   has not started and no v3 implementation is accepted:
   [contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r1/contract.json),
   [events](handoff/codex/events/S0-01-RECOVERY-SPEC.json).
+  The first Cspec was revised before architect start because its frozen input set
+  omitted five required RFC blobs; r2 preserves r1 and records the real stop:
+  [r2 contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r2/contract.json).
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
