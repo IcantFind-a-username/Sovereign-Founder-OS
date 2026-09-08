@@ -11,6 +11,12 @@ use crate::{ArtifactError, Digest, InputLimits, InputSchema, OperationSelector};
 
 pub const MANIFEST_PROTOCOL_VERSION: u32 = 1;
 pub const CORE_WASM_ENTRYPOINT: &str = "sovereign_run";
+/// The single exported function of the pure-compute component world.
+pub const COMPONENT_ENTRYPOINT: &str = "run";
+/// The only WIT world admitted for the `component_wasm` backend in this
+/// phase: zero imports, one export
+/// `run: func(input: list<u8>) -> result<list<u8>, string>`.
+pub const SOVEREIGN_TOOL_WIT_WORLD: &str = "sovereign:tool/pure-tool@0.1.0";
 pub const CANONICALIZATION_PROFILE: &str = "rfc8785-jcs+sovereign-digest-v1";
 pub const HARD_MAX_SIGNED_MANIFEST_BYTES: usize = 256 * 1024;
 pub const HARD_MAX_MANIFEST_PAYLOAD_BYTES: usize = 192 * 1024;
@@ -157,6 +163,11 @@ pub struct PluginManifest {
     risk_class: RiskClass,
     abi: ArtifactAbi,
     entrypoint: String,
+    /// Required (and exact) for the `component_wasm` backend; must be absent
+    /// for `core_wasm`. Optional so existing signed core-Wasm manifests keep
+    /// their canonical JCS encoding unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    wit_world: Option<String>,
     requested_host_capabilities: Vec<String>,
     operations: Vec<OperationDefinition>,
 }
@@ -192,6 +203,10 @@ impl PluginManifest {
 
     pub fn entrypoint(&self) -> &str {
         &self.entrypoint
+    }
+
+    pub fn wit_world(&self) -> Option<&str> {
+        self.wit_world.as_deref()
     }
 
     pub fn operations(&self) -> &[OperationDefinition] {
@@ -231,15 +246,32 @@ impl PluginManifest {
         if self.risk_class != RiskClass::PureCompute {
             return Err(ArtifactError::UnsupportedRiskClass);
         }
-        if self.backend != ArtifactBackend::CoreWasm {
-            return Err(ArtifactError::UnsupportedBackend);
-        }
-        if !matches!(
-            self.abi,
-            ArtifactAbi::SovereignCoreWasmV1 | ArtifactAbi::SovereignCoreWasmV2
-        ) || self.entrypoint != CORE_WASM_ENTRYPOINT
-        {
-            return Err(ArtifactError::UnsupportedAbi);
+        match self.backend {
+            ArtifactBackend::CoreWasm => {
+                if !matches!(
+                    self.abi,
+                    ArtifactAbi::SovereignCoreWasmV1 | ArtifactAbi::SovereignCoreWasmV2
+                ) || self.entrypoint != CORE_WASM_ENTRYPOINT
+                {
+                    return Err(ArtifactError::UnsupportedAbi);
+                }
+                if self.wit_world.is_some() {
+                    return Err(ArtifactError::WitWorldMismatch);
+                }
+            }
+            ArtifactBackend::ComponentWasm => {
+                if self.abi != ArtifactAbi::SovereignComponentV1
+                    || self.entrypoint != COMPONENT_ENTRYPOINT
+                {
+                    return Err(ArtifactError::UnsupportedAbi);
+                }
+                if self.wit_world.as_deref() != Some(SOVEREIGN_TOOL_WIT_WORLD) {
+                    return Err(ArtifactError::WitWorldMismatch);
+                }
+            }
+            ArtifactBackend::Native | ArtifactBackend::Unsupported => {
+                return Err(ArtifactError::UnsupportedBackend);
+            }
         }
         if !self.requested_host_capabilities.is_empty() {
             return Err(ArtifactError::HostCapabilitiesForbidden);

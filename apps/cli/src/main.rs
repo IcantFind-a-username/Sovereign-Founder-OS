@@ -1,4 +1,5 @@
 mod demo;
+mod gauntlet_report;
 mod ui;
 mod workspace;
 

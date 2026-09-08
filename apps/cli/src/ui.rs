@@ -599,8 +599,9 @@ fn check(results: &mut Vec<serde_json::Value>, key: &str, name: &str, pass: bool
 }
 
 /// A compilation worker that re-executes this binary with the hidden compile
-/// subcommand, so untrusted Wasmtime compilation runs in a killable,
-/// memory-limited child process.
+/// subcommand, so untrusted Wasmtime compilation runs in a killable child
+/// process — under an address-space ceiling where the platform can enforce
+/// one (`CompileWorker::address_space_enforcement`).
 fn compile_worker() -> CompileWorker {
     let program = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("sovereign"));
     CompileWorker::new(program, vec![crate::COMPILE_WORKER_SUBCOMMAND.to_string()])
@@ -662,18 +663,21 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
     let invoice_selector = OperationSelector::new("invoice.tools", "1.0.0", "validate")?;
     let stress_selector = OperationSelector::new("demo.stress", "1.0.0", "spin")?;
     // The gauntlet runs as the real `sovereign` binary, so every module below
-    // is compiled out-of-process in a killable, memory-limited worker (this
-    // binary re-executed with its hidden compile subcommand), and compiled
-    // results are cached under a signed record verified before any reuse.
+    // is compiled out-of-process in a killable worker (this binary re-executed
+    // with its hidden compile subcommand), and compiled results are cached
+    // under a signed record verified before any reuse. Whether that worker
+    // also runs under an address-space ceiling is platform-dependent — ask
+    // `address_space_enforcement()` rather than assuming it.
     let cache_dir = std::env::temp_dir().join(format!(
         "sovereign-gauntlet-cache-{}",
         Uuid::new_v4().simple()
     ));
+    let worker = compile_worker();
     let mut executor = VerifiedSandboxExecutor::new(
         vec![invoice_selector.clone(), stress_selector.clone()],
         validator,
     )?
-    .with_compile_worker(compile_worker())
+    .with_compile_worker(worker.clone())
     .with_compiled_cache(compiled_cache(&cache_dir, now_unix)?);
 
     let invoice_component =
@@ -813,12 +817,21 @@ fn run_gauntlet() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> 
         ))
     })()
     .unwrap_or(false);
+    // The baseline above compiled a known-good component through this same
+    // worker against a fresh cache directory, so its success is independent
+    // proof that the worker process actually launches here. Without it a
+    // failed spawn would be indistinguishable from a contained failure.
+    let verdict = crate::gauntlet_report::compile_isolation(
+        baseline.is_ok(),
+        compile_isolation,
+        worker.address_space_enforcement(),
+    );
     check(
         &mut results,
         "compile_isolation",
         "Hostile compilation in the host process",
-        compile_isolation,
-        "an artifact that fails compilation was compiled in a killable, memory-limited worker; the failure was contained in the child and the host stayed up",
+        verdict.pass,
+        &verdict.detail,
     );
 
     // Cache poisoning: the baseline execution stored a compiled blob under a

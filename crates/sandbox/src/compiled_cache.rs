@@ -20,6 +20,7 @@
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use wasmtime::component::Component;
 use wasmtime::{Engine, Module};
 
 use sovereign_artifact::Digest;
@@ -33,6 +34,12 @@ use crate::SandboxError;
 /// that slips past this tag still fails closed at deserialize (quarantined,
 /// then recompiled). Bump on any change to the shared engine configuration.
 pub const COMPILED_CACHE_ENGINE_IDENTITY: &str = "sovereign-corewasm-v2";
+
+/// Identity tag for component-backend entries. A distinct identity (also part
+/// of the entry key) means a core-module blob can never be presented as a
+/// component or vice versa: the signed record pins which artifact kind — and
+/// which unsafe deserializer — the blob was produced for.
+pub const COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY: &str = "sovereign-component-v1";
 
 const RECORD_TYPE: &str = "sovereign.compiled-cache-record";
 const RECORD_VERSION: u64 = 1;
@@ -90,7 +97,46 @@ impl CompiledCache {
     /// miss or any integrity failure. A failing entry is quarantined so the
     /// caller recompiles and never sees it again.
     pub(crate) fn lookup(&self, engine: &Engine, component_digest: Digest) -> Option<Module> {
-        let key = self.entry_key(component_digest);
+        let blob = self.lookup_verified_blob(COMPILED_CACHE_ENGINE_IDENTITY, component_digest)?;
+        // SAFETY: the blob's digest was just re-verified against a record
+        // signed under the trusted compiled-cache role for the core-module
+        // identity; wasmtime's own compatibility check is the final gate.
+        match unsafe { Module::deserialize(engine, &blob) } {
+            Ok(module) => Some(module),
+            Err(_) => {
+                self.quarantine_by_key(COMPILED_CACHE_ENGINE_IDENTITY, component_digest);
+                None
+            }
+        }
+    }
+
+    /// Component-backend variant of [`Self::lookup`]: same record and blob
+    /// verification, but under the component engine identity and the
+    /// component deserializer.
+    pub(crate) fn lookup_component(
+        &self,
+        engine: &Engine,
+        component_digest: Digest,
+    ) -> Option<Component> {
+        let blob =
+            self.lookup_verified_blob(COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, component_digest)?;
+        // SAFETY: as in `lookup`, the blob was re-verified against a signed
+        // record bound to the component identity before deserialization.
+        match unsafe { Component::deserialize(engine, &blob) } {
+            Ok(component) => Some(component),
+            Err(_) => {
+                self.quarantine_by_key(COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, component_digest);
+                None
+            }
+        }
+    }
+
+    fn lookup_verified_blob(
+        &self,
+        engine_identity: &str,
+        component_digest: Digest,
+    ) -> Option<Vec<u8>> {
+        let key = self.entry_key(engine_identity, component_digest);
         let blob_path = self.dir.join(format!("{key}.blob"));
         let record_path = self.dir.join(format!("{key}.cose"));
 
@@ -100,8 +146,8 @@ impl CompiledCache {
             return None;
         }
 
-        match self.verify_entry(engine, component_digest, &blob_path, &record_path) {
-            Ok(module) => Some(module),
+        match self.verify_entry(engine_identity, component_digest, &blob_path, &record_path) {
+            Ok(blob) => Some(blob),
             Err(_) => {
                 // Poisoned/mismatched/mutable entry: move it aside and miss.
                 self.quarantine_entry(&key, &blob_path, &record_path);
@@ -118,6 +164,28 @@ impl CompiledCache {
         component_digest: Digest,
         serialized: &[u8],
     ) -> Result<(), SandboxError> {
+        self.store_with_identity(COMPILED_CACHE_ENGINE_IDENTITY, component_digest, serialized)
+    }
+
+    /// Component-backend variant of [`Self::store`].
+    pub(crate) fn store_component(
+        &self,
+        component_digest: Digest,
+        serialized: &[u8],
+    ) -> Result<(), SandboxError> {
+        self.store_with_identity(
+            COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY,
+            component_digest,
+            serialized,
+        )
+    }
+
+    fn store_with_identity(
+        &self,
+        engine_identity: &str,
+        component_digest: Digest,
+        serialized: &[u8],
+    ) -> Result<(), SandboxError> {
         if serialized.len() as u64 > MAX_BLOB_BYTES {
             return Err(SandboxError::CompiledCacheUnavailable(
                 "blob too large".into(),
@@ -126,7 +194,7 @@ impl CompiledCache {
         let record = serde_json::json!({
             "typ": RECORD_TYPE,
             "version": RECORD_VERSION,
-            "engine_identity": COMPILED_CACHE_ENGINE_IDENTITY,
+            "engine_identity": engine_identity,
             "component_digest": component_digest.as_hex(),
             "compiled_blob_digest": Digest::of_bytes(serialized).as_hex(),
         });
@@ -137,7 +205,7 @@ impl CompiledCache {
             .sign_cose(&canonical)
             .map_err(|error| SandboxError::CompiledCacheUnavailable(error.to_string()))?;
 
-        let key = self.entry_key(component_digest);
+        let key = self.entry_key(engine_identity, component_digest);
         // Write the blob first, then the record: a lookup requires both, and
         // an interrupted store that left only a blob is an ignorable miss.
         write_atomic(&self.dir.join(format!("{key}.blob")), serialized)
@@ -149,11 +217,11 @@ impl CompiledCache {
 
     fn verify_entry(
         &self,
-        engine: &Engine,
+        engine_identity: &str,
         component_digest: Digest,
         blob_path: &Path,
         record_path: &Path,
-    ) -> Result<Module, SandboxError> {
+    ) -> Result<Vec<u8>, SandboxError> {
         let signed = read_regular_bounded(record_path, MAX_RECORD_BYTES)?;
         let blob = read_regular_bounded(blob_path, MAX_BLOB_BYTES)?;
 
@@ -183,7 +251,7 @@ impl CompiledCache {
         {
             return Err(SandboxError::CompiledCachePoisoned("type/version".into()));
         }
-        if field("engine_identity")? != COMPILED_CACHE_ENGINE_IDENTITY {
+        if field("engine_identity")? != engine_identity {
             return Err(SandboxError::CompiledCachePoisoned(
                 "engine identity".into(),
             ));
@@ -198,19 +266,24 @@ impl CompiledCache {
         }
 
         // Every field checked and the blob rehashed against the signed digest:
-        // only now is deserialization of the machine code allowed.
-        // SAFETY: the blob's digest was just re-verified against a record
-        // signed under the trusted compiled-cache role; wasmtime's own
-        // compatibility check is the final gate.
-        unsafe { Module::deserialize(engine, &blob) }
-            .map_err(|error| SandboxError::CompiledCachePoisoned(error.to_string()))
+        // only now may the caller run its kind-specific unsafe deserializer.
+        Ok(blob)
     }
 
-    fn entry_key(&self, component_digest: Digest) -> String {
-        let mut keyed = COMPILED_CACHE_ENGINE_IDENTITY.as_bytes().to_vec();
+    fn entry_key(&self, engine_identity: &str, component_digest: Digest) -> String {
+        let mut keyed = engine_identity.as_bytes().to_vec();
         keyed.push(0);
         keyed.extend_from_slice(component_digest.as_bytes());
         Digest::of_bytes(&keyed).as_hex()
+    }
+
+    fn quarantine_by_key(&self, engine_identity: &str, component_digest: Digest) {
+        let key = self.entry_key(engine_identity, component_digest);
+        self.quarantine_entry(
+            &key,
+            &self.dir.join(format!("{key}.blob")),
+            &self.dir.join(format!("{key}.cose")),
+        );
     }
 
     fn quarantine_entry(&self, key: &str, blob_path: &Path, record_path: &Path) {
@@ -391,8 +464,8 @@ mod tests {
 
         // Rename A's files under B's key: the record still says component A.
         let other = Digest::of_bytes(b"component-B");
-        let a_key = cache.entry_key(real);
-        let b_key = cache.entry_key(other);
+        let a_key = cache.entry_key(COMPILED_CACHE_ENGINE_IDENTITY, real);
+        let b_key = cache.entry_key(COMPILED_CACHE_ENGINE_IDENTITY, other);
         std::fs::rename(
             dir.path().join(format!("{a_key}.blob")),
             dir.path().join(format!("{b_key}.blob")),

@@ -33,3 +33,6 @@ notes/
 # Isolated development workspaces and agent execution ledgers
 .worktrees/
 .superpowers/
+
+# Automation harness local logs
+.harness/

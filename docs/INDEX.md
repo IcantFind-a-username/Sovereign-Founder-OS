@@ -21,6 +21,7 @@ This page helps contributors find the current source of truth without reading th
 | If you want to… | Start here |
 | --- | --- |
 | Make a first contribution | [CONTRIBUTING.md](../CONTRIBUTING.md) and current open issues |
+| Work a relayed task card as an AI worker session | [Handoff protocol](handoff/README.md), then [`docs/backlog.md`](backlog.md) and [`CLAUDE.md`](../CLAUDE.md) |
 | Understand product direction | [README.md](../README.md) and [MANIFESTO.md](../MANIFESTO.md) |
 | Change runtime architecture | [ARCHITECTURE.md](../ARCHITECTURE.md) and the relevant [RFC](../rfcs/) |
 | Review security | [THREAT_MODEL.md](../THREAT_MODEL.md), [SECURITY.md](../SECURITY.md), [RFC 0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md), [RFC 0004](../rfcs/0004-data-sovereignty-boundaries.md), [RFC 0005](../rfcs/0005-dual-root-vault-and-recovery.md), and the [open-source cross-validation note](security/open-source-security-cross-validation.md) |
@@ -61,3 +62,5 @@ an accepted RFC proposal.
 | [0003](../rfcs/0003-signed-approval-evidence.md) | Draft; partial foundation | Signed approval-role evidence; approval-expiry retention is tested, while owner ceremony, transactional reservation, revocation, and full subprocess races remain Target |
 | [0004](../rfcs/0004-data-sovereignty-boundaries.md) | Draft; approved implementation target | Data sovereignty, privacy compilation, visibility, and compute placement |
 | [0005](../rfcs/0005-dual-root-vault-and-recovery.md) | Draft; implementation none | Dual-root Vault, backup, and recovery target |
+| [0006](../rfcs/0006-synthetic-owner-session-exact-effect-fixture.md) | Draft; fixture-proof contract (no product claim) | Synthetic owner-session / exact local-outbox fixture — a mechanism proof for 1C0 (WebAuthn/session/one-use approval) and Program 2 (exact `.eml` effect), gated conjunctively behind 1B1 + 1C1 + 1D `ActiveV2` + protected-payload review |
+| [0007](../rfcs/0007-audit-ledger-freshness-anchor.md) | Draft; approved implementation target | Audit-ledger freshness anchor — a device-signed head commitment and open-time check that reject a rewound/forked ledger when the anchor is protected independently of the ledger (v0.1 rollback-anchoring slice; whole-device rollback stays out of scope) |

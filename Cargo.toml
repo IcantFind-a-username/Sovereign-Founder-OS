@@ -13,6 +13,7 @@ members = [
     "crates/capability",
     "crates/consultant-playground",
     "crates/vault",
+    "crates/vault-v2-engine",
     "crates/workflow",
     "crates/sandbox",
     "apps/cli",
@@ -39,6 +40,7 @@ sovereign-policy = { path = "crates/policy" }
 sovereign-capability = { path = "crates/capability" }
 sovereign-consultant-playground = { path = "crates/consultant-playground" }
 sovereign-vault = { path = "crates/vault" }
+sovereign-vault-v2-engine = { path = "crates/vault-v2-engine" }
 sovereign-workflow = { path = "crates/workflow" }
 sovereign-sandbox = { path = "crates/sandbox" }
 
@@ -55,7 +57,7 @@ aes-gcm = "0.10"
 base64 = "0.22"
 dirs = "5"
 clap = { version = "4", features = ["derive"] }
-wasmtime = { version = "=46.0.2", default-features = false, features = ["cranelift", "runtime", "std"] }
+wasmtime = { version = "=46.0.3", default-features = false, features = ["cranelift", "runtime", "std", "component-model"] }
 coset = "=0.4.2"
 serde_json_canonicalizer = "=0.3.2"
 

@@ -18,8 +18,10 @@ use sovereign_policy::PolicyAuthorizationV2;
 use thiserror::Error;
 use uuid::Uuid;
 
-pub use compile_worker::{run_compile_worker, CompileWorker};
-pub use compiled_cache::{CompiledCache, COMPILED_CACHE_ENGINE_IDENTITY};
+pub use compile_worker::{run_compile_worker, AddressSpaceEnforcement, CompileWorker};
+pub use compiled_cache::{
+    CompiledCache, COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, COMPILED_CACHE_ENGINE_IDENTITY,
+};
 pub use wasm::{WasmExecutionResult, WasmSandbox, WasmSandboxLimits, DEFAULT_ENTRYPOINT};
 
 #[derive(Debug, Error)]
@@ -74,6 +76,10 @@ pub enum SandboxError {
     ResourceLimitExceeded(String),
     #[error("WebAssembly guest trapped: {0}")]
     GuestTrap(String),
+    #[error("guest reported an error result: {0}")]
+    GuestReportedError(String),
+    #[error("guest output is {actual} bytes; maximum is {maximum}")]
+    OutputLimitExceeded { actual: usize, maximum: usize },
     #[error("execution intent could not be persisted; execution denied")]
     ExecutionIntentNotPersisted,
     #[error("execution journal unavailable: {0}")]
@@ -89,6 +95,8 @@ impl SandboxError {
             Self::DeadlineExceeded => "deadline_exceeded",
             Self::ResourceLimitExceeded(_) => "resource_limit",
             Self::GuestTrap(_) => "guest_trap",
+            Self::GuestReportedError(_) => "guest_error",
+            Self::OutputLimitExceeded { .. } => "output_limit",
             Self::MissingEntrypoint(_) => "missing_abi",
             Self::InvalidEntrypoint { .. } => "incompatible_abi",
             Self::InvalidModule(_) => "invalid_module",
@@ -125,6 +133,9 @@ pub enum ExecutionRuntime {
     InProcessSimulation,
     WasmtimeCorePhaseA,
     WasmtimeVerifiedPureComputeV2,
+    /// Verified pure-compute execution of a WebAssembly component under the
+    /// `sovereign:tool/pure-tool` world (zero imports, bounded input/output).
+    WasmtimeVerifiedComponentV1,
 }
 
 impl ExecutionRuntime {
@@ -134,7 +145,9 @@ impl ExecutionRuntime {
     pub fn is_isolated(self) -> bool {
         matches!(
             self,
-            Self::WasmtimeCorePhaseA | Self::WasmtimeVerifiedPureComputeV2
+            Self::WasmtimeCorePhaseA
+                | Self::WasmtimeVerifiedPureComputeV2
+                | Self::WasmtimeVerifiedComponentV1
         )
     }
 
@@ -147,6 +160,7 @@ impl ExecutionRuntime {
             Self::InProcessSimulation => "in_process_simulation",
             Self::WasmtimeCorePhaseA => "wasmtime_core_phase_a",
             Self::WasmtimeVerifiedPureComputeV2 => "wasmtime_verified_pure_compute_v2",
+            Self::WasmtimeVerifiedComponentV1 => "wasmtime_verified_component_v1",
         }
     }
 }

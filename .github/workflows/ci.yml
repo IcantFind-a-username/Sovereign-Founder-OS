@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Rapid consecutive pushes race the in-flight run (gitleaks resolves the PR
+# head via the API mid-run and fails on a revision it doesn't have). Cancel
+# superseded runs instead of letting them fail as false alarms.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest

@@ -30,9 +30,9 @@ pub use invocation::{PreparedInvocation, RawResourceGrant};
 pub use manifest::{
     AdmissionLimits, ArtifactAbi, ArtifactBackend, ArtifactVerificationIntent, ArtifactVerifier,
     OperationDefinition, PluginManifest, ResourceBindingRule, ResourceNormalization, RiskClass,
-    SystemClock, TrustedClock, VerifiedArtifact, CANONICALIZATION_PROFILE, CORE_WASM_ENTRYPOINT,
-    HARD_MAX_COMPONENT_BYTES, HARD_MAX_MANIFEST_PAYLOAD_BYTES, HARD_MAX_SIGNED_MANIFEST_BYTES,
-    MANIFEST_PROTOCOL_VERSION,
+    SystemClock, TrustedClock, VerifiedArtifact, CANONICALIZATION_PROFILE, COMPONENT_ENTRYPOINT,
+    CORE_WASM_ENTRYPOINT, HARD_MAX_COMPONENT_BYTES, HARD_MAX_MANIFEST_PAYLOAD_BYTES,
+    HARD_MAX_SIGNED_MANIFEST_BYTES, MANIFEST_PROTOCOL_VERSION, SOVEREIGN_TOOL_WIT_WORLD,
 };
 pub use schema::{
     InputLimits, InputSchema, IJSON_SAFE_INTEGER_MAX, IJSON_SAFE_INTEGER_MIN,

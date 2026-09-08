@@ -42,10 +42,12 @@ pub enum ArtifactError {
     PublisherKeyIdMismatch,
     #[error("only the pure_compute risk class is supported in this phase")]
     UnsupportedRiskClass,
-    #[error("only the core_wasm backend is supported in this phase")]
+    #[error("only the core_wasm and component_wasm backends are supported in this phase")]
     UnsupportedBackend,
-    #[error("only the sovereign_core_wasm_v1 ABI is supported in this phase")]
+    #[error("manifest ABI or entrypoint does not match its declared backend")]
     UnsupportedAbi,
+    #[error("manifest wit_world does not match its declared backend")]
+    WitWorldMismatch,
     #[error("host capabilities are forbidden for pure-compute artifacts")]
     HostCapabilitiesForbidden,
     #[error("manifest declares no operations")]

@@ -645,7 +645,10 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
         if claims.risk_class != RiskClass::PureCompute {
             return Err(CapabilityV2Error::UnsupportedRiskClass);
         }
-        if claims.backend != ArtifactBackend::CoreWasm {
+        if !matches!(
+            claims.backend,
+            ArtifactBackend::CoreWasm | ArtifactBackend::ComponentWasm
+        ) {
             return Err(CapabilityV2Error::BackendDowngradeDenied);
         }
         if claims.venture_id != context.venture_id {
@@ -878,7 +881,10 @@ fn validate_supported_invocation(prepared: &PreparedInvocation) -> Result<(), Ca
     if prepared.artifact().manifest().risk_class() != RiskClass::PureCompute {
         return Err(CapabilityV2Error::UnsupportedRiskClass);
     }
-    if prepared.artifact().manifest().backend() != ArtifactBackend::CoreWasm {
+    if !matches!(
+        prepared.artifact().manifest().backend(),
+        ArtifactBackend::CoreWasm | ArtifactBackend::ComponentWasm
+    ) {
         return Err(CapabilityV2Error::BackendDowngradeDenied);
     }
     let primary_resource = required_primary_resource(prepared)?;

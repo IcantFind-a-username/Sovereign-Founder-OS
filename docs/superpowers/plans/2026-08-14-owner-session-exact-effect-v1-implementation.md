@@ -126,6 +126,18 @@ For every task: register only the named tests and their exact package/target/fea
 
 ## Task 1: Accept the fixture-only RFC and freeze the mechanism matrix/origin
 
+> **PARTIALLY LANDED (2026-08-26).** The judgment-dense half is done: RFC 0006
+> and its RED-first freeze gate `scripts/check-owner-effect-rfc.sh` exist and
+> are green (34 checks; teeth verified by dropping a required anchor and
+> injecting a forbidden activation claim, both caught). `docs/INDEX.md` links
+> the RFC. The remaining mechanical scaffolding — the origin preflight harness,
+> the mechanism-matrix doc, and the two checked test-manifest runners with
+> their self-tests — is re-sliced into untagged single-round backlog entries
+> for the nightly pipeline; see `docs/backlog.md`. The `ROADMAP.md` edit this
+> task lists is held as an owner-approval diff per the session's roadmap-
+> governance rule, not landed here. RED-first order held: the gate failed with
+> `missing rfcs/0006-...` before the RFC existed.
+
 **Files:**
 
 - Create: `rfcs/0006-synthetic-owner-session-exact-effect-fixture.md`
@@ -174,6 +186,15 @@ For every task: register only the named tests and their exact package/target/fea
 
 ## Task 2: Fix RFC 0003 approval retention before coordinator work
 
+> **VERIFIED ALREADY LANDED (2026-08-26).** This task's behavior and all three
+> exact test names shipped ahead of this plan (see the vault missing-key round,
+> backlog run log 2026-08-15). No code change was needed. The `run-owner-effect`
+> runners named below do not exist until Task 1 lands, so verification used
+> plain `cargo test`; the runner-wrapped commands become the standing gate once
+> Task 1 is done. Task 4 (redb migration of these legacy claims) still consumes
+> this. Checkboxes are ticked to reflect the verified state, not a fresh
+> implementation.
+
 **Files:**
 
 - Modify: `crates/capability/src/v2.rs`
@@ -183,7 +204,7 @@ For every task: register only the named tests and their exact package/target/fea
 
 **Consumes:** RFC 0003's independent approval expiry. **Produces:** Correct legacy claim semantics that Task 4 migrates.
 
-- [ ] **RED:** Add `durable_approval_survives_token_expiry_purge_until_approval_expiry` and `expired_approval_purges_at_approval_expiry`. Use approval expiry `t+120`, token expiry `t+30`, purge/reopen at `t+31`, and attempt reuse with a second token. Run:
+- [x] **RED:** Add `durable_approval_survives_token_expiry_purge_until_approval_expiry` and `expired_approval_purges_at_approval_expiry`. Use approval expiry `t+120`, token expiry `t+30`, purge/reopen at `t+31`, and attempt reuse with a second token. Run:
 
   ```bash
   ./scripts/run-owner-effect-tests.sh --task 2 --phase red \
@@ -195,8 +216,8 @@ For every task: register only the named tests and their exact package/target/fea
 
   Expected RED: reuse succeeds because current storage purges the approval at token expiry.
 
-- [ ] Carry `(approval_id, approval_expires_at_unix)` from full RFC 0003 verification into `AuthorityStore::claim_approval`; keep token/idempotency expiries independent. Add authority test `purge_uses_each_claim_kind_expiry`.
-- [ ] **GREEN:** Run:
+- [x] Carry `(approval_id, approval_expires_at_unix)` from full RFC 0003 verification into `AuthorityStore::claim_approval`; keep token/idempotency expiries independent. Add authority test `purge_uses_each_claim_kind_expiry`.
+- [x] **GREEN:** Run:
 
   ```bash
   ./scripts/run-owner-effect-tests.sh --task 2 --phase green -- \
@@ -206,8 +227,8 @@ For every task: register only the named tests and their exact package/target/fea
   ./scripts/run-owner-effect-regression.sh -- cargo test --workspace --no-default-features --locked
   ```
 
-- [ ] Commit: `fix(authority): retain approvals through their own expiry`
-- [ ] Push checkpoint 2.
+- [x] Commit: `fix(authority): retain approvals through their own expiry`
+- [x] Push checkpoint 2.
 
 ## Task 3: Characterize real subprocess claims with exact release-excluded barriers
 

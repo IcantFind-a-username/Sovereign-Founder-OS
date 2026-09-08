@@ -1,0 +1,22 @@
+// The `sovereign:tool/pure-tool` world — the only WIT world admitted for the
+// `component_wasm` backend in this phase (RFC 0002).
+//
+// It is deliberately minimal: zero imports and one export. The trusted host
+// delivers the capability-authenticated canonical invocation input through
+// the canonical ABI and lifts a host-bounded output. There is no context, no
+// grant resource, and no host interface of any kind; those arrive only with
+// the reviewed Phase D host interfaces.
+//
+// The host does not consume this file at build time (no bindgen); it is the
+// normative description of the ABI enforced by the verified executor, which
+// refuses any component whose `run` export does not have exactly this type
+// and refuses any component that declares any import at all.
+
+package sovereign:tool@0.1.0;
+
+world pure-tool {
+    /// Pure computation over the authenticated canonical input.
+    /// Success is the tool's output payload; failure is a bounded,
+    /// guest-reported diagnostic string.
+    export run: func(input: list<u8>) -> result<list<u8>, string>;
+}
