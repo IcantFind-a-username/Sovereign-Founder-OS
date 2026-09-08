@@ -43,7 +43,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Set the recommended Goal to an integrated end-to-end MVP.** IN PROGRESS (2026-09-09)
+- [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Set the recommended Goal to an integrated end-to-end MVP.**
   Replace the default stage-limited Goal with one bounded outcome spanning
   S0 through S3 and their integrated consultant UI. Define synthetic business
   data, real model participation, complete business flow, observable acceptance
