@@ -1,0 +1,18 @@
+{
+  "kind": "owner-authorised-continuation",
+  "taskId": "S0-01-RECOVERY-SPEC",
+  "revision": 3,
+  "baseCommit": "558ed6c460e319809300bdae24bdba028a94eb22",
+  "ownerInstruction": "怎么影响小怎么去修，然后快点开发",
+  "historicalElapsedMs": null,
+  "historicalRecordsValid": false,
+  "dispatch": null,
+  "segmentBudgetMs": 1800000,
+  "status": "freeze-reviewed",
+  "freezeReview": {
+    "reviewer": "/root/recovery_spec_card_review",
+    "outcome": "accepted",
+    "baseCommit": "558ed6c460e319809300bdae24bdba028a94eb22",
+    "scope": "r3 freeze only; no valid historical v2 replay claimed"
+  }
+}
