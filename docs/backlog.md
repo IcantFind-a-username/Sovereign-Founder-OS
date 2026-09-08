@@ -16,6 +16,14 @@ repo audit; every entry below points at verified, real state of the code.
 - **Stuck = diagnose and release.** If a round can't go green, write the
   diagnosis as an indented note under the item, remove the IN PROGRESS mark,
   and end the session. The note is the next session's starting point.
+- **Codex lane routing.** Entries labelled `lane:codex` belong exclusively to
+  [the Codex scaffold](handoff/codex/README.md). Legacy nightly and human-relayed
+  workers MUST skip them. Codex controllers use the linked card as the sole
+  detailed scope/acceptance definition; controllers update queue records,
+  while workers write only their card's allowed files and report. An existing
+  `needs:fable` tag still blocks small-model execution until an architect
+  releases that exact card. A lane label is a protocol rule, not a proven
+  process-isolation mechanism; check for active conflicting work before claim.
 - **Entry format:** priority (P1 urgent / P2 soon / P3 opportunistic) +
   directory-level scope + done criteria that a test (or an exact command)
   can verify.
@@ -35,17 +43,123 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `docs/product/`, `docs/INDEX.md`, `docs/backlog.md` | Consolidate the Founder OS execution blueprint and bounded Luna task queue.** IN PROGRESS (2026-09-09)
+- [x] **P1 | `docs/product/`, `docs/handoff/`, `docs/INDEX.md`, `docs/backlog.md` | Consolidate the Founder OS execution blueprint and bounded Luna task queue.**
   Record the product vision, verified implementation baseline, researched
   component choices, business-demo milestones, and the requested Luna-medium
   worker / strong-model review / two-failure escalation protocol in one Chinese
-  document. Separate current mechanisms from proposed automation, preserve the
+  document set with one canonical entry and frozen first-stage task cards.
+  Separate current mechanisms from proposed automation, preserve the
   standalone synthetic Playground boundary, and add dependency-ordered tasks
   with explicit readiness and acceptance criteria. Documentation only; no
   product implementation or unattended development is activated by this item.
-  Done when: the blueprint is linked from `docs/INDEX.md`, its repository links
+  Done when: the canonical scaffold is linked from `docs/INDEX.md`, its repository links
   resolve, the task queue distinguishes executable work from design gates,
   `git diff --check` and `./scripts/test_changed.sh` pass.
+
+Codex execution uses the [single scaffold entry](handoff/codex/README.md).
+The entries below are queue records only: scope details, dependencies and
+acceptance are maintained in each linked card, not copied here. Frozen cards
+still require their dependencies, a clean base and a controller claim.
+Legacy human/nightly lanes must skip every `lane:codex` item. Unfrozen design
+and strong-model items retain `needs:fable`; Luna must skip those.
+
+- [x] **P1 | `docs/handoff/codex/` | S0-00 — Freeze the canonical scaffold document set.** `lane:codex`
+  Delivered as part of the current scaffold documentation item; no separate
+  planning round is required after that item is accepted.
+  Definition and done criteria: [S0-00](handoff/codex/README.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex`
+  Definition and done criteria: [S0-01](handoff/codex/cards/S0-01.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
+  Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-03 — Bind Git candidates to real check evidence.** `lane:codex`
+  Definition and done criteria: [S0-03](handoff/codex/cards/S0-03.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-04 — Enforce one controller and bounded recovery.** `lane:codex`
+  Definition and done criteria: [S0-04](handoff/codex/cards/S0-04.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-05A — Expose one controller CLI entry.** `lane:codex`
+  Definition and done criteria: [S0-05A](handoff/codex/cards/S0-05A.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-05 — Rehearse escalation recovery and real handoff.** `lane:codex`
+  Definition and done criteria: [S0-05](handoff/codex/cards/S0-05.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `docs/handoff/codex/` | S0-06 — Accept the scaffold and nominate the next product card.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S0-06](handoff/codex/cards/S0-06.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-00](handoff/codex/cards/S1-00.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G01 — Migrate the existing source boundary for the next closed stage.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-G01](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-01 — Implement four closed actions.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-01](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO dependency boundary.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-G02](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-02](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-03](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-04](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-05](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-06](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-07 — Add exact loopback server routes.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-07](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-08](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-09](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-10](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S1-11](handoff/codex/cards/S1-after-design.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S2-00](handoff/codex/milestones.md).
+  Design only; release implementation cards after the linked stage is frozen.
+
+- [ ] **P2 | `rfcs/, docs/handoff/codex/` | S3-00 — Freeze synthetic employee execution contracts.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S3-00](handoff/codex/milestones.md).
+  Design only; release implementation cards after the linked stage is frozen.
 
 - [x] **P1 | `crates/consultant-playground/tests/` | Split `physical_boundary.rs` before it breaks the file-size gate.**
   The file is at 1192 lines against the hard 1200 limit in

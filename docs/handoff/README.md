@@ -1,5 +1,10 @@
 # Orchestrated handoff rounds
 
+**Codex automated lane:** start at the [Luna scaffold entry](codex/README.md).
+It owns the Codex task cards, model roles, review/escalation protocol and
+controller-managed queue updates. The human-relayed procedure below remains
+the legacy lane; do not mix its worker/owner responsibilities into a Codex card.
+
 How a human-relayed **orchestrator** session dispatches bounded work to
 **worker** sessions and receives a report back. The worker never decides
 scope; the orchestrator never types implementation code; the owner relays
