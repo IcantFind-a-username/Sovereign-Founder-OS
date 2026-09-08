@@ -228,8 +228,10 @@ while the controller routes eligible design/review cards to the strong role.
   This is pure domain behavior; no search results, HTTP or browser UI yet.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO dependency boundary.** `lane:codex` `needs:fable`
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO source and dependency boundary.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
   Definition and done criteria: [S1-G02](handoff/codex/cards/S1-G02.md).
+  Base `d42c50eb3303cd3c494b62321125af44a43ff4e6`; card blob
+  `b3c4cf31f00d0dc786440e861c19639b378c304f`; exact six-file test-only scope.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` `needs:fable`
