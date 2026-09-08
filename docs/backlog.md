@@ -228,10 +228,19 @@ while the controller routes eligible design/review cards to the strong role.
   This is pure domain behavior; no search results, HTTP or browser UI yet.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO source and dependency boundary.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO source and dependency boundary.** `lane:codex` DONE (Astra fallback accepted after two substantive Luna failures)
   Definition and done criteria: [S1-G02](handoff/codex/cards/S1-G02.md).
   Base `d42c50eb3303cd3c494b62321125af44a43ff4e6`; card blob
   `b3c4cf31f00d0dc786440e861c19639b378c304f`; exact six-file test-only scope.
+  Attempt 1 changes requested: incomplete static grammar/visibility fixture, missing
+  required metadata fields accepted, and incomplete mutation coverage. Attempt 2
+  repaired required null fields and partial tests but still omitted the complete
+  static grammar/visibility fixture. Two substantive failures; no third Luna
+  attempt. Astra fallback repaired the six files; independent strong reviewer
+  `/root/recovery_spec_card_review` accepted the final candidate. Full workspace
+  test/clippy and scoped gate passed; logs `.harness/s1-g02/integration/`.
+  Evidence: [supervised report](handoff/codex/reports/S1-G02-supervised.md).
+  Logs: `.harness/s1-g02/attempt2*`.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` `needs:fable`
@@ -239,7 +248,7 @@ while the controller routes eligible design/review cards to the strong role.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-03](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-03](handoff/codex/cards/S1-03.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`

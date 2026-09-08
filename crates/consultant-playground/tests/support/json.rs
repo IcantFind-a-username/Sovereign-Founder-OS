@@ -8,6 +8,8 @@ pub(crate) enum JsonValue {
     String(String),
     Array(Vec<JsonValue>),
     Object(BTreeMap<String, JsonValue>),
+    Bool(bool),
+    Null,
     Scalar,
 }
 
@@ -150,7 +152,12 @@ impl<'a> JsonParser<'a> {
             return Err(format!("invalid JSON keyword at byte {}", self.cursor));
         }
         self.cursor += keyword.len();
-        Ok(JsonValue::Scalar)
+        Ok(match keyword {
+            b"true" => JsonValue::Bool(true),
+            b"false" => JsonValue::Bool(false),
+            b"null" => JsonValue::Null,
+            _ => JsonValue::Scalar,
+        })
     }
 
     fn parse_number(&mut self) -> Result<JsonValue, String> {

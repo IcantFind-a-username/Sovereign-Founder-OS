@@ -97,6 +97,8 @@ impl PlaygroundSession {
 
 pub(crate) const ACTION_DOMAIN_ADDITIONS: &str =
     include_str!("fixtures/action-domain-additions.rs.txt");
+pub(crate) const READ_MODEL_DOMAIN_PRODUCTION: &str =
+    include_str!("fixtures/read-model-domain.rs.txt");
 
 const DOMAIN_TEST_HEADER: &str = "#[cfg(test)] mod tests {";
 
@@ -174,7 +176,9 @@ fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError
         RustLexer::lex(EXPECTED_DOMAIN_PRODUCTION).expect("expected domain shape must lex");
     let mut extended = expected.clone();
     extended.extend(RustLexer::lex(ACTION_DOMAIN_ADDITIONS).expect("action additions must lex"));
-    if production == expected || production == extended {
+    let read_model = RustLexer::lex(READ_MODEL_DOMAIN_PRODUCTION)
+        .expect("complete read model production fixture must lex");
+    if production == expected || production == extended || production == read_model {
         Ok(())
     } else {
         Err(SourceBoundaryError::new(

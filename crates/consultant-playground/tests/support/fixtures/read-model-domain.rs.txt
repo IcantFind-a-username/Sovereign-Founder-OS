@@ -1,0 +1,164 @@
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SemanticKey {
+    ReportingClaritySprint,
+    WeeklyReportingTakesSixHours,
+    FinanceMustApprove,
+    ThirtyMinuteScopingCall,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RelationshipStage {
+    Lead,
+    Customer,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Company {
+    name: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Offer {
+    name_key: SemanticKey,
+    price_usd_cents: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Relationship {
+    organization: &'static str,
+    contact_name: &'static str,
+    contact_email: &'static str,
+    stage: RelationshipStage,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Discovery {
+    problem_key: SemanticKey,
+    budget_min_usd_cents: u32,
+    budget_max_usd_cents: u32,
+    constraint_key: SemanticKey,
+    next_step_key: SemanticKey,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ConsultantPlaygroundGraph {
+    company: Company,
+    offer: Offer,
+    relationship: Relationship,
+    discovery: Discovery,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct PlaygroundSession {
+    graph: ConsultantPlaygroundGraph,
+}
+
+impl PlaygroundSession {
+    pub(crate) fn new() -> Self {
+        Self {
+            graph: ConsultantPlaygroundGraph {
+                company: Company {
+                    name: "North Star Operations",
+                },
+                offer: Offer {
+                    name_key: SemanticKey::ReportingClaritySprint,
+                    price_usd_cents: 250_000,
+                },
+                relationship: Relationship {
+                    organization: "Acme Ltd",
+                    contact_name: "Alex Chen",
+                    contact_email: "alex.chen@example.test",
+                    stage: RelationshipStage::Lead,
+                },
+                discovery: Discovery {
+                    problem_key: SemanticKey::WeeklyReportingTakesSixHours,
+                    budget_min_usd_cents: 300_000,
+                    budget_max_usd_cents: 500_000,
+                    constraint_key: SemanticKey::FinanceMustApprove,
+                    next_step_key: SemanticKey::ThirtyMinuteScopingCall,
+                },
+            },
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PlaygroundAction {
+    CorrectOfferPrice,
+    PromoteAcmeToCustomer,
+    ShowReportingSearch,
+    Reset,
+}
+
+impl PlaygroundSession {
+    pub(crate) fn apply(&mut self, action: PlaygroundAction) {
+        match action {
+            PlaygroundAction::CorrectOfferPrice => {
+                self.graph.offer.price_usd_cents = 350_000;
+            }
+            PlaygroundAction::PromoteAcmeToCustomer => {
+                self.graph.relationship.stage = RelationshipStage::Customer;
+            }
+            PlaygroundAction::ShowReportingSearch => {}
+            PlaygroundAction::Reset => {
+                *self = Self::new();
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+pub(crate) struct PlaygroundReadModel {
+    profile: &'static str,
+    real_data_enabled: bool,
+    persistence: &'static str,
+    company_name: &'static str,
+    offer_name_key: &'static str,
+    offer_price_usd_cents: u32,
+    relationship_organization: &'static str,
+    relationship_contact_name: &'static str,
+    relationship_contact_email: &'static str,
+    relationship_stage: &'static str,
+    discovery_problem_key: &'static str,
+    discovery_budget_min_usd_cents: u32,
+    discovery_budget_max_usd_cents: u32,
+    discovery_constraint_key: &'static str,
+    discovery_next_step_key: &'static str,
+}
+
+impl SemanticKey {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ReportingClaritySprint => "reporting_clarity_sprint",
+            Self::WeeklyReportingTakesSixHours => "weekly_reporting_takes_six_hours",
+            Self::FinanceMustApprove => "finance_must_approve",
+            Self::ThirtyMinuteScopingCall => "thirty_minute_scoping_call",
+        }
+    }
+}
+
+impl PlaygroundSession {
+    pub(crate) fn read_model(&self) -> PlaygroundReadModel {
+        PlaygroundReadModel {
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            company_name: self.graph.company.name,
+            offer_name_key: self.graph.offer.name_key.as_str(),
+            offer_price_usd_cents: self.graph.offer.price_usd_cents,
+            relationship_organization: self.graph.relationship.organization,
+            relationship_contact_name: self.graph.relationship.contact_name,
+            relationship_contact_email: self.graph.relationship.contact_email,
+            relationship_stage: match self.graph.relationship.stage {
+                RelationshipStage::Lead => "lead",
+                RelationshipStage::Customer => "customer",
+            },
+            discovery_problem_key: self.graph.discovery.problem_key.as_str(),
+            discovery_budget_min_usd_cents: self.graph.discovery.budget_min_usd_cents,
+            discovery_budget_max_usd_cents: self.graph.discovery.budget_max_usd_cents,
+            discovery_constraint_key: self.graph.discovery.constraint_key.as_str(),
+            discovery_next_step_key: self.graph.discovery.next_step_key.as_str(),
+        }
+    }
+}

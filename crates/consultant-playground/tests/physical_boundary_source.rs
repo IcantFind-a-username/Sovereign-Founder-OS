@@ -23,6 +23,7 @@ mod symlink_fixture;
 
 use boundary::{
     source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, EXPECTED_DOMAIN_PRODUCTION,
+    READ_MODEL_DOMAIN_PRODUCTION,
 };
 use manifest::{crate_root, manifest_boundary};
 use production_sources::production_sources;
@@ -212,6 +213,151 @@ fn action_gate_accepts_pinned_legacy_and_action_grammars() {
 }
 
 #[test]
+fn read_model_gate_accepts_only_pinned_stage_grammars() {
+    for (name, production) in [
+        ("legacy", EXPECTED_DOMAIN_PRODUCTION.to_string()),
+        ("actions", action_production_fixture()),
+        ("DTO", READ_MODEL_DOMAIN_PRODUCTION.to_string()),
+    ] {
+        let source = format!("{production}\n#[cfg(test)]\nmod tests {{}}");
+        source_boundary(Path::new("domain.rs"), &source)
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+    }
+    let (visible_actions, dto) = READ_MODEL_DOMAIN_PRODUCTION
+        .split_once("#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]")
+        .expect("static fixture contains DTO declaration");
+    let dto = format!("#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]{dto}");
+    let incomplete = [
+        ("visibility only", visible_actions.to_string()),
+        ("DTO only", dto.clone()),
+        (
+            "private actions plus DTO",
+            format!("{}{dto}", action_production_fixture()),
+        ),
+        (
+            "missing actions",
+            format!("{}{dto}", EXPECTED_DOMAIN_PRODUCTION),
+        ),
+    ];
+    for (name, production) in incomplete {
+        assert_source_rejection(
+            name,
+            Path::new("domain.rs"),
+            &format!("{production}\n#[cfg(test)]\nmod tests {{}}"),
+            SourceBoundaryKind::DomainProductionShape,
+        );
+    }
+}
+
+#[test]
+fn read_model_gate_rejects_projection_mutations() {
+    let fixture = format!("{READ_MODEL_DOMAIN_PRODUCTION}\n#[cfg(test)]\nmod tests {{}}");
+    let mutations = [
+        ("profile metadata", "profile: \"synthetic_playground\"", "profile: \"changed\""),
+        ("real data metadata", "real_data_enabled: false", "real_data_enabled: true"),
+        ("persistence metadata", "persistence: \"none\"", "persistence: \"disk\""),
+        ("catalog key", "\"reporting_clarity_sprint\"", "\"changed\""),
+        ("field type", "offer_price_usd_cents: u32", "offer_price_usd_cents: u64"),
+        ("field name", "persistence: &'static str", "other: &'static str"),
+        ("field missing", "    persistence: &'static str,", ""),
+        ("field order", "    profile: &'static str,\n    real_data_enabled: bool,", "    real_data_enabled: bool,\n    profile: &'static str,"),
+        ("field public", "    profile: &'static str,", "    pub profile: &'static str,"),
+        ("value source", "company_name: self.graph.company.name", "company_name: self.graph.relationship.organization"),
+        ("stage projection", "RelationshipStage::Lead => \"lead\"", "RelationshipStage::Lead => \"customer\""),
+        ("graph public", "struct ConsultantPlaygroundGraph", "pub(crate) struct ConsultantPlaygroundGraph"),
+        ("graph field public", "    graph: ConsultantPlaygroundGraph,", "    pub(crate) graph: ConsultantPlaygroundGraph,"),
+        ("serialize graph", "struct ConsultantPlaygroundGraph", "#[derive(serde::Serialize)] struct ConsultantPlaygroundGraph"),
+        ("serialize session", "pub(crate) struct PlaygroundSession", "#[derive(serde::Serialize)] pub(crate) struct PlaygroundSession"),
+        ("serialize action", "pub(crate) enum PlaygroundAction", "#[derive(serde::Serialize)] pub(crate) enum PlaygroundAction"),
+        ("serialize domain", "enum SemanticKey", "#[derive(serde::Serialize)] enum SemanticKey"),
+        ("DTO deserialize", "PartialEq, serde::Serialize", "PartialEq, serde::Serialize, serde::Deserialize"),
+        ("DTO loses Copy", "#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]", "#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]"),
+        ("mutable receiver", "fn read_model(&self)", "fn read_model(&mut self)"),
+        ("graph reference", "fn read_model(&self) -> PlaygroundReadModel", "fn read_model(&self) -> &ConsultantPlaygroundGraph"),
+        ("extra parameter", "fn read_model(&self)", "fn read_model(&self, input: u32)"),
+        ("projection write", "profile: \"synthetic_playground\"", "profile: { self.graph.offer.price_usd_cents = 1; \"synthetic_playground\" }"),
+        ("projection IO", "company_name: self.graph.company.name", "company_name: { std::fs::write(\"leak\", \"data\").unwrap(); self.graph.company.name }"),
+        ("projection env", "company_name: self.graph.company.name", "company_name: env!(\"SECRET\")"),
+        ("projection process", "company_name: self.graph.company.name", "company_name: { std::process::Command::new(\"sh\").spawn().unwrap(); self.graph.company.name }"),
+        ("projection unsafe", "company_name: self.graph.company.name", "company_name: unsafe { self.graph.company.name }"),
+        ("read model visibility", "pub(crate) fn read_model", "pub fn read_model"),
+        ("session visibility missing", "pub(crate) struct PlaygroundSession", "struct PlaygroundSession"),
+        ("action visibility missing", "pub(crate) enum PlaygroundAction", "enum PlaygroundAction"),
+        ("new visibility missing", "pub(crate) fn new", "fn new"),
+        ("apply visibility missing", "pub(crate) fn apply", "fn apply"),
+    ];
+    for (name, target, replacement) in mutations {
+        assert!(fixture.contains(target), "missing target for {name}");
+        let changed = fixture.replacen(target, replacement, 1);
+        assert_ne!(changed, fixture, "mutation had no effect for {name}");
+        assert_source_rejection(
+            name,
+            Path::new("domain.rs"),
+            &changed,
+            SourceBoundaryKind::DomainProductionShape,
+        );
+    }
+    for extra in [
+        "impl From<PlaygroundReadModel> for PlaygroundSession { fn from(_: PlaygroundReadModel) -> Self { Self::new() } }",
+        "impl From<PlaygroundReadModel> for ConsultantPlaygroundGraph { fn from(_: PlaygroundReadModel) -> Self { PlaygroundSession::new().graph } }",
+        "impl PlaygroundSession { fn extra(&self) {} }",
+        "impl serde::Serialize for PlaygroundReadModel {}",
+        "use std::{fs as disk};",
+    ] {
+        let source = format!("{READ_MODEL_DOMAIN_PRODUCTION}\n{extra}\n#[cfg(test)]\nmod tests {{}}");
+        assert_source_rejection(extra, Path::new("domain.rs"), &source, SourceBoundaryKind::DomainProductionShape);
+    }
+    for attribute in [
+        "#[serde(rename = \"changed\")]",
+        "#[serde(flatten)]",
+        "#[serde(default)]",
+        "#[serde(skip)]",
+        "#[serde(serialize_with = \"custom\")]",
+    ] {
+        let source = fixture.replacen(
+            "    profile: &'static str,",
+            &format!("    {attribute} profile: &'static str,"),
+            1,
+        );
+        assert_source_rejection(
+            attribute,
+            Path::new("domain.rs"),
+            &source,
+            SourceBoundaryKind::DomainProductionShape,
+        );
+    }
+    let path = format!("{READ_MODEL_DOMAIN_PRODUCTION}\n#[path=\"../outside.rs\"] mod escaped;\n#[cfg(test)] mod tests {{}}");
+    assert_source_rejection(
+        "DTO path escape",
+        Path::new("domain.rs"),
+        &path,
+        SourceBoundaryKind::PathAttribute,
+    );
+    for (name, source) in [
+        ("wrapper missing", READ_MODEL_DOMAIN_PRODUCTION.to_string()),
+        (
+            "wrapper cfg changed",
+            fixture.replace("#[cfg(test)]", "#[cfg(any())]"),
+        ),
+        (
+            "wrapper not terminal",
+            format!("{fixture} fn escaped() {{}}"),
+        ),
+        (
+            "wrapper duplicated",
+            format!("{fixture} #[cfg(test)] mod tests {{}}"),
+        ),
+    ] {
+        assert_source_rejection(
+            name,
+            Path::new("domain.rs"),
+            &source,
+            SourceBoundaryKind::DomainTestModuleShape,
+        );
+    }
+}
+
+#[test]
 fn action_gate_rejects_unapproved_action_mutations() {
     let mutations = [
         (
@@ -366,6 +512,14 @@ fn domain_with_extra(extra: &str) -> String {
 fn action_fixture() -> String {
     format!(
         "{}\n{}\n#[cfg(test)]\nmod tests {{}}",
+        action_production_fixture(),
+        ""
+    )
+}
+
+fn action_production_fixture() -> String {
+    format!(
+        "{}\n{}",
         EXPECTED_DOMAIN_PRODUCTION, ACTION_DOMAIN_ADDITIONS
     )
 }
