@@ -43,6 +43,12 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P2 | `docs/handoff/codex/provider-setup.md`, `docs/backlog.md` | Record the founder's credential-storage handoff.** IN PROGRESS (2026-09-09)
+  Record the founder-reported local storage state separately from machine
+  verification and API connectivity. Do not read credentials or invoke the
+  provider. Done when the status is explicit and `git diff --check` plus
+  `./scripts/test_changed.sh` pass.
+
 - [x] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Consolidate the Singapore pilot and model-credential handoff.**
   Record the founder's Singapore-first decision and reconcile the discussion
   of employee skills, Claude access, credential custody, desktop delivery,
