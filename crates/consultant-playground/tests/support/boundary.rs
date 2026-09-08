@@ -9,7 +9,7 @@ use crate::rust_lexer::{RustLexer, RustToken};
 
 const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;";
 
-const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
+pub(crate) const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SemanticKey {
     ReportingClaritySprint,
@@ -95,6 +95,9 @@ impl PlaygroundSession {
 }
 "####;
 
+pub(crate) const ACTION_DOMAIN_ADDITIONS: &str =
+    include_str!("fixtures/action-domain-additions.rs.txt");
+
 const DOMAIN_TEST_HEADER: &str = "#[cfg(test)] mod tests {";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -169,7 +172,9 @@ fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError
     reject_path_attributes(production)?;
     let expected =
         RustLexer::lex(EXPECTED_DOMAIN_PRODUCTION).expect("expected domain shape must lex");
-    if production == expected {
+    let mut extended = expected.clone();
+    extended.extend(RustLexer::lex(ACTION_DOMAIN_ADDITIONS).expect("action additions must lex"));
+    if production == expected || production == extended {
         Ok(())
     } else {
         Err(SourceBoundaryError::new(

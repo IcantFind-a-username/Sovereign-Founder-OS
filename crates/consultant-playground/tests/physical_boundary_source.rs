@@ -21,7 +21,9 @@ mod source_root;
 #[path = "support/symlink_fixture.rs"]
 mod symlink_fixture;
 
-use boundary::{source_boundary, SourceBoundaryKind};
+use boundary::{
+    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, EXPECTED_DOMAIN_PRODUCTION,
+};
 use manifest::{crate_root, manifest_boundary};
 use production_sources::production_sources;
 use source_root::SourceRootError;
@@ -194,6 +196,163 @@ fn domain_test_module_wrapper_must_be_exact_and_terminal() {
     );
 }
 
+#[test]
+fn action_gate_accepts_pinned_legacy_and_action_grammars() {
+    let legacy = format!(
+        "{}\n#[cfg(test)]\nmod tests {{}}",
+        EXPECTED_DOMAIN_PRODUCTION
+    );
+    let action = format!(
+        "{}\n{}\n#[cfg(test)]\nmod tests {{}}",
+        EXPECTED_DOMAIN_PRODUCTION, ACTION_DOMAIN_ADDITIONS
+    );
+
+    assert!(source_boundary(Path::new("domain.rs"), &legacy).is_ok());
+    assert!(source_boundary(Path::new("domain.rs"), &action).is_ok());
+}
+
+#[test]
+fn action_gate_rejects_unapproved_action_mutations() {
+    let mutations = [
+        (
+            "fifth action",
+            "    CorrectOfferPrice,\n",
+            "    CorrectOfferPrice,\n    Archive,\n",
+        ),
+        (
+            "unit becomes tuple",
+            "    CorrectOfferPrice,\n",
+            "    CorrectOfferPrice(u32),\n",
+        ),
+        (
+            "unit becomes string",
+            "    CorrectOfferPrice,\n",
+            "    CorrectOfferPrice(String),\n",
+        ),
+        (
+            "unit becomes price",
+            "    CorrectOfferPrice,\n",
+            "    CorrectOfferPrice { cents: u32 },\n",
+        ),
+        (
+            "wrong amount",
+            "self.graph.offer.price_usd_cents = 350_000;",
+            "self.graph.offer.price_usd_cents = 350_001;",
+        ),
+        (
+            "wrong stage",
+            "self.graph.relationship.stage = RelationshipStage::Customer;",
+            "self.graph.relationship.stage = RelationshipStage::Lead;",
+        ),
+        (
+            "extra field write",
+            "self.graph.offer.price_usd_cents = 350_000;",
+            "self.graph.offer.name_key = SemanticKey::ReportingClaritySprint;",
+        ),
+        (
+            "search modification",
+            "PlaygroundAction::ShowReportingSearch => {}",
+            "PlaygroundAction::ShowReportingSearch => { self.graph.offer.price_usd_cents = 350_000; }",
+        ),
+        (
+            "reset keeps old value",
+            "*self = Self::new();",
+            "*self = Self::new(); self.graph.offer.price_usd_cents = 350_000;",
+        ),
+        (
+            "reset IO",
+            "PlaygroundAction::Reset => {\n                *self = Self::new();\n            }",
+            "PlaygroundAction::Reset => { let _ = std::fs::read(\"secret\"); *self = Self::new(); }",
+        ),
+        ("extra method", "#[cfg(test)]\nmod tests", "fn unauthorized(&mut self) {}\n#[cfg(test)]\nmod tests"),
+        ("extra module", "#[cfg(test)]\nmod tests", "mod unauthorized {}\n#[cfg(test)]\nmod tests"),
+        ("extra import", "#[cfg(test)]\nmod tests", "use std::fmt;\n#[cfg(test)]\nmod tests"),
+        ("extra attribute", "#[cfg(test)]\nmod tests", "#[allow(dead_code)]\n#[cfg(test)]\nmod tests"),
+        ("cfg hidden", "#[cfg(test)]\nmod tests", "#[cfg(any())] fn hidden() {}\n#[cfg(test)]\nmod tests"),
+    ];
+    for (name, target, replacement) in mutations {
+        let before = action_fixture();
+        assert!(
+            before.contains(target),
+            "mutation target missing for `{name}`"
+        );
+        let source = before.replacen(target, replacement, 1);
+        assert_ne!(source, before, "mutation had no effect for `{name}`");
+        assert_source_rejection(
+            name,
+            Path::new("domain.rs"),
+            &source,
+            SourceBoundaryKind::DomainProductionShape,
+        );
+    }
+}
+
+#[test]
+fn action_gate_preserves_escape_and_test_wrapper_rejections() {
+    let grouped = action_fixture_with_extra("use std::{fs};");
+    let escapes = [
+        ("grouped std", grouped),
+        (
+            "grouped alias",
+            action_fixture_with_extra("use std::{fs as disk};"),
+        ),
+        (
+            "env",
+            action_fixture_with_extra("const LEAK: &str = env!(\"SECRET\");"),
+        ),
+        (
+            "format",
+            action_fixture_with_extra("fn leak() { let _ = format!(\"secret\"); }"),
+        ),
+        (
+            "allocation",
+            action_fixture_with_extra("fn leak() { let _ = \"secret\".to_owned(); }"),
+        ),
+        (
+            "unsafe",
+            action_fixture_with_extra("unsafe { core::arch::asm!(\"nop\"); }"),
+        ),
+        (
+            "extern",
+            action_fixture_with_extra("unsafe extern \"C\" { fn open(); }"),
+        ),
+        (
+            "path",
+            action_fixture_with_extra("#[path=\"../outside.rs\"] mod escaped;"),
+        ),
+    ];
+    for (name, source) in escapes {
+        let path = Path::new("domain.rs");
+        let kind = if name == "path" {
+            SourceBoundaryKind::PathAttribute
+        } else {
+            SourceBoundaryKind::DomainProductionShape
+        };
+        assert_source_rejection(name, path, &source, kind);
+    }
+
+    let fixture = action_fixture();
+    let changed = fixture.replacen("#[cfg(test)]\nmod tests", "#[cfg(any())]\nmod tests", 1);
+    let removed = fixture
+        .split_once("#[cfg(test)]\nmod tests")
+        .expect("fixture wrapper")
+        .0
+        .to_string();
+    let nonterminal = format!("{}\nmod trailing {{}}", fixture);
+    for (name, source) in [
+        ("changed wrapper", changed),
+        ("removed wrapper", removed),
+        ("nonterminal wrapper", nonterminal),
+    ] {
+        assert_source_rejection(
+            name,
+            Path::new("domain.rs"),
+            &source,
+            SourceBoundaryKind::DomainTestModuleShape,
+        );
+    }
+}
+
 fn domain_with_extra(extra: &str) -> String {
     let source = fs::read_to_string(crate_root().join("src/domain.rs"))
         .expect("domain source must be readable");
@@ -201,6 +360,20 @@ fn domain_with_extra(extra: &str) -> String {
     let offset = source
         .find(marker)
         .expect("domain source must contain its unit-test module");
+    format!("{}\n{extra}\n{}", &source[..offset], &source[offset..])
+}
+
+fn action_fixture() -> String {
+    format!(
+        "{}\n{}\n#[cfg(test)]\nmod tests {{}}",
+        EXPECTED_DOMAIN_PRODUCTION, ACTION_DOMAIN_ADDITIONS
+    )
+}
+
+fn action_fixture_with_extra(extra: &str) -> String {
+    let source = action_fixture();
+    let marker = "#[cfg(test)]\nmod tests";
+    let offset = source.find(marker).expect("fixture wrapper");
     format!("{}\n{extra}\n{}", &source[..offset], &source[offset..])
 }
 

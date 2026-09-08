@@ -209,11 +209,14 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S1-00](handoff/codex/cards/S1-00.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G01 — Migrate the existing source boundary for the next closed stage.** `lane:codex` IN PROGRESS (Luna medium, attempt 1; no prior failures)
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G01 — Migrate the existing source boundary for the next closed stage.** `lane:codex` DONE (Luna two candidates; Astra completion and independent review accepted)
   Definition and done criteria: [S1-G01](handoff/codex/cards/S1-G01.md).
   Frozen source base `32c54a4c2ed5cbb691c4e1c0633d9ed7520545d1`; card blob
   `cb4b2a98cb4d2ac2c3b1aa3e12c1213b3e505db5`. Exact three-file write set and
   commands are in the card; controller reviews before S1-01 dispatch.
+  Attempt 1 review: changes requested. Escape tests exercised the legacy domain
+  instead of the extended action fixture; fifth-action mutation replaced an
+  existing variant. Attempt 2 corrects these cases in the same three-file scope.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-01 — Implement four closed actions.** `lane:codex` `needs:fable`
