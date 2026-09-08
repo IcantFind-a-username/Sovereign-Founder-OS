@@ -82,9 +82,120 @@ impl PlaygroundSession {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlaygroundAction {
+    CorrectOfferPrice,
+    PromoteAcmeToCustomer,
+    ShowReportingSearch,
+    Reset,
+}
+
+impl PlaygroundSession {
+    fn apply(&mut self, action: PlaygroundAction) {
+        match action {
+            PlaygroundAction::CorrectOfferPrice => {
+                self.graph.offer.price_usd_cents = 350_000;
+            }
+            PlaygroundAction::PromoteAcmeToCustomer => {
+                self.graph.relationship.stage = RelationshipStage::Customer;
+            }
+            PlaygroundAction::ShowReportingSearch => {}
+            PlaygroundAction::Reset => {
+                *self = Self::new();
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{PlaygroundSession, RelationshipStage, SemanticKey};
+    use super::{PlaygroundAction, PlaygroundSession, RelationshipStage, SemanticKey};
+
+    fn reachable_states() -> [PlaygroundSession; 4] {
+        let fresh = PlaygroundSession::new();
+        let mut promoted = fresh;
+        promoted.apply(PlaygroundAction::PromoteAcmeToCustomer);
+        let mut corrected = fresh;
+        corrected.apply(PlaygroundAction::CorrectOfferPrice);
+        let mut corrected_promoted = corrected;
+        corrected_promoted.apply(PlaygroundAction::PromoteAcmeToCustomer);
+        [fresh, promoted, corrected, corrected_promoted]
+    }
+
+    #[test]
+    fn closed_actions_cover_every_reachable_transition() {
+        let actions = [
+            PlaygroundAction::CorrectOfferPrice,
+            PlaygroundAction::PromoteAcmeToCustomer,
+            PlaygroundAction::ShowReportingSearch,
+            PlaygroundAction::Reset,
+        ];
+        for state in reachable_states() {
+            for action in actions {
+                let mut actual = state;
+                actual.apply(action);
+                let mut expected = state;
+                match action {
+                    PlaygroundAction::CorrectOfferPrice => {
+                        expected.graph.offer.price_usd_cents = 350_000;
+                    }
+                    PlaygroundAction::PromoteAcmeToCustomer => {
+                        expected.graph.relationship.stage = RelationshipStage::Customer;
+                    }
+                    PlaygroundAction::ShowReportingSearch => {}
+                    PlaygroundAction::Reset => expected = PlaygroundSession::new(),
+                }
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn correct_price_and_promotion_are_idempotent_and_commute() {
+        let mut repeated = PlaygroundSession::new();
+        repeated.apply(PlaygroundAction::CorrectOfferPrice);
+        repeated.apply(PlaygroundAction::CorrectOfferPrice);
+        repeated.apply(PlaygroundAction::PromoteAcmeToCustomer);
+        repeated.apply(PlaygroundAction::PromoteAcmeToCustomer);
+
+        let mut price_then_stage = PlaygroundSession::new();
+        price_then_stage.apply(PlaygroundAction::CorrectOfferPrice);
+        price_then_stage.apply(PlaygroundAction::PromoteAcmeToCustomer);
+        let mut stage_then_price = PlaygroundSession::new();
+        stage_then_price.apply(PlaygroundAction::PromoteAcmeToCustomer);
+        stage_then_price.apply(PlaygroundAction::CorrectOfferPrice);
+
+        assert_eq!(repeated, price_then_stage);
+        assert_eq!(price_then_stage, stage_then_price);
+        assert_eq!(repeated.graph.offer.price_usd_cents, 350_000);
+        assert_eq!(
+            repeated.graph.relationship.stage,
+            RelationshipStage::Customer
+        );
+    }
+
+    #[test]
+    fn reporting_search_is_read_only_in_every_reachable_state() {
+        for state in reachable_states() {
+            let snapshot = state;
+            let mut actual = state;
+            actual.apply(PlaygroundAction::ShowReportingSearch);
+            assert_eq!(actual, snapshot);
+            actual.apply(PlaygroundAction::ShowReportingSearch);
+            assert_eq!(actual, snapshot);
+        }
+    }
+
+    #[test]
+    fn reset_reconstructs_exact_fixture_from_every_reachable_state() {
+        for state in reachable_states() {
+            let mut actual = state;
+            actual.apply(PlaygroundAction::Reset);
+            assert_eq!(actual, PlaygroundSession::new());
+            actual.apply(PlaygroundAction::Reset);
+            assert_eq!(actual, PlaygroundSession::new());
+        }
+    }
 
     #[test]
     fn fixture_matches_exact_synthetic_consultant_thread() {

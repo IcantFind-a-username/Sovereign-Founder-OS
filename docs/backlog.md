@@ -219,10 +219,13 @@ while the controller routes eligible design/review cards to the strong role.
   existing variant. Attempt 2 corrects these cases in the same three-file scope.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-01 — Implement four closed actions.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no prior failures)
+- [x] **P1 | `crates/consultant-playground/` | S1-01 — Implement four closed actions.** `lane:codex` DONE (Luna medium; attempt 1 accepted, no failures)
   Definition and done criteria: [S1-01](handoff/codex/cards/S1-01.md).
   Base `5d909ddc90a46adfa4d9e5ee4d966c05301a5438`; card blob
   `8e282e8a9206998485f0da36be48132c17427cce`. Only domain.rs is writable.
+  Controller accepted exact action grammar and all 16 transitions. Full workspace
+  test/clippy, fmt and scoped gate passed; logs `.harness/s1-01/`.
+  This is pure domain behavior; no search results, HTTP or browser UI yet.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO dependency boundary.** `lane:codex` `needs:fable`
