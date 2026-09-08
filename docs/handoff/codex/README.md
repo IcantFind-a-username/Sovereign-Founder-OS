@@ -6,6 +6,12 @@
 
 用户可选择 **gpt-5.6-luna / medium**，发送 [唯一启动消息](models-and-goals.md#luna-kickoff)。第一张开发卡是 **S0-01**：Luna 先按 [§8.2 自举流程](models-and-goals.md#bootstrap-controller) 分派强模型 controller；通过 S0-06 后再接管日常调度。切换模型本身不会安装配置或自动启动 Goal。
 
+## 当前入口覆盖说明
+
+按 owner 最新指示，当前使用 [主控监督的小任务循环](protocol.md)：Astra 拆卡
+与验收、Luna medium 实现。下文 S0-06 前置仅针对自动调度，不阻塞此监督模式。
+先完成 S1-00 最小产品接口冻结，再实施 S1-G01/S1-01；其余旧状态不追认为通过。
+
 ## 唯一事实来源
 
 “全局唯一 truth”指每类事实只有一个规范位置，由本表统一寻址；不会让新文档覆盖既有安全 RFC，也不再维护一份重复的大计划。

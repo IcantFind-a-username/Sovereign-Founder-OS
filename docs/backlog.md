@@ -205,7 +205,7 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S0-06](handoff/codex/cards/S0-06.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` `needs:fable`
+- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` IN PROGRESS (supervised mode)
   Definition and done criteria: [S1-00](handoff/codex/cards/S1-00.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
