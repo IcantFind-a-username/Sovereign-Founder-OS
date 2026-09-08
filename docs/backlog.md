@@ -45,7 +45,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Strengthen the full-chain Goal and context recovery instructions.** IN PROGRESS (2026-09-09)
+- [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Strengthen the full-chain Goal and context recovery instructions.**
   Extend the canonical MVP Goal with founder-runnable end-to-end acceptance,
   active context reduction, persistent recovery summaries, and continuation
   after compaction without resetting progress or failure history. Keep one
@@ -53,6 +53,11 @@ repo audit; every entry below points at verified, real state of the code.
   prepare the Luna launch text without starting implementation or automation.
   Done when the Goal, protocol and entry agree, links and `git diff --check`
   pass, and `./scripts/test_changed.sh` is green.
+  Independent read-only review accepted `de0fa88`; one ambiguous attempt
+  recovery sentence was corrected before acceptance. Local links/fences and
+  continuity checks pass; scoped gate ran gate-self-test/file-size/fmt, with
+  no Cargo test scope. Canonical Goal remains in models-and-goals §13.1,
+  recovery rules in protocol §9.5.1; no Goal or implementation was started.
 
 - [x] **P1 | `docs/handoff/codex/`, `docs/product/`, `docs/backlog.md` | Finalize the scaffold for a Luna-medium kickoff.**
   Audit the canonical contracts and frozen first-stage cards, resolve bootstrap
