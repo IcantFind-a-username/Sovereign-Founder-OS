@@ -153,13 +153,24 @@ while the controller routes eligible design/review cards to the strong role.
   architect design card is now frozen for v2 execution:
   [S0-01 recovery design](handoff/codex/reports/S0-01-recovery-design.md),
   [S0-01 recovery spec card](handoff/codex/cards/S0-01-RECOVERY-SPEC.md).
-  RECOVERY-SPEC is now claimed under the v2 Cspec records; its architect attempt
-  has not started and no v3 implementation is accepted:
+  RECOVERY-SPEC has a recorded claim, but execution admission is not valid.
+  Architect preflight work occurred without a recorded start; no v3 candidate
+  is accepted. Absence of a start event is not evidence of zero work:
   [contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r1/contract.json),
   [events](handoff/codex/events/S0-01-RECOVERY-SPEC.json).
-  The first Cspec was revised before architect start because its frozen input set
-  omitted five required RFC blobs; r2 preserves r1 and records the real stop:
+  The first Cspec omitted five required RFC blobs. The later r2 does not repair
+  execution admission and must not be dispatched as a valid frozen contract:
   [r2 contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r2/contract.json).
+  Recovery checkpoint at `fce0763`: `SPEC_RECORD_BINDING_MISMATCH`.
+  r2 base is `e9372ad`, whereas its revise event binds `c73c296`; r2 was changed
+  in place by `fce0763`. Its backlog input blob is `785370bd`, but the bound
+  base contains `4a3cf69b`. The source card remains revision 1. These findings
+  are controller record defects, not Luna implementation failures. The latest
+  architect confirmed no file edits/candidate/report and paused; the separate
+  app thread was asked to stop, with its terminal confirmation still pending.
+  Next: one bounded architect correction decision, preserving actual history
+  and work already performed; do not manufacture start times, actors or a new
+  zero-work attempt, and do not recursively create recovery-design cards.
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
