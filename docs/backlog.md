@@ -45,7 +45,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `docs/handoff/codex/`, `docs/product/`, `docs/backlog.md` | Finalize the scaffold for a Luna-medium kickoff.** IN PROGRESS (2026-09-09)
+- [x] **P1 | `docs/handoff/codex/`, `docs/product/`, `docs/backlog.md` | Finalize the scaffold for a Luna-medium kickoff.**
   Audit the canonical contracts and frozen first-stage cards, resolve bootstrap
   and controller handoff gaps, and provide one runnable-instructions entry for
   the requested integrated MVP. Keep runtime implementation, real provider
@@ -53,6 +53,9 @@ repo audit; every entry below points at verified, real state of the code.
   Done when the first task, handoff, recovery and design-release paths are
   unambiguous, local links and card consistency checks pass, and
   `git diff --check` plus `./scripts/test_changed.sh` are green.
+  Accepted documentation candidate: `e45be34`; evidence and next action:
+  [Luna kickoff readiness](handoff/codex/reviews/2026-09-09-luna-kickoff.md).
+  This completes documentation preparation, not S0 implementation.
 
 - [x] **P2 | `docs/handoff/codex/provider-setup.md`, `docs/backlog.md` | Record the founder's credential-storage handoff.**
   Record the founder-reported local storage state separately from machine
