@@ -166,11 +166,18 @@ while the controller routes eligible design/review cards to the strong role.
   in place by `fce0763`. Its backlog input blob is `785370bd`, but the bound
   base contains `4a3cf69b`. The source card remains revision 1. These findings
   are controller record defects, not Luna implementation failures. The latest
-  architect confirmed no file edits/candidate/report and paused; the separate
-  app thread was asked to stop, with its terminal confirmation still pending.
+  architect confirmed no file edits/candidate/report and paused. App thread
+  `01a08356-f1df-7a01-9bed-b9564ab7299a` is now idle with its stop turn completed;
+  its worktree is clean at `5a84fc4`, with no candidate or running check.
   Next: one bounded architect correction decision, preserving actual history
   and work already performed; do not manufacture start times, actors or a new
   zero-work attempt, and do not recursively create recovery-design cards.
+  A finite owner exception was requested and is pending an explicit reply.
+  Proposed scope is only RECOVERY-SPEC: keep defective historical records,
+  document their actual limitations, independently check one corrected freeze,
+  and execute from its isolated base. This proposal does not itself authorize
+  execution or assert successful v2 replay. Automatic Goal continuation is not
+  approval; S0-01 failure history and product authority remain unchanged.
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
