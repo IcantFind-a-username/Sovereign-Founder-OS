@@ -4,7 +4,7 @@
 
 ## 9. 自动施工协议：可恢复、可验收、有限重试
 
-本节是要实现并试演的流程规范。**在 S0 验收之前，依靠主线程明确执行这些步骤，不宣称已有机器强制保障。**
+本节是要实现并试演的流程规范。**在 S0 验收之前，由强模型 bootstrap controller 明确执行这些步骤，不宣称已有机器强制保障。**Luna 主线程的启动与转发边界只定义在 [models-and-goals §8.2](models-and-goals.md#bootstrap-controller)。
 
 ### 9.1 一个控制器、一个写入任务
 
@@ -75,7 +75,7 @@ Reviewer 保持产品源码只读。需要写 target、日志或临时 fixture �
 
 ### 9.4.1 Reviewer-only 里程碑卡
 
-S0-06、S1-11 是对前置候选的独立汇总验收，不产生新的实现 candidate，不分派 worker、不创建实现型 TaskContract/attempt，也不消耗 Luna 失败额度。它们的精确输入由对应卡的依赖和实际 candidate 列表构成。
+S0-06、S1-11，以及后续明确标为 reviewer-only 的里程碑卡，是对前置候选的独立汇总验收，不产生新的实现 candidate，不分派 worker、不创建实现型 TaskContract/attempt，也不消耗 Luna 失败额度。它们的精确输入由对应卡的依赖和实际 candidate 列表构成。
 
 Reviewer 对每个前置实现卡调用已有证据验证，并执行该里程碑门，随后提交唯一报告：gate ID/revision、各 task/candidate/review 引用、实际命令与结果、未完成项、accepted/changes_requested/blocked、下一张卡。Controller 核对这些引用与队列一致后才勾选里程碑卡。发现实现问题生成或退回具名修复卡；reviewer 不在验收报告任务里修改代码。
 
@@ -88,7 +88,8 @@ Reviewer 对每个前置实现卡调用已有证据验证，并执行该里程�
 ~~~text
 docs/handoff/codex/
   cards/        # 冻结卡：controller/architect 维护
-  events/       # 每次状态变化一个新 JSON 记录；Git 追踪
+  tasks/        # 每张卡每个 revision 的冻结 contract.json；Git 追踪
+  events/       # 每张卡一份只追加的事件数组；Git 保留每次追加历史
   reports/      # 每次 attempt 的 worker 报告
   reviews/      # 独立 reviewer 结论
   contracts.md  # 字段/状态/工具接口唯一规范
@@ -120,6 +121,28 @@ docs/handoff/codex/
 - 不使用 git reset --hard 清除用户工作，不自动删除失败分支或证据。
 - 旧 nightly runbook 与人工 handoff 保持原样。S0 检查是否存在仍在运行的流程；必须解决重复 claim 和文件冲突后才能启用新 lane。暂停或修改既有自动化要根据当时明确授权执行。
 
+### 9.6.1 首卡即可执行的提交与 worktree 顺序
+
+设 B 为认领前已经提交、规范完整的集成基线。命名必须使用仓库允许的前缀；controller 在已有专用 integration 分支保存记录，worker 为该卡另建分支/worktree。禁止拿目录名或此处字母代替实际完整 Git object ID。
+
+1. Controller 在 B 上解析 sourceCardBlob/inputBlobs，冻结 TaskContract 的 `baseCommit=B`、实际 actors、精确写集、检查、预算和唯一报告路径。先在 controller 分支提交 C：仅该卡 contract、claim event、backlog 等明确记录；C 完成后才派发。
+2. Worker 分支从 **B** 创建，不能从 C 创建。因此 B→W 的候选 diff 只含该卡产品/工具改动；controller 的 claim 文件不混入 worker 写集。冻结简报提供 C 中契约的确切只读路径与 blob，worker 可读取 controller 记录但不可修改。
+3. Worker 完成检查后提交候选 W。随后可在自己的分支提交 R，R 相对 W **只增加本次指定的报告文件**，报告引用 W；没有“把 W 的 SHA 写进 W 自己”的循环。报告若需更正，后续记录提交仍只能修改这个准确路径，不得混入源码。交付时 worker 工作树必须干净，新的 untracked 文件也须核对。
+4. Controller 创建/使用独立的候选检查 worktree，HEAD 固定为 W。inspect/checks/verify 都在此处运行；不能在 HEAD=R 或 controller HEAD=C 时谎报已经验证 W。R 的报告差异单独由 controller 检查；原始日志只进入批准的 .harness 路径，CheckRun 和 review 由 controller 在记录分支提交。
+5. Reviewer 只读 B→W、报告和实际检查结果。通过后 controller 将 **原始 W** 合并到本地 integration 分支，保留 W 的提交身份，再合入经过精确路径检查的报告记录。不得 cherry-pick 后继续沿用旧 W 的审阅作为新提交已验收的唯一依据。
+6. 集成提交 M 的产品/工具/测试/规范内容必须与 W 相同；差异只允许本次逐项列明的 controller 记录及已核对报告。逐项核对路径、record task/revision/candidate 与事件转换，不按 `docs/`、文件后缀或“只是记录”一概放行。发生冲突或任何非记录差异，停止并生成受审修复/重验，不在合并过程中改逻辑。
+7. controller 完成必需集成门及 Accepted/backlog 记录后，新的干净 HEAD 成为下一张卡的 B。不得删除失败分支、历史契约或旧记录以维持表面干净。尚无 S0 工具时由强模型按此 trace 核对，工具实现后用对应 CLI 复核。
+
+这是开发纪律，Git 检查器只负责候选及其冻结输入；记录分支和合并分类由 controller/reviewer 验证，不声称已有未实现的 record-only 防篡改工具。
+
+### 9.7 后续阶段的架构交接
+
+冻结的实现卡做完后，controller 按 [milestones](milestones.md) 选择依赖成立的下一阶段。未冻结阶段先调用强模型 planner，输入当前基线、完成证据、既有 RFC、该阶段目标与剩余依赖；planner 返回一张设计卡的完整建议，controller 将其交独立 reviewer 检查后登记/冻结，再派 architect 执行。该准备过程不允许 Luna 自行裁决业务或安全接口，也不算产品实现 attempt。
+
+设计卡必须给出：唯一规范文件、精确文档写集、必须回答的接口问题、现有工具清单、依赖证据、验收命令、输出小卡的 ID/依赖/写集，以及哪些判断需要新的 RFC 或 owner 决定。architect 在获准写集中把已冻结旧草案替换为链接，设计产物作为候选接受独立审阅；通过后 controller 只将可执行卡登记 backlog 和准入记录。存在必要未知项时只阻塞相关卡，不把目录级草案标成 Frozen。
+
+强模型缺失或无法分派时记录具名阻塞，不用 Luna 继承值代替。S0/S1/S2/S3 的阶段验收都是完整 MVP Goal 的检查点；最终阶段必须通过 MVP 集成卡，而非把单独通过的界面和员工实验当作完整交付。
+
 ## 10. 适用门槛与工具复用
 
 ### 10.1 验证矩阵
@@ -147,7 +170,7 @@ git diff --check
 
 S1 最终还需遵守 v2 计划中更严格的 all-features clippy、release build、Playground 自身 tsconfig、真实进程隔离和既有 UI transcript 比较。
 
-当前 test_changed 在缺 npx 时可能报告 SKIPPED frontend tsc；**ALL GREEN 字样不等于本卡所有必需门都执行过**。新 lane 必须拒绝必需检查的 skipped、零测试、无完成标记或运行器错误。未来测试名先用 --list 等方式确认存在，再运行筛选，禁止“筛到零个也过关”。
+当前 test_changed 在缺 npx 时可能报告 SKIPPED frontend tsc；**ALL GREEN 字样不等于本卡所有必需门都执行过**。新 lane 必须拒绝必需检查的 skipped、零测试、缺失对应完成证据或运行器错误；具体判据只在 [contracts §4](contracts.md) 定义，普通命令可正常无输出。未来测试先枚举确认必需名称存在，冻结完整适用测试集，禁止“筛到零个也过关”。
 
 Python 并行协议中的 pytest/ruff/mypy 只对实际 Python 工作适用，本 Rust 文档任务不虚构它们的运行结果。同输入表驱动、fixture 复用和序列化纪律仍应在对应语言落地。Rust 已签名类型的 serde 声明顺序不能为了通用规范化而改变。
 

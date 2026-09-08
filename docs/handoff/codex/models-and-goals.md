@@ -12,15 +12,15 @@
 
 | 开发角色 | 建议模型 | 负责 | 交接点 |
 | --- | --- | --- | --- |
-| Bootstrap architect | 当前强模型；固定配置候选 gpt-6-astra / high | 冻结协议、第一批卡、接口与验收 | 产出可施工的卡，完成 S0 试演。 |
-| Controller | 默认 gpt-5.6-luna / medium | 按规则选卡、启动/等待子任务、记录状态、提交给 reviewer | 不自行降低验收、解除设计阻塞或宣布自己的补丁获批。 |
+| Bootstrap controller / architect | 当前强模型；固定配置候选 gpt-6-astra / high | 自举阶段的控制、接口冻结与独立审阅分派 | 完成 S0，提交控制权交接。 |
+| Controller（S0-06 后） | 默认 gpt-5.6-luna / medium | 按规则选卡、启动/等待子任务、记录状态、提交给 reviewer | 不自行降低验收、解除设计阻塞或宣布自己的补丁获批。 |
 | Worker | gpt-5.6-luna / medium | 一卡一个任务上下文，测试先行，限定文件施工 | 交付 candidate 与报告后停止。 |
 | Reviewer / planner | gpt-6-astra / high | 核对实际 diff、门槛和报告；验收；选择或细化下一张卡 | 每卡必须返回结构化 accepted / changes_requested / blocked。 |
 | Fallback | gpt-6-astra / high，单独任务上下文 | 第二次实质失败后定位、修复或重新拆卡 | 自己改的代码再交独立 reviewer 上下文验收。 |
 
 模型名称以当前账号真实可调用结果为准。如果指定的强模型不可用，应明确记录阻塞；不能继承 Luna 默认值后假装完成了强模型验收。
 
-第一阶段建议由当前强模型主线程完成 bootstrap，并亲自验收首张产品卡；流程通过后，日常主线程可以改为 Luna medium，强模型只在规划、验收和兜底时运行。
+第一阶段由强模型承担 bootstrap controller；可以是当前强模型主线程，也可以是 Luna 主线程显式调用的强模型子任务，启动责任见 §8.2。S0-06 通过后，Luna 才接管日常 controller；强模型继续承担规划、逐卡验收与兜底。
 
 “交给我兜底”的持久实现是**强模型角色 + 仓库内的设计和记录**。不能承诺每次都唤醒同一个已经结束的会话实例，或依靠某个会话永不丢失的记忆。
 
@@ -39,6 +39,21 @@
 
 官方资料：[子 Agent 与配置](https://learn.chatgpt.com/docs/agent-configuration/subagents)、[Goal / 长时间工作](https://learn.chatgpt.com/docs/long-running-work)、[定时任务](https://learn.chatgpt.com/docs/automations?surface=app)、[Luna 模型](https://developers.openai.com/api/docs/models/gpt-5.6-luna)。
 
+<a id="bootstrap-controller"></a>
+
+### 8.2 从 Luna medium 主线程开始的 S0 自举
+
+**文档就绪允许开始 S0，不表示运行器已完成。**用户可先将主线程切为 gpt-5.6-luna / medium。若没有 S0-06 的真实验收记录，Luna 此时仅负责启动和消息转发，不能以日常 controller 身份自行验收、发布接口或解除设计阻塞。
+
+1. Luna 读取唯一入口、当前 backlog、protocol 和本文件，检查工作树、既有 claim 与正在运行的任务。首张卡为 S0-01；不得因 Anthropic key 已存储就跳到真实模型或法务实现。
+2. 用原生子任务工具显式启动 `gpt-6-astra / high`，职责为 bootstrap controller。简报只包含仓库/当前基线、规范路径、S0 范围与精确交付要求，不携带全部聊天历史。需要覆盖模型时使用允许覆盖的独立上下文分派形式；不能用完整历史继承后把 Luna 子任务称为强模型。
+3. 强模型 controller 按 protocol 为一张卡冻结契约、actor 快照、写集和报告，提交 claim 并组织施工。每份 S0 契约中的 controller 模型记录为实际强模型；普通 worker 仍为 Luna medium，reviewer/fallback/architect 仍为本文件指定的强模型。
+4. 优先让 bootstrap controller 直接分派 worker/reviewer；当前工具不支持嵌套时，Luna 主线程按它已冻结的完整简报逐项转发并回传工具 ID、真实 model/effort 参数与结果。Luna 不改简报、不判断验收，也不写 controller 的事件/队列；报告区分决策者与实际工具调用者，不能把转发者伪报为强模型。
+5. 同一时刻最多一个写入 worker；bootstrap controller 不与 worker 争写。worker 停止后再派独立 reviewer。槽位不足先按工具实际生命周期等待/释放已结束任务的占用；无可用方式时记录阻塞，不重复启动或声称已经完成分派。
+6. 强模型完成 S0-06 后，提交交接报告：S0 各候选/审阅、真实调用方式、CLI 验证入口、当前 integration HEAD、无活动 writer 的证据、锁释放状态与下一卡。锁不能仅改 owner 字段；旧控制器先合法释放，新控制器核对停止证据后重新获取。
+7. Luna 读取已提交交接与 S0-06 结论，再对后续新卡使用 Luna controller 快照。不能更改运行中契约的 actor 或接管在途 worker。S0-06 前强模型不可用时，只报告启动阻塞，不能用未验收的弱化流程继续。
+
+本流程只使用原生分派/等待和现有 Git 工具，S0 中逐卡补齐机械检查。显式分派参数、角色 TOML 的覆盖优先级与线程上限需在 S0-01 实测；参考[官方子任务说明](https://learn.chatgpt.com/docs/agent-configuration/subagents)与[配置参考](https://learn.chatgpt.com/docs/config-file/config-reference)。未观察到的能力保留未验证。
 
 ## 13. 默认 Luna medium 的配置与启动方式
 
@@ -51,10 +66,12 @@ model_reasoning_effort = "medium"
 
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 2
+max_concurrent_threads_per_session = 3
 default_subagent_model = "gpt-5.6-luna"
 default_subagent_reasoning_effort = "medium"
 ~~~
+
+上限 3 为 S0 的强模型 controller、worker 与独立 reviewer 预留子任务槽位，排除主线程；它不表示可以同时启动三个写入任务。运行时或账户的实际限制仍以 S0-01 观察为准，不因配置文件存在就宣称有足够槽位。
 
 ~~~toml
 # .codex/agents/founder-reviewer.toml
@@ -77,6 +94,20 @@ Worker 使用同样的必填 name/description/developer_instructions 结构，�
 官方配置支持单独指定 Agent 的 model 与 model_reasoning_effort；未指定时可能继承。当前运行时权限覆盖可能优先于 Agent 文件，因此 read-only 字样必须以真实工具行为验证。[配置依据](https://learn.chatgpt.com/docs/agent-configuration/subagents)
 
 若当前分派工具只接受 model/effort 而不接受自定义 Agent 名称，就显式传入模型和推理档，并携带相同的冻结简报；不能声称只创建 TOML 就已经保证分派正确。模型身份能核实到什么程度，应在 smoke report 写明，不接受模型在文本中自称某个型号作为唯一证据。
+
+<a id="luna-kickoff"></a>
+
+### 13.0 给 Luna 的启动消息
+
+用户选择 gpt-5.6-luna / medium 后，可以发送下面的消息。它仅指向唯一目标正文，不维护第二份 MVP 目标。发送前的文档准备不会自动启用 Goal；实际启动按用户发出的指令执行。
+
+~~~text
+开始执行本仓库的全流程 MVP 目标。
+唯一入口是 docs/handoff/codex/README.md；读取 models-and-goals.md §13.1，
+将其中完整目标用于目标模式，按 §8.2 从 S0-01 开始组织强模型自举。
+允许按文档分派 Luna medium worker 和强模型 controller/reviewer/architect/fallback，
+逐卡施工、验收并继续下一阶段；遵守既有范围、失败上限和凭据边界。
+~~~
 
 ### 13.1 当前推荐 Goal：交付全流程可演示 MVP
 
@@ -108,7 +139,8 @@ S3 必须包含 S3-M 真实模型连接前置与 S3-L 法务/RAG 扩展。
 阶段验收是检查点：通过后继续规划和执行下一阶段，直到完整 MVP 验收。
 S0 脚手架、S1 固定 Playground、独立 Agent 实验都只是中间产物。
 进入未冻结阶段时，自动交强模型冻结设计、接口、验收和小任务卡，写入 backlog 后施工。
-最终集成缺少任务卡时，同样由强模型先补齐；不得把分别完成的模块当作集成完成。
+最终按 milestones 中 MVP-00 冻结集成卡，完成实现后经 MVP-02 独立验收；
+不得把分别完成的模块当作集成完成。
 
 Controller 和普通 worker 默认使用 gpt-5.6-luna / medium。
 架构、逐卡 reviewer 和 fallback 使用 gpt-6-astra / high。
@@ -116,7 +148,8 @@ Controller 和普通 worker 默认使用 gpt-5.6-luna / medium。
 每卡回报后，强模型检查实际 diff、测试证据和用户行为，再决定下一卡。
 同一卡两次实质失败后停止 Luna 重试，保留诊断，交强模型修复或重新拆分；
 强模型修复的代码再由独立 reviewer 验收。按 protocol 处理预算、锁与中断恢复。
-S0 工具尚未实现时，由强模型承担明确的人工式控制步骤，不假装自动机制已存在。
+S0 工具尚未实现时，按本文件 §8.2 由强模型承担明确的控制步骤；
+Luna 主线程可以转发，但不能提前接管日常 controller 或假装自动机制已存在。
 
 MVP 必须满足：
 1. 有一个文档化启动命令和统一浏览器入口；创始人完成核心路径不需要手动改 JSON。
@@ -162,7 +195,7 @@ MVP 必须满足：
 
 ### 13.2 阶段推进与完成判定
 
-S0-06、S1-11、S2-07、S3-06 各自验收其阶段，之后 controller 根据强模型的下一卡继续本 Goal。它们不单独终结本节目标。最终集成与浏览器验收必须有受审任务卡和记录，具体实现契约仍只维护在该卡及适用规范中。
+S0-06、S1-11、S2-07、S3-06 各自验收其阶段，之后 controller 根据强模型的下一卡继续本 Goal。它们不单独终结本节目标。随后按 [MVP 集成阶段](milestones.md#mvp-integration) 冻结并执行 MVP-00/01/02；MVP-02 才汇总本节完整目标的最终验收，具体实现契约仍只维护在该卡及适用规范中。
 
 用户若另行明确要求只完成某阶段，才缩小目标。此 Goal 不自动放行尚未冻结的设计、不降低原有测试或安全门槛，也不把合成 MVP 的完成等同于 S4 真实经营 Alpha。
 

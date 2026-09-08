@@ -21,8 +21,10 @@ repo audit; every entry below points at verified, real state of the code.
   workers MUST skip them. Codex controllers use the linked card as the sole
   detailed scope/acceptance definition; controllers update queue records,
   while workers write only their card's allowed files and report. An existing
-  `needs:fable` tag still blocks small-model execution until an architect
-  releases that exact card. A lane label is a protocol rule, not a proven
+  `needs:fable` tag still blocks small-model implementation until an architect
+  releases that exact card. The Codex controller may route it to the prescribed
+  strong-model design/review role under the scaffold protocol; this is not
+  permission for Luna to decide its interfaces. A lane label is a protocol rule, not a proven
   process-isolation mechanism; check for active conflicting work before claim.
 - **Entry format:** priority (P1 urgent / P2 soon / P3 opportunistic) +
   directory-level scope + done criteria that a test (or an exact command)
@@ -110,7 +112,8 @@ The entries below are queue records only: scope details, dependencies and
 acceptance are maintained in each linked card, not copied here. Frozen cards
 still require their dependencies, a clean base and a controller claim.
 Legacy human/nightly lanes must skip every `lane:codex` item. Unfrozen design
-and strong-model items retain `needs:fable`; Luna must skip those.
+and strong-model items retain `needs:fable`; Luna workers must skip those,
+while the controller routes eligible design/review cards to the strong role.
 
 - [x] **P1 | `docs/handoff/codex/` | S0-00 — Freeze the canonical scaffold document set.** `lane:codex`
   Delivered as part of the current scaffold documentation item; no separate
@@ -220,6 +223,12 @@ and strong-model items retain `needs:fable`; Luna must skip those.
   Definition and done criteria: [S3 legal extension](handoff/codex/milestones.md#legal-extension).
   Wait for its design dependencies, then freeze exact S3-L implementation and
   acceptance cards. No real legal rule or professional approval is implied.
+
+- [ ] **P2 | `docs/handoff/codex/`, `docs/product/` | MVP-00 — Freeze unified business and employee integration.** `lane:codex` `needs:fable`
+  Definition and prerequisites: [MVP integration](handoff/codex/milestones.md#mvp-integration).
+  After S2-07 and S3-06, release exact implementation cards and the final
+  reviewer-only MVP-02 acceptance card. Map every complete-Goal requirement
+  to integrated behavior and evidence; separate demos do not complete it.
 
 - [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S4-L00 — Review the first real legal-rule pack and pilot scope.** `lane:codex` `needs:fable`
   Definition and prerequisites: [S4 legal admission](handoff/codex/milestones.md).

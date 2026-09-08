@@ -99,4 +99,4 @@
 - 仅报告、产品成熟度和 controller 队列记录；不在验收角色里修源码。
 - 完整 standalone-v2 final gate：all-features clippy、workspace tests、release build、Playground tsc、现有 UI tsc、file-size、diff check、两进程和兼容性证明。
 - 实际走通中英文路径；没有五名顾问的实际观察就保留 Target，不伪造访谈结果。
-- 交付可运行入口、准确能力声明和 S2 是否进入设计的判断；不自动开发 S2。
+- 交付可运行入口、准确能力声明和下一卡。完整 MVP Goal 仍有效时继续 S2-00 的架构冻结，再按受审小卡施工；不把 S1 验收当作整个目标完成。
