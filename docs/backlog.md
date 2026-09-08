@@ -141,6 +141,9 @@ while the controller routes eligible design/review cards to the strong role.
 - [ ] **P1 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex` IN PROGRESS (2026-09-09)
   Definition and done criteria: [S0-01](handoff/codex/cards/S0-01.md).
   Complete only when the linked card's checks and independent acceptance pass.
+  Attempt 1 smoke report: [S0-01 attempt 1](handoff/codex/reports/S0-01-attempt-1.md).
+  TOML parsing and explicit Luna/Astra read-only smoke returned; client loading,
+  enforced reviewer isolation, nested dispatch, and slot lifecycle remain unverified.
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
