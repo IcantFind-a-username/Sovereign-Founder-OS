@@ -1,8 +1,8 @@
 # S0-01 attempt 1 · model configuration smoke
 
-日期：2026-09-09  
-基线：`ebceebf`  
-执行角色：controller（主线程）  
+日期：2026-09-09
+基线：`ebceebf`
+执行角色：controller（主线程）
 状态：`Candidate`，等待配置加载与角色生命周期验收
 
 ## 已观察
