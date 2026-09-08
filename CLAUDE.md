@@ -12,11 +12,12 @@ Developer Preview maturity.
 
 ## Repo map
 
-- `crates/` — 14 runtime crates, package name = `sovereign-<dir>`:
+- `crates/` — 15 workspace crates, package name = `sovereign-<dir>`:
   `contracts` (canonical signed types), `policy`, `capability`, `authority`,
   `identity`, `vault`, `audit-ledger`, `sandbox` (wasmtime), `model`
   (gateway), `effects`, `execution`, `artifact`, `workflow`,
-  `consultant-playground`.
+  `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
+  `publish = false`, no product path yet).
 - `apps/cli` — `sovereign-cli` binary + zero-dependency web frontend under
   `apps/cli/assets/` (JSDoc-typed JS, checked with `tsc --checkJs`).
 - `tests/adversarial` — cross-crate security-invariant suite
@@ -31,7 +32,7 @@ Green on macOS 26.5 arm64 as well, as of 2026-08-15.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
-cargo test --workspace --locked  # full suite (~198 tests, 39 targets)
+cargo test --workspace --locked  # full suite (~293 tests as of 2026-09-09)
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 ./scripts/check-file-size.sh     # god-file limit: 1200 rs / 800 frontend
@@ -70,6 +71,10 @@ secret scanning. Toolchain is pinned: 1.97.0.
 
 - Work comes from `docs/backlog.md` — one item per session, claim it first,
   test-first, stay in the item's stated scope (see `/iterate`).
+- Relayed task cards (an orchestrator session chooses the item, a worker
+  session lands it) follow `docs/handoff/README.md`: one card = one session
+  = one branch, ending with a report under `docs/handoff/reports/`. Workers
+  never merge, push, or open PRs.
 - Features too big for one medium commit go through `/plan-feature` before
   any code is written.
 - `./scripts/test_changed.sh` must be green before any commit; the Stop hook
