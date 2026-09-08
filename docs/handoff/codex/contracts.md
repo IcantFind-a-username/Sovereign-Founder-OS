@@ -203,7 +203,7 @@ CheckSpec.kind=test 时 minimumExecuted 必须 >=1，completion 只能为 node-t
 | exit | 普通命令进程正常退出 0 且无 timeout/signal；允许空 stdout。用于 git diff、fmt/clippy、tsc 等显式命令，不接受用它包装复合测试脚本来跳过计数。 |
 | node-tap | argv 显式使用 `node --test --test-reporter=tap`；收到完整 TAP 尾部统计、fail/cancelled 为 0，实际非 skipped/todo 测试数达到 minimumExecuted；任何 skip/todo 使 skipped=true。 |
 | cargo-test | 完整 Cargo 测试 summary，全部失败数为 0，汇总实际 passed 数达到 minimumExecuted；ignored 或 filtered-out 非零则 skipped=true。可以有正常的 0-test 二进制，但不能整体零测试。测试名称是否包含卡的必需项由 controller 在 claim 前枚举、reviewer 核对；枚举命令单独冻结为 command，runner 不隐式生成额外命令。 |
-| scoped-gate | argv 必须为仓库 test_changed.sh；退出 0 且 stdout 有其 ALL GREEN/steps 完成行。runner 将 TEST_CHANGED_LOG 固定到 outputDir 下该 check 的日志，核对文件存在、日志步骤记录与 stdout 完成行一致；stdout/stderr/详细日志任一含 SKIPPED 则 skipped=true。缺日志/完成行、提前退出或空步骤均不能通过。 |
+| scoped-gate | argv 必须为 `["./scripts/test_changed.sh"]`；退出 0 且 stdout 有其 ALL GREEN/steps 完成行。runner 固定 TEST_CHANGED_BASE=contract.baseCommit、GATE_SELFTEST_RUNNING=0、TEST_CHANGED_LOG=outputDir 下该 check 的日志，覆盖父进程同名值；不能继承 HEAD 基线或跳过自检的环境设置。核对日志存在、步骤记录与 stdout 完成行一致，且含 gate-self-test/file-size/fmt；stdout/stderr/详细日志任一含 SKIPPED 则 skipped=true。缺日志/完成行、提前退出或空步骤均不能通过。 |
 
 所有 result 的 completed 只表示按该判据观察到了完成，不能吞掉 timeout/spawn failure。必需项出现 skipped 一律拒收。stdoutPath/stderrPath 和 scoped gate 详细日志都在批准 outputDir，日志不得含秘密；不打印整个进程环境。
 
