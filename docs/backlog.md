@@ -43,6 +43,17 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Scope legal assistance, jurisdiction rules, and pilot markets.** IN PROGRESS (2026-09-09)
+  Extend the canonical blueprint with the requested Singapore, EU, and US
+  jurisdiction direction; distinguish legal research, reviewed deterministic
+  rules, and uncovered or conflicting requirements. Compare pilot markets,
+  including mainland China, using current primary sources and explicit
+  product assumptions. Add bounded synthetic legal-review acceptance to the
+  MVP Goal and an architect-owned design queue entry. No production legal
+  rules, legal guarantees, real-data access, or implementation is authorized
+  by this documentation item. Done when local links, `git diff --check`, and
+  `./scripts/test_changed.sh` pass and all implementation remains design-gated.
+
 - [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Set the recommended Goal to an integrated end-to-end MVP.**
   Replace the default stage-limited Goal with one bounded outcome spanning
   S0 through S3 and their integrated consultant UI. Define synthetic business
