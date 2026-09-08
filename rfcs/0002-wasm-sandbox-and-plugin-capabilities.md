@@ -54,7 +54,7 @@ Sandbox escape vulnerabilities in the chosen engine remain possible. Process iso
 
 | Risk class | Current developer-preview foundation | Target backend |
 | --- | --- | --- |
-| Pure local computation | Publisher-verified and locally admitted import-free Core Wasm; exact V2 binding; authenticated input through `sovereign_core_wasm_v2`; no guest host effects | Wasmtime Component with reviewed WIT world |
+| Pure local computation | Publisher-verified and locally admitted import-free Core Wasm; exact V2 binding; authenticated input through `sovereign_core_wasm_v2`; Experimental: one zero-import component world (`sovereign:tool/pure-tool@0.1.0`); no guest host effects | Wasmtime Component with reviewed WIT world |
 | Low-risk constrained plugin | Denied | Wasmtime Component plus explicit capability host interfaces |
 | High-risk/native tool | Denied | Ephemeral container or micro-VM |
 | Unknown or undeclared | Denied | None |
@@ -245,14 +245,19 @@ The durable Authority Store also exists and can be attached for cross-process
 individual token, approval, and idempotency claims; validators remain
 process-local by default. The complete three-claim reservation is not one
 transaction and revocation is not implemented. The verified slice remains
-pure computation: Core Wasm v2 receives authenticated canonical input, but
-there is no general Component/WIT ABI or guest-invoked host effect. These
+pure computation: Core Wasm v2 receives authenticated canonical input, and a
+component backend runs one reviewed zero-import WIT world
+(`sovereign:tool/pure-tool@0.1.0`, `run: func(input: list<u8>) ->
+result<list<u8>, string>`) with the input delivered through the canonical ABI
+and host ceilings on the lifted output and guest error string; there is no
+general Component/WIT ABI, no host interface in that world, and no
+guest-invoked host effect. These
 primitives do not make the missing execution and durability boundaries
 complete.
 
 ## Component Interface
 
-The target public plugin ABI uses the WebAssembly Component Model and WIT. The world exposes only Sovereign interfaces selected for the verified manifest. It does not link the complete WASI CLI world.
+The target public plugin ABI uses the WebAssembly Component Model and WIT. The world exposes only Sovereign interfaces selected for the verified manifest. It does not link the complete WASI CLI world. The first admitted subset is the `sovereign:tool/pure-tool@0.1.0` world in `crates/sandbox/wit/sovereign-tool.wit`: zero imports and a single `run` export, so it exposes none of the host interfaces below.
 
 Conceptually:
 
@@ -444,11 +449,16 @@ Core Wasm v2 input, downgrade rejection, and guest-failure consumption.
 Admission and executor tests cover on-disk substitution, record tampering,
 cross-role signatures, poisoned/symlinked entries, mandatory admitted handles,
 cache poisoning, store reopen, and concurrent token claims across threads.
+Component-backend tests cover exact input delivery and bounded output, import
+refusal before instantiation, fuel, memory, and output ceilings, missing or
+mistyped exports, bounded guest errors, cross-backend substitution, and
+token-to-artifact binding.
 Mandatory worker/cache wiring on product paths, full cache-record binding and
 strict parsing, full real-subprocess validator races, transactional
 authorization and revocation, durable effect-intent ordering, independently
-admitted owner presence, Component/WIT behavior, and capability-bound host
-interfaces remain completion-gate work.
+admitted owner presence, Component/WIT behavior beyond the single zero-import
+`pure-tool` world, and capability-bound host interfaces remain completion-gate
+work.
 
 ## Implementation Phases
 
@@ -474,9 +484,11 @@ Phase A alone proves core-Wasm isolation mechanics only; it does not verify publ
 The current branch implements the Core Wasm pure-compute subset of these
 requirements, including local admission, authenticated v2 input, the optional
 worker/cache, and optional durable Authority Store attachment. It does **not**
-complete the production extension boundary: Component/WIT and effectful
-host-call interfaces remain unimplemented, and product paths do not yet
-mandate every optional hardening component. None may be represented as a
+complete the production extension boundary: only the single zero-import
+component world (`sovereign:tool/pure-tool@0.1.0`) is executable, the general
+Component/WIT interface and effectful host-call interfaces remain
+unimplemented, and product paths do not yet mandate every optional hardening
+component. None may be represented as a
 general plugin/effect boundary until its adversarial tests and completion gate
 pass.
 

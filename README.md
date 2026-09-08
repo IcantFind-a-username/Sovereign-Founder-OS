@@ -222,8 +222,10 @@ Important current limitations:
 - export is plaintext workspace/audit JSON, not an encrypted backup or restore
   package, and integrity reconciliation does not bind every workspace field;
 - customer/document editing, real models, network effects, clean-machine
-  restore, Component/WIT plugins, and broader business modules remain targets;
-  Secure Mesh remains Research.
+  restore, and broader business modules remain targets; the sandbox can run a
+  component under one zero-import WIT world (Experimental, pure compute only),
+  but the general Component/WIT plugin boundary with host interfaces remains a
+  target; Secure Mesh remains Research.
 
 The Rust workspace contains thirteen Runtime crates covering contracts,
 identity, artifacts, policy, capabilities, authority, execution, effects,

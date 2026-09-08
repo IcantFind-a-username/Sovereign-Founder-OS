@@ -269,8 +269,9 @@ only compiler-created projections. See [RFC 0004](rfcs/0004-data-sovereignty-bou
 The target architecture treats plugins as **untrusted by default**. The current
 repository implements import-free Wasmtime paths plus a pure-compute foundation
 for publisher verification, local admission, exact invocation binding, durable
-authority when attached, and authenticated Core Wasm v2 input. It is not a
-general Component/WIT extension boundary.
+authority when attached, authenticated Core Wasm v2 input, and an Experimental
+component backend for one zero-import WIT world. It is not a general
+Component/WIT extension boundary.
 
 - Signed manifest declaring exact permissions
 - Low-risk plugins: WASM/WASI sandbox
