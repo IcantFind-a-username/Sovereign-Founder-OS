@@ -243,8 +243,11 @@ while the controller routes eligible design/review cards to the strong role.
   Logs: `.harness/s1-g02/attempt2*`.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` `needs:fable`
+- [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
   Definition and done criteria: [S1-02](handoff/codex/cards/S1-02.md).
+  Base `b4935f00dfb06704454bf3b305a2c79ad1402073`; card blob
+  `76a00e5b165289e763150674818c75a33bd6cf8d`; domain.rs, leaf Cargo.toml,
+  Cargo.lock only. G02 accepted in `5e740b1`.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
