@@ -34,7 +34,7 @@
     {"path": "docs/handoff/codex/tasks/S0-01/r2/contract.draft.json", "blob": "f5c3411a2abdd16d55b9953911a79e2ae66d5996"},
     {"path": "docs/handoff/codex/tasks/S0-01-RECOVERY-SPEC/r1/contract.json", "blob": "1277dade1b741890cc21af7aa0758848cae74475"}
   ],
-  "baseCommit": "c73c296792a286d83abba7676f0faf2d19dc66f5",
+  "baseCommit": "e9372adb9f0ba29f122f4a490b9b849a130a4da3",
   "dependencies": ["S0-01-RECOVERY-REVIEW"],
   "allowedWritePaths": ["docs/handoff/codex/protocol.md", "docs/handoff/codex/contracts.md", "docs/handoff/codex/README.md", "docs/handoff/codex/cards/S0-01.md", "docs/handoff/codex/cards/S0-02.md", "docs/handoff/codex/cards/S0-03.md", "docs/handoff/codex/cards/S0-04.md", "docs/handoff/codex/cards/S0-05A.md", "docs/handoff/codex/cards/S0-05.md", "docs/handoff/codex/cards/S0-06.md"],
   "reportPath": "docs/handoff/codex/reports/S0-01-recovery-spec.md",
