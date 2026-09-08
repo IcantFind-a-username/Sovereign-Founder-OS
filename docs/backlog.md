@@ -35,6 +35,18 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `docs/product/`, `docs/INDEX.md`, `docs/backlog.md` | Consolidate the Founder OS execution blueprint and bounded Luna task queue.** IN PROGRESS (2026-09-09)
+  Record the product vision, verified implementation baseline, researched
+  component choices, business-demo milestones, and the requested Luna-medium
+  worker / strong-model review / two-failure escalation protocol in one Chinese
+  document. Separate current mechanisms from proposed automation, preserve the
+  standalone synthetic Playground boundary, and add dependency-ordered tasks
+  with explicit readiness and acceptance criteria. Documentation only; no
+  product implementation or unattended development is activated by this item.
+  Done when: the blueprint is linked from `docs/INDEX.md`, its repository links
+  resolve, the task queue distinguishes executable work from design gates,
+  `git diff --check` and `./scripts/test_changed.sh` pass.
+
 - [x] **P1 | `crates/consultant-playground/tests/` | Split `physical_boundary.rs` before it breaks the file-size gate.**
   The file is at 1192 lines against the hard 1200 limit in
   `scripts/check-file-size.sh` (allowlist is deliberately empty) — the next
