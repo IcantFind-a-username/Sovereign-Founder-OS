@@ -144,6 +144,11 @@ while the controller routes eligible design/review cards to the strong role.
   Attempt 1 smoke report: [S0-01 attempt 1](handoff/codex/reports/S0-01-attempt-1.md).
   TOML parsing and explicit Luna/Astra read-only smoke returned; client loading,
   enforced reviewer isolation, nested dispatch, and slot lifecycle remain unverified.
+  The record-repair audit is independently accepted as blocked:
+  [S0-01 record repair](handoff/codex/reports/S0-01-record-repair.md).
+  `S0_01_HISTORY_NOT_REPLAYABLE` means the old mixed B/C/W history cannot be
+  relabeled; a strong architect must approve a history-preserving recovery
+  decision before a clean attempt or S0-02 dispatch.
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
