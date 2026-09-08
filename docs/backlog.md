@@ -205,16 +205,16 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S0-06](handoff/codex/cards/S0-06.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` IN PROGRESS (supervised mode)
+- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` IN PROGRESS (first action slice accepted; later interfaces deferred)
   Definition and done criteria: [S1-00](handoff/codex/cards/S1-00.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G01 — Migrate the existing source boundary for the next closed stage.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-G01](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-G01](handoff/codex/cards/S1-G01.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-01 — Implement four closed actions.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-01](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-01](handoff/codex/cards/S1-01.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO dependency boundary.** `lane:codex` `needs:fable`
