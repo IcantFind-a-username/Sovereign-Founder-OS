@@ -43,7 +43,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Consolidate the Singapore pilot and model-credential handoff.** IN PROGRESS (2026-09-09)
+- [x] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Consolidate the Singapore pilot and model-credential handoff.**
   Record the founder's Singapore-first decision and reconcile the discussion
   of employee skills, Claude access, credential custody, desktop delivery,
   legal RAG, and the integrated MVP with the existing canonical scaffold.
@@ -194,6 +194,12 @@ and strong-model items retain `needs:fable`; Luna must skip those.
 - [ ] **P2 | `rfcs/, docs/handoff/codex/` | S3-00 — Freeze synthetic employee execution contracts.** `lane:codex` `needs:fable`
   Definition and done criteria: [S3-00](handoff/codex/milestones.md).
   Design only; release implementation cards after the linked stage is frozen.
+
+- [ ] **P2 | `rfcs/, docs/handoff/codex/`, `docs/product/` | S3-M00 — Freeze the real model connection and its credential/authority prerequisites.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S3 model connection](handoff/codex/milestones.md#model-connection).
+  Resolve real-egress/Exact Effect and actual owner/authority dependencies
+  before releasing bounded Keychain, dispatch and connection-acceptance cards.
+  Reuse existing core tasks; synthetic input does not waive real-effect gates.
 
 - [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S3-L00 — Freeze legal RAG, jurisdiction facts, assistance outputs, and synthetic rule enforcement.** `lane:codex` `needs:fable`
   Definition and done criteria: [S3 legal extension](handoff/codex/milestones.md#legal-extension).

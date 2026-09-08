@@ -12,6 +12,7 @@
 | --- | --- | --- |
 | 项目硬规则、Git/迭代纪律 | [CLAUDE.md](../../../CLAUDE.md)（AGENTS.md 指向它） | 本目录只说明获准的新 Codex lane 差异。 |
 | 产品愿景、当前代码判断、组件研究 | [产品与选型](../../product/founder-os-execution-blueprint.zh-CN.md) | 任务卡引用对应设计，不重复选型结论。 |
+| 产品模型凭据录入步骤、本地条目标识、配置状态含义 | [provider-setup.md](provider-setup.md) | 只说明保管与交接；实际凭据和敏感账户配置不入库。 |
 | 安全协议、数据/授权边界 | [现有 RFC](../../../rfcs/)、[MANIFESTO](../../../MANIFESTO.md)、[THREAT_MODEL](../../../THREAT_MODEL.md) | 本目录不得降级安全要求；源码与规范不一致是缺口，不是豁免。 |
 | 任务是否进入队列、认领与完成 | [backlog](../../backlog.md) | 这里不维护第二份勾选清单。 |
 | 一张任务的范围、接口、验收、依赖 | [任务卡](#任务卡)；实现卡引用 contracts | backlog 仅保存 ID、优先级、链接、claim/诊断/完成；详细正文只在卡中修改。 |
@@ -22,6 +23,20 @@
 | 一次 attempt 的实际经过 | 分派后追加的 events/reports/reviews 与对应 Git 提交 | 它们是执行证据；状态必须与 backlog 的认领/完成一致，冲突即停止检查。 |
 
 执行范围冲突时：先满足上位的 owner 指令和仓库硬规则；安全内容服从适用 RFC；同一任务以冻结的卡及其引用契约为准。发现旧卡、源码或索引不一致时，由 controller/architect 修正唯一源并发新 revision，worker 不自行挑一个较宽松版本。
+
+## 本次讨论的定位入口
+
+| 内容 | 规范位置 |
+| --- | --- |
+| 已确认的试点市场与后续地区方向 | [产品蓝图 §1.3](../../product/founder-os-execution-blueprint.zh-CN.md#pilot-market) |
+| AI 员工岗位、skills、后训练边界 | [产品蓝图 §4.1–4.2](../../product/founder-os-execution-blueprint.zh-CN.md#employee-skills) |
+| 法务助手、地区规则与法律 RAG | [产品蓝图 §4.4–4.5](../../product/founder-os-execution-blueprint.zh-CN.md#legal-assistance) |
+| Web MVP、桌面应用与安装包顺序 | [产品蓝图 §5.4](../../product/founder-os-execution-blueprint.zh-CN.md#product-surface) |
+| 现有安全内核的复用与真实模型前置依赖 | [产品蓝图 §7–7.1](../../product/founder-os-execution-blueprint.zh-CN.md#provider-boundary) |
+| 现在怎样保管 Anthropic key | [模型凭据配置指南](provider-setup.md) |
+| 全流程目标、Luna medium、逐卡验收和两次失败升级 | [models-and-goals](models-and-goals.md)、[protocol](protocol.md) |
+
+这些链接只负责寻址，决策和验收正文继续在各自唯一位置维护。新增模型与法务任务仍须完成设计冻结和依赖验收，不能把本表当作功能已实现的证明。
 
 ## Luna 第一次进入仓库的读法
 
