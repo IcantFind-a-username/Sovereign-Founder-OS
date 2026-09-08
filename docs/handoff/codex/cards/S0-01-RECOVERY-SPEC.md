@@ -1,6 +1,6 @@
 # S0-01-RECOVERY-SPEC — 历史保留恢复规范落地
 
-**Revision 1 · Spec Frozen（设计任务，按 v2 执行）· workerRole=architect。**
+**Revision 3 · Spec Frozen（设计任务，按 v2 执行）· workerRole=architect。**
 本卡只把已接受恢复设计落到唯一规范，不实现 v3，不执行 S0-01 恢复。
 实际认领/完成唯一见 [backlog](../../../backlog.md)；Frozen 不代表准入已完成。
 
@@ -16,7 +16,7 @@
 | 字段 | 值 |
 | --- | --- |
 | schemaVersion | `2` |
-| taskId / revision / parentTaskId | `S0-01-RECOVERY-SPEC` / `1` / `null` |
+| taskId / revision / parentTaskId | `S0-01-RECOVERY-SPEC` / `3` / `null` |
 | sourceCardPath | `docs/handoff/codex/cards/S0-01-RECOVERY-SPEC.md` |
 | workerRole / reviewerRole | `architect` / `reviewer` |
 | dependencies | `["S0-01-RECOVERY-REVIEW"]` |
@@ -260,3 +260,29 @@ Python 工具不宣称复用；不新增 runtime、schema、canonical JSON、数
 恢复 CLI 或 `recovery.mjs`。新增工具为无。
 
 > 复用以上，禁止重新实现同类工具；需要新工具先在简报回复中申报。
+
+
+## Owner-authorised one-time continuation (revision 3)
+
+The owner's instruction “怎么影响小怎么去修，然后快点开发” authorises this bounded
+correction. Earlier r1/r2 records and all Git commits remain unchanged as
+imperfect historical evidence. This continuation does not assert valid v2 replay
+of that history. The original task scope and ten-file ownership remain unchanged.
+
+For this continuation only, freeze a new r3 contract from the committed revision 3
+card and all required inputs, including r1/r2 contracts and the historical events.
+Store it at `docs/handoff/codex/tasks/S0-01-RECOVERY-SPEC/r3/contract.json`.
+Use `docs/handoff/codex/tasks/S0-01-RECOVERY-SPEC/r3/continuation.json` for explicit
+owner authority, frozen base, actual dispatch evidence and new segment timing;
+this is a one-off record, not an event accepted by the v2 validator. Historical
+elapsed time remains unknown; do not insert retrospective start events. The new
+segment budget is 1800000 ms, measured from the actual continuation dispatch.
+
+The controller must compare every input with `base:path`, check the complete
+required input set and obtain independent freeze review before dispatch. Worker
+uses an isolated checkout at that base, commits W before the report-only R, and
+is reviewed using the frozen v2 requirements for the new candidate. Include the
+r3 contract/continuation instead of the r1 contract in the enumerated integration
+record paths; preserve the old event file. No further recovery cards are permitted.
+Another record mismatch stops execution. This exception does not accept S0-01,
+reset any known failure, enable v3 early or change any product security boundary.

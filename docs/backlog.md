@@ -172,12 +172,14 @@ while the controller routes eligible design/review cards to the strong role.
   Next: one bounded architect correction decision, preserving actual history
   and work already performed; do not manufacture start times, actors or a new
   zero-work attempt, and do not recursively create recovery-design cards.
-  A finite owner exception was requested and is pending an explicit reply.
-  Proposed scope is only RECOVERY-SPEC: keep defective historical records,
-  document their actual limitations, independently check one corrected freeze,
-  and execute from its isolated base. This proposal does not itself authorize
-  execution or assert successful v2 replay. Automatic Goal continuation is not
-  approval; S0-01 failure history and product authority remain unchanged.
+  Owner authorised minimal-impact correction: “怎么影响小怎么去修，然后快点开发”.
+  The exception covers only one forward continuation of RECOVERY-SPEC.
+  r1/r2 contracts, events and Git history remain defective historical evidence;
+  no successful v2 replay or zero historical work is claimed. The corrected
+  card uses revision 3, a new independently checked freeze and isolated base.
+  New work has a separately measured 30-minute budget; old elapsed time remains
+  unknown. Stop on another binding mismatch. Keep W/R separation and independent
+  review; do not reset S0-01/Luna failures or extend product authority.
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
