@@ -43,7 +43,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P2 | `docs/handoff/codex/provider-setup.md`, `docs/backlog.md` | Record the founder's credential-storage handoff.** IN PROGRESS (2026-09-09)
+- [x] **P2 | `docs/handoff/codex/provider-setup.md`, `docs/backlog.md` | Record the founder's credential-storage handoff.**
   Record the founder-reported local storage state separately from machine
   verification and API connectivity. Do not read credentials or invoke the
   provider. Done when the status is explicit and `git diff --check` plus
