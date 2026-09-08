@@ -1,8 +1,9 @@
 use std::sync::mpsc::{self, RecvTimeoutError, SyncSender};
-use std::sync::{Mutex, TryLockError};
+use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use wasmtime::component::{Component, Linker as ComponentLinker};
 use wasmtime::{Config, Engine, Instance, Module, ResourceLimiter, Store, Trap};
 
 use sovereign_artifact::PreparedInvocation;
@@ -10,7 +11,7 @@ use sovereign_artifact::PreparedInvocation;
 use crate::compile_worker::CompileWorker;
 use crate::compiled_cache::CompiledCache;
 use crate::{ExecutionRuntime, SandboxError};
-use sovereign_artifact::{ArtifactAbi, Digest};
+use sovereign_artifact::{ArtifactAbi, ArtifactBackend, Digest, COMPONENT_ENTRYPOINT};
 
 pub const DEFAULT_ENTRYPOINT: &str = "sovereign_run";
 
@@ -37,10 +38,24 @@ pub(crate) fn compile_engine_config() -> Config {
         .cranelift_nan_canonicalization(true);
     config
 }
+
+/// Engine configuration for the component backend: exactly the restrictive
+/// core configuration plus the component model. Kept as a separate engine so
+/// the core-module configuration (and its compiled-cache identity) stays
+/// byte-for-byte unchanged.
+pub(crate) fn component_engine_config() -> Config {
+    let mut config = compile_engine_config();
+    config.wasm_component_model(true);
+    config
+}
 const WASM_PAGE_BYTES: u128 = 64 * 1024;
 const MAX_DEADLINE_TICKS: u64 = 10_000;
 /// Host ceiling on delivered guest input, independent of any manifest limit.
 const MAX_GUEST_INPUT_BYTES: usize = 64 * 1024;
+/// Host ceiling on lifted guest output bytes for the component backend.
+const MAX_GUEST_OUTPUT_BYTES: usize = 256 * 1024;
+/// Host ceiling on a guest-reported error string; longer strings truncate.
+const MAX_GUEST_ERROR_BYTES: usize = 4 * 1024;
 
 /// Host-enforced ceilings. Guest code can request less, never more.
 #[derive(Debug, Clone)]
@@ -91,6 +106,10 @@ pub struct WasmExecutionResult {
     pub exit_code: i32,
     pub fuel_consumed: u64,
     pub runtime: ExecutionRuntime,
+    /// Lifted guest output for the component backend (`run`'s `list<u8>`
+    /// success payload, bounded by the host output ceiling). Always `None`
+    /// for the core-Wasm backends, whose ABI returns only an exit code.
+    pub output: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
@@ -154,6 +173,10 @@ impl ResourceLimiter for StoreState {
 #[derive(Debug)]
 pub struct WasmSandbox {
     engine: Engine,
+    /// Separate engine for the component backend (same restrictive config
+    /// plus the component model); the core engine's configuration and
+    /// compiled-cache identity are unaffected by its existence.
+    component_engine: Engine,
     limits: WasmSandboxLimits,
     epoch_stop: SyncSender<()>,
     epoch_worker: Option<JoinHandle<()>>,
@@ -176,8 +199,12 @@ impl WasmSandbox {
 
         let engine = Engine::new(&config)
             .map_err(|error| SandboxError::RuntimeInitialization(error.to_string()))?;
+        let mut component_config = component_engine_config();
+        component_config.max_wasm_stack(limits.max_wasm_stack_bytes);
+        let component_engine = Engine::new(&component_config)
+            .map_err(|error| SandboxError::RuntimeInitialization(error.to_string()))?;
         let (epoch_stop, stop_receiver) = mpsc::sync_channel(1);
-        let ticker_engine = engine.clone();
+        let ticker_engines = [engine.clone(), component_engine.clone()];
         let epoch_tick = limits.epoch_tick;
         let catch_up_ceiling = deadline_ticks(limits.wall_timeout, limits.epoch_tick);
         let epoch_worker = thread::Builder::new()
@@ -192,7 +219,9 @@ impl WasmSandbox {
                             let elapsed_ticks =
                                 elapsed_ticks(last_tick, now, epoch_tick).min(catch_up_ceiling);
                             for _ in 0..elapsed_ticks {
-                                ticker_engine.increment_epoch();
+                                for ticker_engine in &ticker_engines {
+                                    ticker_engine.increment_epoch();
+                                }
                             }
                             last_tick = now;
                         }
@@ -203,6 +232,7 @@ impl WasmSandbox {
 
         Ok(Self {
             engine,
+            component_engine,
             limits,
             epoch_stop,
             epoch_worker: Some(epoch_worker),
@@ -239,16 +269,26 @@ impl WasmSandbox {
         &self,
         invocation: &PreparedInvocation,
     ) -> Result<WasmExecutionResult, SandboxError> {
-        let input = match invocation.artifact().manifest().abi() {
-            ArtifactAbi::SovereignCoreWasmV2 => Some(invocation.canonical_input()),
-            _ => None,
-        };
-        self.execute_entrypoint_with_runtime(
-            invocation.artifact().bytes(),
-            DEFAULT_ENTRYPOINT,
-            ExecutionRuntime::WasmtimeVerifiedPureComputeV2,
-            input,
-        )
+        match invocation.artifact().manifest().backend() {
+            ArtifactBackend::CoreWasm => {
+                let input = match invocation.artifact().manifest().abi() {
+                    ArtifactAbi::SovereignCoreWasmV2 => Some(invocation.canonical_input()),
+                    _ => None,
+                };
+                self.execute_entrypoint_with_runtime(
+                    invocation.artifact().bytes(),
+                    DEFAULT_ENTRYPOINT,
+                    ExecutionRuntime::WasmtimeVerifiedPureComputeV2,
+                    input,
+                )
+            }
+            ArtifactBackend::ComponentWasm => self.execute_component_verified(invocation),
+            // Structural manifest validation refuses these backends before an
+            // invocation can exist; refuse again rather than trusting that.
+            ArtifactBackend::Native | ArtifactBackend::Unsupported => Err(
+                SandboxError::RuntimeUnavailable("unsupported execution backend".into()),
+            ),
+        }
     }
 
     pub fn execute_entrypoint(
@@ -264,13 +304,9 @@ impl WasmSandbox {
         )
     }
 
-    fn execute_entrypoint_with_runtime(
-        &self,
-        module_bytes: &[u8],
-        entrypoint: &str,
-        runtime: ExecutionRuntime,
-        input: Option<&[u8]>,
-    ) -> Result<WasmExecutionResult, SandboxError> {
+    /// Shared execution preamble: the epoch deadline worker must be alive and
+    /// the single-execution gate must be free. Both backends go through this.
+    fn acquire_execution_slot(&self) -> Result<MutexGuard<'_, ()>, SandboxError> {
         if self
             .epoch_worker
             .as_ref()
@@ -280,15 +316,23 @@ impl WasmSandbox {
                 "epoch deadline worker stopped".into(),
             ));
         }
-        let _execution_guard = match self.execution_gate.try_lock() {
-            Ok(guard) => guard,
-            Err(TryLockError::WouldBlock) => return Err(SandboxError::RuntimeBusy),
-            Err(TryLockError::Poisoned(_)) => {
-                return Err(SandboxError::RuntimeUnavailable(
-                    "execution gate poisoned".into(),
-                ));
-            }
-        };
+        match self.execution_gate.try_lock() {
+            Ok(guard) => Ok(guard),
+            Err(TryLockError::WouldBlock) => Err(SandboxError::RuntimeBusy),
+            Err(TryLockError::Poisoned(_)) => Err(SandboxError::RuntimeUnavailable(
+                "execution gate poisoned".into(),
+            )),
+        }
+    }
+
+    fn execute_entrypoint_with_runtime(
+        &self,
+        module_bytes: &[u8],
+        entrypoint: &str,
+        runtime: ExecutionRuntime,
+        input: Option<&[u8]>,
+    ) -> Result<WasmExecutionResult, SandboxError> {
+        let _execution_guard = self.acquire_execution_slot()?;
 
         if module_bytes.len() > self.limits.max_module_bytes {
             return Err(SandboxError::ModuleTooLarge {
@@ -405,7 +449,141 @@ impl WasmSandbox {
             exit_code,
             fuel_consumed: self.limits.fuel.saturating_sub(remaining_fuel),
             runtime,
+            output: None,
         })
+    }
+
+    /// Verified component-backend execution: compile through the same
+    /// worker/cache boundaries as core modules, refuse any import before
+    /// instantiation, deliver the authenticated canonical input through the
+    /// canonical ABI, and lift a host-bounded output.
+    fn execute_component_verified(
+        &self,
+        invocation: &PreparedInvocation,
+    ) -> Result<WasmExecutionResult, SandboxError> {
+        let _execution_guard = self.acquire_execution_slot()?;
+
+        let component_bytes = invocation.artifact().bytes();
+        if component_bytes.len() > self.limits.max_module_bytes {
+            return Err(SandboxError::ModuleTooLarge {
+                actual: component_bytes.len(),
+                maximum: self.limits.max_module_bytes,
+            });
+        }
+        let input = invocation.canonical_input();
+        if input.len() > MAX_GUEST_INPUT_BYTES {
+            return Err(SandboxError::GuestInputRejected(format!(
+                "input of {} bytes exceeds the {MAX_GUEST_INPUT_BYTES}-byte host limit",
+                input.len()
+            )));
+        }
+
+        let component_digest = Digest::of_bytes(component_bytes);
+        let cached = self
+            .compiled_cache
+            .as_ref()
+            .and_then(|cache| cache.lookup_component(&self.component_engine, component_digest));
+        let component = match cached {
+            Some(component) => component,
+            None => {
+                let component = match &self.compile_worker {
+                    Some(worker) => {
+                        worker.compile_component(&self.component_engine, component_bytes)?
+                    }
+                    None => Component::new(&self.component_engine, component_bytes)
+                        .map_err(|error| SandboxError::InvalidModule(error.to_string()))?,
+                };
+                if let Some(cache) = &self.compiled_cache {
+                    if let Ok(serialized) = component.serialize() {
+                        let _ = cache.store_component(component_digest, &serialized);
+                    }
+                }
+                component
+            }
+        };
+
+        // Default-deny: the admitted world imports nothing, so any import at
+        // all is refused before instantiation — the empty linker is a second
+        // line, not the check.
+        if let Some((name, _)) = component
+            .component_type()
+            .imports(&self.component_engine)
+            .next()
+        {
+            return Err(SandboxError::ForbiddenImport {
+                module: "component".into(),
+                name: name.to_string(),
+            });
+        }
+
+        let mut store = Store::new(
+            &self.component_engine,
+            StoreState {
+                max_memory_bytes: self.limits.max_memory_bytes,
+                max_table_elements: self.limits.max_table_elements,
+                limit_hit: None,
+            },
+        );
+        store.limiter(|state| state);
+        store
+            .set_fuel(self.limits.fuel)
+            .map_err(|error| SandboxError::RuntimeInitialization(error.to_string()))?;
+        store.set_epoch_deadline(self.deadline_ticks());
+        store.epoch_deadline_trap();
+
+        let linker: ComponentLinker<StoreState> = ComponentLinker::new(&self.component_engine);
+        let instance = match linker.instantiate(&mut store, &component) {
+            Ok(instance) => instance,
+            Err(error) => {
+                if let Some(resource) = store.data().limit_hit {
+                    return Err(SandboxError::ResourceLimitExceeded(resource.to_string()));
+                }
+                return Err(map_instantiation_error(error));
+            }
+        };
+
+        let entry = instance
+            .get_func(&mut store, COMPONENT_ENTRYPOINT)
+            .ok_or_else(|| SandboxError::MissingEntrypoint(COMPONENT_ENTRYPOINT.to_string()))?;
+        let run = entry
+            .typed::<(&[u8],), (Result<Vec<u8>, String>,)>(&store)
+            .map_err(|error| SandboxError::InvalidEntrypoint {
+                entrypoint: COMPONENT_ENTRYPOINT.to_string(),
+                detail: error.to_string(),
+            })?;
+
+        let outcome = match run.call(&mut store, (input,)) {
+            Ok((outcome,)) => outcome,
+            Err(error) => {
+                if let Some(resource) = store.data().limit_hit {
+                    return Err(SandboxError::ResourceLimitExceeded(resource.to_string()));
+                }
+                return Err(map_guest_error(error));
+            }
+        };
+        let remaining_fuel = store
+            .get_fuel()
+            .map_err(|error| SandboxError::ExecutionFailed(error.to_string()))?;
+
+        match outcome {
+            Ok(output) => {
+                if output.len() > MAX_GUEST_OUTPUT_BYTES {
+                    return Err(SandboxError::OutputLimitExceeded {
+                        actual: output.len(),
+                        maximum: MAX_GUEST_OUTPUT_BYTES,
+                    });
+                }
+                Ok(WasmExecutionResult {
+                    exit_code: 0,
+                    fuel_consumed: self.limits.fuel.saturating_sub(remaining_fuel),
+                    runtime: ExecutionRuntime::WasmtimeVerifiedComponentV1,
+                    output: Some(output),
+                })
+            }
+            Err(message) => Err(SandboxError::GuestReportedError(truncate_guest_error(
+                message,
+            ))),
+        }
     }
 
     /// Write the authenticated canonical input into the guest's exported
@@ -489,6 +667,19 @@ fn map_instantiation_error(error: wasmtime::Error) -> SandboxError {
     } else {
         SandboxError::InstantiationFailed(error.to_string())
     }
+}
+
+/// Bound a guest-reported error string to the host ceiling, cutting on a
+/// character boundary so the result stays valid UTF-8.
+fn truncate_guest_error(mut message: String) -> String {
+    if message.len() > MAX_GUEST_ERROR_BYTES {
+        let mut end = MAX_GUEST_ERROR_BYTES;
+        while !message.is_char_boundary(end) {
+            end -= 1;
+        }
+        message.truncate(end);
+    }
+    message
 }
 
 fn deadline_ticks(wall_timeout: Duration, epoch_tick: Duration) -> u64 {

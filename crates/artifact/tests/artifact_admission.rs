@@ -3,7 +3,7 @@ use sovereign_artifact::{
     AdmissionLimits, ArtifactError, ArtifactVerificationIntent, ArtifactVerifier, Digest,
     OperationSelector, PreparedInvocation, RawResourceGrant, TrustedClock,
     HARD_MAX_COMPONENT_BYTES, HARD_MAX_MANIFEST_PAYLOAD_BYTES, HARD_MAX_SIGNED_MANIFEST_BYTES,
-    IJSON_SAFE_INTEGER_MAX, IJSON_SAFE_INTEGER_MIN,
+    IJSON_SAFE_INTEGER_MAX, IJSON_SAFE_INTEGER_MIN, SOVEREIGN_TOOL_WIT_WORLD,
 };
 use sovereign_identity::{KeyValidity, PublisherRole, RoleTrustStore, TypedSigner};
 
@@ -410,8 +410,15 @@ fn protocol_risk_backend_and_host_capabilities_are_not_downgraded() {
         ),
         (
             "backend",
-            json!("component_wasm"),
+            json!("native"),
             ArtifactError::UnsupportedBackend,
+        ),
+        // component_wasm is a supported backend now, but never with the
+        // core-Wasm ABI/entrypoint this manifest declares.
+        (
+            "backend",
+            json!("component_wasm"),
+            ArtifactError::UnsupportedAbi,
         ),
     ] {
         let mut value = manifest(&component, &signer);
@@ -427,6 +434,67 @@ fn protocol_risk_backend_and_host_capabilities_are_not_downgraded() {
     assert_eq!(
         verify_artifact(&trust, &sign_value(&value, &signer), &component).unwrap_err(),
         ArtifactError::HostCapabilitiesForbidden
+    );
+}
+
+/// A component-backend manifest: same operations, but the component ABI,
+/// `run` entrypoint, and the exact admitted WIT world.
+fn component_manifest(component: &[u8], signer: &TypedSigner<PublisherRole>) -> Value {
+    let mut value = manifest(component, signer);
+    value["backend"] = json!("component_wasm");
+    value["abi"] = json!("sovereign_component_v1");
+    value["entrypoint"] = json!("run");
+    value["wit_world"] = json!(SOVEREIGN_TOOL_WIT_WORLD);
+    value
+}
+
+#[test]
+fn component_backend_requires_the_exact_wit_world_abi_and_entrypoint() {
+    let (signer, trust) = publisher();
+    let component = component_a();
+
+    // The well-formed component manifest verifies.
+    let signed = sign_value(&component_manifest(&component, &signer), &signer);
+    let artifact = verify_artifact(&trust, &signed, &component).unwrap();
+    assert_eq!(
+        artifact.manifest().wit_world(),
+        Some(SOVEREIGN_TOOL_WIT_WORLD)
+    );
+
+    // Missing or foreign wit_world fails closed.
+    let mut value = component_manifest(&component, &signer);
+    value.as_object_mut().unwrap().remove("wit_world");
+    assert_eq!(
+        verify_artifact(&trust, &sign_value(&value, &signer), &component).unwrap_err(),
+        ArtifactError::WitWorldMismatch
+    );
+    let mut value = component_manifest(&component, &signer);
+    value["wit_world"] = json!("wasi:cli/command@0.2.0");
+    assert_eq!(
+        verify_artifact(&trust, &sign_value(&value, &signer), &component).unwrap_err(),
+        ArtifactError::WitWorldMismatch
+    );
+
+    // A core-Wasm manifest must not smuggle a wit_world claim.
+    let mut value = manifest(&component, &signer);
+    value["wit_world"] = json!(SOVEREIGN_TOOL_WIT_WORLD);
+    assert_eq!(
+        verify_artifact(&trust, &sign_value(&value, &signer), &component).unwrap_err(),
+        ArtifactError::WitWorldMismatch
+    );
+
+    // The component backend accepts only its own ABI and entrypoint.
+    let mut value = component_manifest(&component, &signer);
+    value["abi"] = json!("sovereign_core_wasm_v2");
+    assert_eq!(
+        verify_artifact(&trust, &sign_value(&value, &signer), &component).unwrap_err(),
+        ArtifactError::UnsupportedAbi
+    );
+    let mut value = component_manifest(&component, &signer);
+    value["entrypoint"] = json!("sovereign_run");
+    assert_eq!(
+        verify_artifact(&trust, &sign_value(&value, &signer), &component).unwrap_err(),
+        ArtifactError::UnsupportedAbi
     );
 }
 

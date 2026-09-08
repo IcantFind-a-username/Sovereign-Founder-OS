@@ -28,11 +28,18 @@ use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use wasmtime::component::Component;
 use wasmtime::{Engine, Module};
 
 use sovereign_artifact::Digest;
 
 use crate::SandboxError;
+
+/// First framing byte of a compile request: which artifact kind the worker
+/// must compile, and therefore which engine configuration and serializer it
+/// uses. Anything else is a malformed request and a non-zero worker exit.
+const REQUEST_KIND_CORE_MODULE: u8 = 1;
+const REQUEST_KIND_COMPONENT: u8 = 2;
 
 /// How the parent launches its compilation worker: a program plus arguments
 /// that re-enter this crate's [`run_compile_worker`] (for the single-binary
@@ -118,7 +125,7 @@ impl CompileWorker {
     /// malformed output.
     pub(crate) fn compile(&self, engine: &Engine, bytes: &[u8]) -> Result<Module, SandboxError> {
         let expected = Digest::of_bytes(bytes);
-        let serialized = self.run(bytes, &expected)?;
+        let serialized = self.run(REQUEST_KIND_CORE_MODULE, bytes, &expected)?;
         // SAFETY: `serialized` is produced this run by the parent's own trusted
         // worker from digest-verified source bytes and never read from an
         // untrusted on-disk cache; deserializing it is equivalent to the
@@ -127,7 +134,22 @@ impl CompileWorker {
             .map_err(|error| SandboxError::CompileWorkerFailed(error.to_string()))
     }
 
-    fn run(&self, bytes: &[u8], expected: &Digest) -> Result<Vec<u8>, SandboxError> {
+    /// Component-backend variant of [`Self::compile`]: same worker boundary
+    /// and digest check, with the component engine and serializer.
+    pub(crate) fn compile_component(
+        &self,
+        engine: &Engine,
+        bytes: &[u8],
+    ) -> Result<Component, SandboxError> {
+        let expected = Digest::of_bytes(bytes);
+        let serialized = self.run(REQUEST_KIND_COMPONENT, bytes, &expected)?;
+        // SAFETY: as in `compile` — produced this run by the parent's own
+        // trusted worker from digest-verified source bytes.
+        unsafe { Component::deserialize(engine, &serialized) }
+            .map_err(|error| SandboxError::CompileWorkerFailed(error.to_string()))
+    }
+
+    fn run(&self, kind: u8, bytes: &[u8], expected: &Digest) -> Result<Vec<u8>, SandboxError> {
         let mut command = Command::new(&self.program);
         command
             .args(&self.args)
@@ -140,17 +162,15 @@ impl CompileWorker {
             .spawn()
             .map_err(|error| SandboxError::CompileWorkerFailed(format!("spawn: {error}")))?;
 
-        // Frame the request as digest(32) || module bytes. Write from a thread
-        // and drain stdout from another so a large module cannot deadlock on a
-        // full pipe while the parent waits.
+        // Frame the request as kind(1) || digest(32) || artifact bytes. Write
+        // from a thread and drain stdout from another so a large artifact
+        // cannot deadlock on a full pipe while the parent waits.
         let mut stdin = child
             .stdin
             .take()
             .ok_or_else(|| SandboxError::CompileWorkerFailed("no worker stdin".into()))?;
-        let request: Vec<u8> = expected
-            .as_bytes()
-            .iter()
-            .copied()
+        let request: Vec<u8> = std::iter::once(kind)
+            .chain(expected.as_bytes().iter().copied())
             .chain(bytes.iter().copied())
             .collect();
         let writer = std::thread::spawn(move || {
@@ -250,28 +270,48 @@ impl CompileWorker {
 /// output, which the parent treats as fail-closed.
 pub fn run_compile_worker(mut reader: impl Read, mut writer: impl Write) -> u8 {
     let mut input = Vec::new();
-    if reader.read_to_end(&mut input).is_err() || input.len() < 32 {
+    if reader.read_to_end(&mut input).is_err() || input.len() < 33 {
         return 2;
     }
-    let (digest_bytes, module_bytes) = input.split_at(32);
+    let (kind_byte, framed) = input.split_at(1);
+    let (digest_bytes, artifact_bytes) = framed.split_at(32);
     let mut expected = [0u8; 32];
     expected.copy_from_slice(digest_bytes);
-    if Digest::of_bytes(module_bytes) != Digest::from_bytes(expected) {
+    if Digest::of_bytes(artifact_bytes) != Digest::from_bytes(expected) {
         // Byte substitution in transit — refuse rather than compile it.
         return 3;
     }
 
-    let engine = match Engine::new(&crate::wasm::compile_engine_config()) {
-        Ok(engine) => engine,
-        Err(_) => return 4,
-    };
-    let module = match Module::from_binary(&engine, module_bytes) {
-        Ok(module) => module,
-        Err(_) => return 5,
-    };
-    let serialized = match module.serialize() {
-        Ok(bytes) => bytes,
-        Err(_) => return 6,
+    let serialized = match kind_byte[0] {
+        REQUEST_KIND_CORE_MODULE => {
+            let engine = match Engine::new(&crate::wasm::compile_engine_config()) {
+                Ok(engine) => engine,
+                Err(_) => return 4,
+            };
+            let module = match Module::from_binary(&engine, artifact_bytes) {
+                Ok(module) => module,
+                Err(_) => return 5,
+            };
+            match module.serialize() {
+                Ok(bytes) => bytes,
+                Err(_) => return 6,
+            }
+        }
+        REQUEST_KIND_COMPONENT => {
+            let engine = match Engine::new(&crate::wasm::component_engine_config()) {
+                Ok(engine) => engine,
+                Err(_) => return 4,
+            };
+            let component = match Component::new(&engine, artifact_bytes) {
+                Ok(component) => component,
+                Err(_) => return 5,
+            };
+            match component.serialize() {
+                Ok(bytes) => bytes,
+                Err(_) => return 6,
+            }
+        }
+        _ => return 2,
     };
     if writer.write_all(&serialized).is_err() || writer.flush().is_err() {
         return 7;
@@ -291,10 +331,8 @@ mod tests {
     }
 
     fn request_bytes(digest: &Digest, module: &[u8]) -> Vec<u8> {
-        digest
-            .as_bytes()
-            .iter()
-            .copied()
+        std::iter::once(REQUEST_KIND_CORE_MODULE)
+            .chain(digest.as_bytes().iter().copied())
             .chain(module.iter().copied())
             .collect()
     }

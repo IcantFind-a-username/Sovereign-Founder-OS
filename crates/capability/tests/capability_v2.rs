@@ -574,7 +574,7 @@ fn rejects_self_supplied_approval_evidence_and_backend_downgrade() {
     ));
 
     let mut downgraded = claims(&prepared, &decision, session_id);
-    downgraded.backend = ArtifactBackend::ComponentWasm;
+    downgraded.backend = ArtifactBackend::Native;
     let token = sign_claims(&downgraded);
     let (_, mut validator) = authority(NOW);
     assert!(matches!(
