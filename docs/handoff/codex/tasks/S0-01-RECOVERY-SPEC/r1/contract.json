@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 2,
+  "taskId": "S0-01-RECOVERY-SPEC",
+  "revision": 1,
+  "parentTaskId": null,
+  "sourceCardPath": "docs/handoff/codex/cards/S0-01-RECOVERY-SPEC.md",
+  "sourceCardBlob": "e656675a40afbcce2cc5a43cfec2b215ce99def5",
+  "inputBlobs": [
+    {"path": "CLAUDE.md", "blob": "d15b2a5d109f4d2e7090a13ae4ce5eea1e49f8d7"},
+    {"path": "docs/handoff/codex/README.md", "blob": "0a3619c323189fd93f0049c291d40e037c7b6f2f"},
+    {"path": "docs/backlog.md", "blob": "785370bd60a18660d74b4ccc5d397de35e784a0d"},
+    {"path": "docs/handoff/codex/protocol.md", "blob": "1a4eb6780bc7b36f621b1ecf1f70d372acdfff4a"},
+    {"path": "docs/handoff/codex/contracts.md", "blob": "cd8c34ee497676aa7dc6749ab16646eeb88031e1"},
+    {"path": "docs/handoff/codex/models-and-goals.md", "blob": "09888cc8e0b1f0a672d3f57c60a617a15dbb4489"},
+    {"path": "docs/handoff/codex/cards/S0-01-RECOVERY-SPEC.md", "blob": "e656675a40afbcce2cc5a43cfec2b215ce99def5"},
+    {"path": "docs/handoff/codex/cards/S0-01.md", "blob": "f6231acf98cb611b0798ee1aff49e8ca1daf5fa4"},
+    {"path": "docs/handoff/codex/cards/S0-02.md", "blob": "5d14e735358e1235d47f4587b813cddd52a3d4db"},
+    {"path": "docs/handoff/codex/cards/S0-03.md", "blob": "63efab077363c1c5bdd3b548f0874cdc560a46c3"},
+    {"path": "docs/handoff/codex/cards/S0-04.md", "blob": "746b6f6f8a43adb0cf651d22baac80d6daf47d45"},
+    {"path": "docs/handoff/codex/cards/S0-05A.md", "blob": "2666a9a1e2356a1f9e20416a3e6db476e21230a7"},
+    {"path": "docs/handoff/codex/cards/S0-05.md", "blob": "b5d77cbb857852f9c34b10efa23dde83a7be86b2"},
+    {"path": "docs/handoff/codex/cards/S0-06.md", "blob": "67d5e7365bdd97b203a7b0461d62474644a55f88"},
+    {"path": "MANIFESTO.md", "blob": "f24a7ae03464af49ebea5f8a382c265f386cffad"},
+    {"path": "THREAT_MODEL.md", "blob": "f8875468a714d5ad28b1f124969edfe506691128"},
+    {"path": "docs/handoff/codex/reports/S0-01-recovery-design.md", "blob": "4ef02498ef4564e8ebbdee5d578180de5f8eb0af"},
+    {"path": "docs/handoff/codex/reviews/S0-01-recovery-design.md", "blob": "eeaaefdcf4dcda03e406c502a41d1e47d67d9d3f"},
+    {"path": "docs/handoff/codex/reports/S0-01-attempt-1.md", "blob": "ffef538faa70c2d9f17ffc1ed85caed983cf1899"},
+    {"path": "docs/handoff/codex/reports/S0-01-record-repair.md", "blob": "4fcdb17aa66927c9183fbbbdd383fd6255cf5e6c"},
+    {"path": "docs/handoff/codex/tasks/S0-01/r2/contract.draft.json", "blob": "f5c3411a2abdd16d55b9953911a79e2ae66d5996"}
+  ],
+  "baseCommit": "5a84fc4022dda2c7c843ca60a3351c92c78d6e00",
+  "dependencies": ["S0-01-RECOVERY-REVIEW"],
+  "allowedWritePaths": [
+    "docs/handoff/codex/protocol.md",
+    "docs/handoff/codex/contracts.md",
+    "docs/handoff/codex/README.md",
+    "docs/handoff/codex/cards/S0-01.md",
+    "docs/handoff/codex/cards/S0-02.md",
+    "docs/handoff/codex/cards/S0-03.md",
+    "docs/handoff/codex/cards/S0-04.md",
+    "docs/handoff/codex/cards/S0-05A.md",
+    "docs/handoff/codex/cards/S0-05.md",
+    "docs/handoff/codex/cards/S0-06.md"
+  ],
+  "reportPath": "docs/handoff/codex/reports/S0-01-recovery-spec.md",
+  "workerRole": "architect",
+  "reviewerRole": "reviewer",
+  "expectedActors": {
+    "controller": {"model": "gpt-6-astra", "effort": "high"},
+    "worker": {"model": "gpt-5.6-luna", "effort": "medium"},
+    "reviewer": {"model": "gpt-6-astra", "effort": "high"},
+    "architect": {"model": "gpt-6-astra", "effort": "high"},
+    "fallback": {"model": "gpt-6-astra", "effort": "high"}
+  },
+  "maxLunaFailures": 2,
+  "attemptBudgetMs": 1800000,
+  "checks": [
+    {"id": "diff-check", "argv": ["git", "diff", "--check"], "kind": "command", "completion": "exit", "minimumExecuted": null, "timeoutMs": 60000},
+    {"id": "scoped-gate", "argv": ["./scripts/test_changed.sh"], "kind": "command", "completion": "scoped-gate", "minimumExecuted": null, "timeoutMs": 1800000}
+  ]
+}

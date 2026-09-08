@@ -153,6 +153,10 @@ while the controller routes eligible design/review cards to the strong role.
   architect design card is now frozen for v2 execution:
   [S0-01 recovery design](handoff/codex/reports/S0-01-recovery-design.md),
   [S0-01 recovery spec card](handoff/codex/cards/S0-01-RECOVERY-SPEC.md).
+  RECOVERY-SPEC is now claimed under the v2 Cspec records; its architect attempt
+  has not started and no v3 implementation is accepted:
+  [contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r1/contract.json),
+  [events](handoff/codex/events/S0-01-RECOVERY-SPEC.json).
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
