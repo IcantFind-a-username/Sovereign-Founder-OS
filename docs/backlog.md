@@ -43,6 +43,17 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Consolidate the Singapore pilot and model-credential handoff.** IN PROGRESS (2026-09-09)
+  Record the founder's Singapore-first decision and reconcile the discussion
+  of employee skills, Claude access, credential custody, desktop delivery,
+  legal RAG, and the integrated MVP with the existing canonical scaffold.
+  Document a concrete local secret-entry route and distinguish storing a key
+  from a working broker. Schedule the bounded synthetic-model connection
+  before S3 requires it; retain S4/S5 gates for real data and external actions.
+  Documentation only; no secret reading, live API call, implementation, or
+  automation activation. Done when links and cross-document scope agree,
+  `git diff --check` and `./scripts/test_changed.sh` pass.
+
 - [x] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Scope legal assistance, jurisdiction rules, and pilot markets.**
   Extend the canonical blueprint with the requested Singapore, EU, and US
   jurisdiction direction; distinguish legal research, reviewed deterministic
