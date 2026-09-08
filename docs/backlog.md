@@ -138,7 +138,7 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S0-00](handoff/codex/README.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex`
+- [ ] **P1 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex` IN PROGRESS (2026-09-09)
   Definition and done criteria: [S0-01](handoff/codex/cards/S0-01.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
