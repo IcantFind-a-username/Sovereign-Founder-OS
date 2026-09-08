@@ -229,11 +229,11 @@ while the controller routes eligible design/review cards to the strong role.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO dependency boundary.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-G02](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-G02](handoff/codex/cards/S1-G02.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-02](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-02](handoff/codex/cards/S1-02.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`

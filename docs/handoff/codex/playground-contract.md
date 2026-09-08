@@ -71,3 +71,82 @@ symlink/path 属性拒绝、精确测试 wrapper、零依赖/feature、publish=f
 Workspace、导出、校验、CLI 或产品安全边界。
 DTO/可见性扩展、检索结果、guidance、双语 catalog、HTTP、assets、server、CLI
 接线和真实进程隔离仍为 Blocked design，需要时再冻结，未授予写权限。
+
+## S1-G02→S1-02：可序列化单向 DTO（已独立接受）
+
+本节已由主线程独立审阅并冻结；旧动作行为/fixture不变。本轮直接实现JSON输出所需
+DTO，不做临时非序列化版本。G02合并本阶段必要source与manifest窄门，旧代码须绿色。
+生产grammar是原fixture+动作，仅精确替换 `struct PlaygroundSession`、
+`enum PlaygroundAction` 为 pub(crate)，new/apply 为 pub(crate) fn；再追加下块。
+DTO及read_model为pub(crate)，供未来同crate HTTP消费；DTO字段私有，graph及其字段
+保持私有；lib.rs不变、不re-export。读取返回独立Copy快照，无graph引用或反向构造。
+15字段声明顺序及JSON key固定，无serde rename/flatten/default/skip/custom serializer。
+
+```rust
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+pub(crate) struct PlaygroundReadModel {
+    profile: &'static str,
+    real_data_enabled: bool,
+    persistence: &'static str,
+    company_name: &'static str,
+    offer_name_key: &'static str,
+    offer_price_usd_cents: u32,
+    relationship_organization: &'static str,
+    relationship_contact_name: &'static str,
+    relationship_contact_email: &'static str,
+    relationship_stage: &'static str,
+    discovery_problem_key: &'static str,
+    discovery_budget_min_usd_cents: u32,
+    discovery_budget_max_usd_cents: u32,
+    discovery_constraint_key: &'static str,
+    discovery_next_step_key: &'static str,
+}
+impl SemanticKey {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ReportingClaritySprint => "reporting_clarity_sprint",
+            Self::WeeklyReportingTakesSixHours => "weekly_reporting_takes_six_hours",
+            Self::FinanceMustApprove => "finance_must_approve",
+            Self::ThirtyMinuteScopingCall => "thirty_minute_scoping_call",
+        }
+    }
+}
+impl PlaygroundSession {
+    pub(crate) fn read_model(&self) -> PlaygroundReadModel {
+        PlaygroundReadModel {
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            company_name: self.graph.company.name,
+            offer_name_key: self.graph.offer.name_key.as_str(),
+            offer_price_usd_cents: self.graph.offer.price_usd_cents,
+            relationship_organization: self.graph.relationship.organization,
+            relationship_contact_name: self.graph.relationship.contact_name,
+            relationship_contact_email: self.graph.relationship.contact_email,
+            relationship_stage: match self.graph.relationship.stage {
+                RelationshipStage::Lead => "lead",
+                RelationshipStage::Customer => "customer",
+            },
+            discovery_problem_key: self.graph.discovery.problem_key.as_str(),
+            discovery_budget_min_usd_cents: self.graph.discovery.budget_min_usd_cents,
+            discovery_budget_max_usd_cents: self.graph.discovery.budget_max_usd_cents,
+            discovery_constraint_key: self.graph.discovery.constraint_key.as_str(),
+            discovery_next_step_key: self.graph.discovery.next_step_key.as_str(),
+        }
+    }
+}
+```
+
+只有DTO实现Serialize；graph/session/action及领域类型均不实现Serialize/Deserialize，
+无DTO→graph/session/Workspace转换。key是固定catalog标识，后续翻译不改graph。
+不写JSON编码器；调用既有serde_json::to_value/to_string即可，错误按Result返回调用方。
+manifest只允许原零依赖集合或**完整二项**普通依赖：`serde = { workspace = true }`、
+`serde_json = { workspace = true }`。复用根 `serde version="1", features=["derive"]`
+及 `serde_json="1"`；Cargo.lock当前版本分别1.0.228、1.0.150，仅添加leaf依赖边，
+不升级包/校验和。Cargo metadata逐项固定name、req=`^1`、kind/target/rename/registry
+均null、source=`registry+https://github.com/rust-lang/crates.io-index`、optional=false、
+uses_default_features=true、features分别恰为[derive]/[]；path必须缺失或null。
+拒绝单项/第三项/改kind/source/version/features/target/optional/rename/defaults；
+package features仍空，publish=false、无build script、单一lib及source-root规则不变。
+本节仅放开两个精确依赖与明确crate可见性，其他永久边界保持；HTTP/UI/server、
+catalog、检索/guidance、CLI未冻结。真实业务与AI后续Goal不变，不宣称S1已完成。
