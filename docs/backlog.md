@@ -43,6 +43,15 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `docs/handoff/codex/`, `docs/product/`, `docs/backlog.md` | Finalize the scaffold for a Luna-medium kickoff.** IN PROGRESS (2026-09-09)
+  Audit the canonical contracts and frozen first-stage cards, resolve bootstrap
+  and controller handoff gaps, and provide one runnable-instructions entry for
+  the requested integrated MVP. Keep runtime implementation, real provider
+  access and automation activation distinct from documentation readiness.
+  Done when the first task, handoff, recovery and design-release paths are
+  unambiguous, local links and card consistency checks pass, and
+  `git diff --check` plus `./scripts/test_changed.sh` are green.
+
 - [x] **P2 | `docs/handoff/codex/provider-setup.md`, `docs/backlog.md` | Record the founder's credential-storage handoff.**
   Record the founder-reported local storage state separately from machine
   verification and API connectivity. Do not read credentials or invoke the
