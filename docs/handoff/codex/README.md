@@ -1,16 +1,18 @@
 # Founder OS：Luna 施工总入口
 
-**从这里开始。版本 v2，2026-09-09。**本目录是 Codex 自动施工的唯一入口。文档脚手架用于启动 S0；模型角色配置、校验器和自动升级仍须实现、试演后才能声明可用。
+**从这里开始。版本 v2，2026-09-09。**本目录是 Codex 自动施工的唯一入口。当前采用主控监督的小任务循环；自动运行器和自动升级仍须实际验收后才能声明可用。
 
 当前推荐目标为 [全流程可演示 MVP](models-and-goals.md)：覆盖 S0–S3 和最终业务/AI 界面集成，阶段验收后继续推进。完整目标正文只维护在该文件 §13.1。
 
-用户可选择 **gpt-5.6-luna / medium**，发送 [唯一启动消息](models-and-goals.md#luna-kickoff)。第一张开发卡是 **S0-01**：Luna 先按 [§8.2 自举流程](models-and-goals.md#bootstrap-controller) 分派强模型 controller；通过 S0-06 后再接管日常调度。切换模型本身不会安装配置或自动启动 Goal。
+用户现在可以选择 **gpt-5.6-luna / medium**。按 [protocol 的当前监督模式](protocol.md)
+继续 backlog 中已认领的任务；Astra 拆卡、验收和兜底，Luna 实现冻结的小任务。
+切换模型不会自动启动 Goal，也不代表自动升级机制已通过验收。
 
 ## 当前入口覆盖说明
 
-按 owner 最新指示，当前使用 [主控监督的小任务循环](protocol.md)：Astra 拆卡
-与验收、Luna medium 实现。下文 S0-06 前置仅针对自动调度，不阻塞此监督模式。
-先完成 S1-00 最小产品接口冻结，再实施 S1-G01/S1-01；其余旧状态不追认为通过。
+Owner 最新指示优先：S0-06 仅约束自动调度，不阻塞主控监督下的产品施工。
+恢复会话时先核对 backlog 的当前认领、候选和失败数，继续未终结的 attempt；
+不要重新从 S0-01 开始，不清零失败历史。产品安全 RFC 和真实模型前置保持不变。
 
 ## 唯一事实来源
 
@@ -49,14 +51,14 @@
 
 ## Luna 第一次进入仓库的读法
 
-1. 读 CLAUDE.md、本文件和 backlog。没有 S0-06 实际验收时，先调用强模型 bootstrap controller；后续由当前合法 controller 只选择本 lane 的一张未完成卡。
+1. 读 CLAUDE.md、本文件和 backlog。按当前监督模式交强模型主控检查已有认领与候选，只继续本 lane 的一张当前卡；Luna 不自行验收。
 2. 读 protocol、该卡、它引用的 contracts 段落；涉及产品时读对应 RFC/Playground v2 计划。
 3. 查看所有依赖是否有已提交的验收证据；Spec frozen 不代表已实现，Blocked design 卡不能派给 worker。
 4. Controller 写入本次 base commit、卡的 Git blob、精确写入集合、角色、预算和报告路径；按 protocol §9.6.1 分离认领记录与 worker 基线，运行门后提交 claim。
 5. 用新任务上下文分派 worker，等待 candidate；强模型审阅实际 diff 与检查结果，再作最终验收。
 6. 一张卡完成后由 reviewer 指定下一卡，controller 才继续。两次失败或边界变更按协议升级。
 
-**从 S0-01 配置开始，再做 S0-02 纯状态校验核心**，默认串行。这些卡的设计已冻结，但执行仍需正常 claim、干净基线和真实模型/环境预检。S0-00 的设计产物由本次文档任务提供，不再安排一轮同内容规划。
+默认串行。已完成项与当前认领只在 backlog 维护；下一项须满足冻结卡的依赖和验收要求。S0 自动运行器的旧卡保留供后续验收，不再作为当前产品施工的起点。
 
 ## 任务卡
 
@@ -70,8 +72,8 @@
 | S0-05A | worker；Frozen，等待 S0-02–04 | [单一 CLI 入口](cards/S0-05A.md) |
 | S0-05 | worker；Frozen，等待 S0-01–04、S0-05A | [试演与报告](cards/S0-05.md) |
 | S0-06 | reviewer；Frozen，等待 S0-05 | [脚手架验收](cards/S0-06.md) |
-| S1-00 | architect；设计任务已冻结，产出的产品接口尚待裁决 | [Playground 接口与门迁移](cards/S1-00.md) |
-| S1-G01 / G02、S1-01–11 | Blocked design/dependencies，禁止提前施工 | [后续 Playground 卡](cards/S1-after-design.md) |
+| S1-00 | architect；按增量冻结产品接口，实际状态见 backlog | [Playground 接口与门迁移](cards/S1-00.md) |
+| S1-G01 / G02、S1-01–11 | 已冻结增量及未冻结后续项见索引；完成与认领见 backlog | [后续 Playground 卡](cards/S1-after-design.md) |
 | S2–S3、MVP-00/01/02 | Target；按证据冻结 | [里程碑索引](milestones.md)，最终必须完成统一业务/AI 界面验收。 |
 | S4–S6 | Target / Research，完整合成 MVP 之后 | [里程碑索引](milestones.md)，真实模型所必需的核心安全依赖按 S3-M 前置。 |
 
@@ -86,4 +88,4 @@ Frozen 表示这张卡自身的任务契约可用；依赖、claim、环境与�
 - 旧人工 handoff 和 nightly 模式不自动采用本 lane。启动前确认没有重复 claim；不得让旧 worker 因遇到新 P1 条目就提前施工。
 - 原始日志可放 .harness，最终报告与状态证据须入 Git；不可依赖某次聊天保存唯一记录。
 
-本次只建立文档集，不安装依赖、不改全局模型、不启动 Goal 或 recurring automation。后续以 S0-06 的实际验收结论决定能否启用日常 Luna controller。
+当前按监督模式推进产品实现。启用自动运行器须另有实际验收证据，不能由默认模型设置推定。

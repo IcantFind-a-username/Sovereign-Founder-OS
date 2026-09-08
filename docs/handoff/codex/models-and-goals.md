@@ -104,7 +104,8 @@ Worker 使用同样的必填 name/description/developer_instructions 结构，�
 ~~~text
 开始执行本仓库的全流程 MVP 目标。
 唯一入口是 docs/handoff/codex/README.md；读取 models-and-goals.md §13.1，
-将其中完整目标用于目标模式，按 §8.2 从 S0-01 开始组织强模型自举。
+沿用其中完整目标和当前 Goal；按 protocol 当前监督模式继续 backlog 的当前卡。
+恢复时保留已有候选和失败数，不重建 Goal、不重跑已完成项或从 S0-01 重启。
 允许按文档分派 Luna medium worker 和强模型 controller/reviewer/architect/fallback，
 逐卡施工、验收并继续下一阶段；遵守既有范围、失败上限和凭据边界。
 执行 protocol §9.5.1 的上下文精简与恢复规则，持续推进到我能亲自全链路测试。
@@ -112,7 +113,7 @@ Worker 使用同样的必填 name/description/developer_instructions 结构，�
 
 ### 13.1 当前推荐 Goal：交付全流程可演示 MVP
 
-**目标规格：Target；尚未启动。**本节是当前完整 MVP Goal 的唯一正文，替换原先分别止于 S0/S1 的启动提示词。验收定位为合成业务数据、真实模型参与、真实可操作界面的集成 MVP；首次模型出网须先完成 S3-M，真实客户数据与发信等业务外部执行仍按 S4/S5 的门槛推进。
+**目标规格：Target；完整 MVP 尚未验收。**本节是当前完整 MVP Goal 的唯一正文，替换原先分别止于 S0/S1 的启动提示词。验收定位为合成业务数据、真实模型参与、真实可操作界面的集成 MVP；首次模型出网须先完成 S3-M，真实客户数据与发信等业务外部执行仍按 S4/S5 的门槛推进。
 
 将以下内容作为一个持续目标：
 
