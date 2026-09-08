@@ -149,6 +149,10 @@ while the controller routes eligible design/review cards to the strong role.
   `S0_01_HISTORY_NOT_REPLAYABLE` means the old mixed B/C/W history cannot be
   relabeled; a strong architect must approve a history-preserving recovery
   decision before a clean attempt or S0-02 dispatch.
+  The recovery design and its independent review are accepted; the separate
+  architect design card is now frozen for v2 execution:
+  [S0-01 recovery design](handoff/codex/reports/S0-01-recovery-design.md),
+  [S0-01 recovery spec card](handoff/codex/cards/S0-01-RECOVERY-SPEC.md).
 
 - [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
