@@ -43,13 +43,15 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Scope legal assistance, jurisdiction rules, and pilot markets.** IN PROGRESS (2026-09-09)
+- [x] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Scope legal assistance, jurisdiction rules, and pilot markets.**
   Extend the canonical blueprint with the requested Singapore, EU, and US
   jurisdiction direction; distinguish legal research, reviewed deterministic
   rules, and uncovered or conflicting requirements. Compare pilot markets,
   including mainland China, using current primary sources and explicit
   product assumptions. Add bounded synthetic legal-review acceptance to the
-  MVP Goal and an architect-owned design queue entry. No production legal
+  MVP Goal and an architect-owned design queue entry. Include the requested
+  legal RAG knowledge base, source/version and retrieval boundaries, and
+  citation and non-answer acceptance. No production legal
   rules, legal guarantees, real-data access, or implementation is authorized
   by this documentation item. Done when local links, `git diff --check`, and
   `./scripts/test_changed.sh` pass and all implementation remains design-gated.
@@ -181,6 +183,16 @@ and strong-model items retain `needs:fable`; Luna must skip those.
 - [ ] **P2 | `rfcs/, docs/handoff/codex/` | S3-00 — Freeze synthetic employee execution contracts.** `lane:codex` `needs:fable`
   Definition and done criteria: [S3-00](handoff/codex/milestones.md).
   Design only; release implementation cards after the linked stage is frozen.
+
+- [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S3-L00 — Freeze legal RAG, jurisdiction facts, assistance outputs, and synthetic rule enforcement.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S3 legal extension](handoff/codex/milestones.md#legal-extension).
+  Wait for its design dependencies, then freeze exact S3-L implementation and
+  acceptance cards. No real legal rule or professional approval is implied.
+
+- [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S4-L00 — Review the first real legal-rule pack and pilot scope.** `lane:codex` `needs:fable`
+  Definition and prerequisites: [S4 legal admission](handoff/codex/milestones.md).
+  Requires actual jurisdiction-specific professional review for production
+  legal rules; model-generated or synthetic approval is insufficient.
 
 - [x] **P1 | `crates/consultant-playground/tests/` | Split `physical_boundary.rs` before it breaks the file-size gate.**
   The file is at 1192 lines against the hard 1200 limit in
