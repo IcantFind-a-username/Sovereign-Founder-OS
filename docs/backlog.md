@@ -43,6 +43,16 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Set the recommended Goal to an integrated end-to-end MVP.** IN PROGRESS (2026-09-09)
+  Replace the default stage-limited Goal with one bounded outcome spanning
+  S0 through S3 and their integrated consultant UI. Define synthetic business
+  data, real model participation, complete business flow, observable acceptance
+  and continuation across stage reviews. Keep the canonical Goal in
+  `docs/handoff/codex/models-and-goals.md`; no implementation or Goal activation
+  belongs to this documentation item. Done when the entry links to that Goal,
+  old early-stop prompts are retired, repository links resolve,
+  `git diff --check` and `./scripts/test_changed.sh` pass.
+
 - [x] **P1 | `docs/product/`, `docs/handoff/`, `docs/INDEX.md`, `docs/backlog.md` | Consolidate the Founder OS execution blueprint and bounded Luna task queue.**
   Record the product vision, verified implementation baseline, researched
   component choices, business-demo milestones, and the requested Luna-medium
