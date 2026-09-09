@@ -252,6 +252,9 @@ fn kernel_evidence_json(root: &Path) -> serde_json::Value {
 }
 
 fn workspace_post(path: &str, body: &serde_json::Value, root: &Path) -> serde_json::Value {
+    if let Some(response) = crate::ui_mvp::workspace_post(path, body, root) {
+        return response;
+    }
     let result = (|| {
         let store = workspace::Store::open(root)?;
         match path {
@@ -346,7 +349,7 @@ fn export_response(root: &Path) -> UiResponse {
     }
 }
 
-fn str_field<'a>(
+pub(crate) fn str_field<'a>(
     body: &'a serde_json::Value,
     field: &str,
 ) -> Result<&'a str, workspace::WorkspaceError> {
@@ -355,7 +358,10 @@ fn str_field<'a>(
         .ok_or_else(|| workspace::WorkspaceError::Invalid(format!("{field} is required")))
 }
 
-fn uuid_field(body: &serde_json::Value, field: &str) -> Result<Uuid, workspace::WorkspaceError> {
+pub(crate) fn uuid_field(
+    body: &serde_json::Value,
+    field: &str,
+) -> Result<Uuid, workspace::WorkspaceError> {
     str_field(body, field)?
         .parse()
         .map_err(|_| workspace::WorkspaceError::Invalid(format!("{field} must be a UUID")))

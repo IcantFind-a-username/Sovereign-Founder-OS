@@ -27,6 +27,8 @@
 //! live in the prototype vault.
 
 mod compose;
+mod erp_ops;
+mod erp_types;
 mod kernel_exec;
 mod ops;
 mod reporting;
@@ -37,10 +39,13 @@ mod util;
 mod verify;
 
 #[cfg(test)]
+mod erp_tests;
+#[cfg(test)]
 mod stage1_suite;
 #[cfg(test)]
 mod tests;
 
+pub use erp_types::*;
 pub use types::*;
 pub use util::parse_amount_cents;
 pub use verify::verify_export;
@@ -51,12 +56,20 @@ use sovereign_identity::DeviceIdentity;
 use sovereign_policy::PolicyEngine;
 
 pub const WORKSPACE_VAULT_ENTRY: &str = "workspace_graph";
-const WORKSPACE_VERSION: u32 = 1;
+/// Version 2 adds the business graph (stages, projects, tasks, follow-ups,
+/// payments). Older vaults load through serde defaults and are stamped with
+/// the current version on the next commit; nothing is rewritten on read.
+const WORKSPACE_VERSION: u32 = 2;
 /// Stable identifier stamped into every export and required on verification.
 pub const EXPORT_FORMAT: &str = "sovereign-founder-os-export";
 const MAX_TEXT_FIELD_BYTES: usize = 4 * 1024;
 const MAX_CUSTOMERS: usize = 500;
 const MAX_DOCUMENTS: usize = 2_000;
+const MAX_BODY_BYTES: usize = 32 * 1024;
+const MAX_PROJECTS: usize = 500;
+const MAX_TASKS: usize = 5_000;
+const MAX_FOLLOW_UPS: usize = 2_000;
+const MAX_PAYMENTS: usize = 5_000;
 
 // The built-in delivery-preparation tool is authored by the application
 // itself; its publisher key is a build constant, not a secret. Owner keys

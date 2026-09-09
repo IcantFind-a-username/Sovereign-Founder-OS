@@ -23,11 +23,13 @@ impl Store {
         }
         let mut workspace = self.load()?;
         workspace.version = WORKSPACE_VERSION;
-        workspace.venture = Some(Venture {
-            name: name.clone(),
-            service,
-            updated_at: now(),
-        });
+        // Name and service only; registration facts entered through the
+        // profile form survive this legacy path untouched.
+        let mut venture = workspace.venture.take().unwrap_or_else(Venture::blank);
+        venture.name = name.clone();
+        venture.service = service;
+        venture.updated_at = now();
+        workspace.venture = Some(venture);
         self.commit(
             &workspace,
             vec![AuditEntry {
@@ -62,12 +64,19 @@ impl Store {
         if workspace.customers.len() >= MAX_CUSTOMERS {
             return Err(WorkspaceError::Invalid("customer limit reached".into()));
         }
+        let at = now();
         let customer = Customer {
             id: Uuid::new_v4(),
             name: name.clone(),
             email,
             notes,
-            created_at: now(),
+            created_at: at,
+            // New contacts start as leads; the founder promotes them.
+            stage: CustomerStage::Lead,
+            discovery_notes: String::new(),
+            jurisdiction: String::new(),
+            personal_data_consent: false,
+            updated_at: at,
         };
         let resource = format!("customer:{}", customer.id);
         workspace.customers.push(customer);

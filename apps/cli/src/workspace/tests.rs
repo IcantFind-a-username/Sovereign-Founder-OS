@@ -525,6 +525,7 @@ fn compose_email_is_wellformed_and_injection_safe() {
         name: "Acme".into(),
         service: "Landing pages".into(),
         updated_at: 0,
+        ..Venture::blank()
     };
     let document = Document {
         id: Uuid::new_v4(),
@@ -535,6 +536,11 @@ fn compose_email_is_wellformed_and_injection_safe() {
         amount_cents: None,
         status: DocumentStatus::PendingApproval,
         created_at: 0,
+        updated_at: 0,
+        revision: 1,
+        due_at: None,
+        project_id: None,
+        accepted_at: None,
     };
 
     // With a real address the To header resolves and there is no placeholder.
@@ -544,6 +550,11 @@ fn compose_email_is_wellformed_and_injection_safe() {
         email: "dr.tan@example.com".into(),
         notes: String::new(),
         created_at: 0,
+        stage: CustomerStage::Customer,
+        discovery_notes: String::new(),
+        jurisdiction: String::new(),
+        personal_data_consent: false,
+        updated_at: 0,
     };
     let message = compose_email(Some(&venture), Some(&with_email), &document);
     assert!(message.contains("From: Acme <founder@example.invalid>"));
@@ -746,9 +757,25 @@ fn command_center_guidance_reports_pending_and_all_clear() {
     assert_eq!(guidance[0].kind, "decide_pending");
     assert_eq!(guidance[0].count, 1);
 
-    // Once decided, with an emailed customer and no drafts left, the founder
-    // is caught up.
+    // Once decided, the issued invoice is money to collect — the one thing
+    // still open. Recording the full payment leaves the founder caught up.
     store.decide(approval_id, true).unwrap();
+    let kinds: Vec<String> = store
+        .command_center()
+        .unwrap()
+        .guidance
+        .into_iter()
+        .map(|item| item.kind)
+        .collect();
+    assert_eq!(kinds, vec!["collect_receivables"]);
+    store
+        .record_payment(
+            document_id,
+            250_000,
+            chrono::Utc::now().timestamp(),
+            "paid in full",
+        )
+        .unwrap();
     let kinds: Vec<String> = store
         .command_center()
         .unwrap()

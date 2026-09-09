@@ -2,6 +2,7 @@ mod business_demo;
 mod demo;
 mod gauntlet_report;
 mod ui;
+mod ui_mvp;
 mod workspace;
 
 use clap::{Parser, Subcommand};
