@@ -406,7 +406,7 @@ function renderCommandCenter() {
   $("cc-plugins").textContent = k.admitted_plugins;
 
   renderCommandGuidance(s.guidance);
-  renderCommandDecisions(s.pending_decisions);
+  renderCommandDecisions(s.pending_decisions, s.counts.proposals_pending);
 }
 
 function renderCommandGuidance(items) {
@@ -428,11 +428,16 @@ function renderCommandGuidance(items) {
   }));
 }
 
-function renderCommandDecisions(decisions) {
+function renderCommandDecisions(decisions, proposalsPending) {
   const box = $("cc-decisions");
   if (!decisions.length) {
     box.className = "empty";
-    box.replaceChildren(document.createTextNode(t("cc_no_decisions")));
+    // The tile above counts send approvals and team proposals together, but
+    // this section only lists send approvals. Saying "nothing is waiting"
+    // while a proposal waits contradicts the number directly above it, so
+    // when that is the case, name what is waiting and where it is.
+    box.replaceChildren(document.createTextNode(
+      proposalsPending ? t("cc_only_proposals")(proposalsPending) : t("cc_no_decisions")));
     return;
   }
   box.className = "";

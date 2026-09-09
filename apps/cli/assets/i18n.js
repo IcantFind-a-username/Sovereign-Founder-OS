@@ -27,6 +27,9 @@ const STRINGS = {
     }[g.kind] || g.kind),
     cc_decisions_title: "Needs your decision",
     cc_no_decisions: "Nothing is waiting on you.",
+    cc_only_proposals: (n) =>
+      "No send approvals. " + n + (n === 1 ? " team proposal is" : " team proposals are") +
+      " waiting for your decision, under Proposals from your team below.",
     cc_decision_line: (d) => d.action + " · " + (d.customer_name || "—") + " · " + d.document_title,
     cc_evidence_title: "Kernel evidence",
     cc_evidence_note: "Every number below is re-derivable from your export. This view only reports what the kernel already proved — it makes no new claim and writes nothing.",
@@ -157,6 +160,9 @@ const STRINGS = {
     }[g.kind] || g.kind),
     cc_decisions_title: "需要你的决定",
     cc_no_decisions: "没有等待你处理的事项。",
+    cc_only_proposals: (n) =>
+      "没有待处理的发送批准。有 " + n +
+      " 条团队提案等你决定，见下方的“团队的提案”。",
     cc_decision_line: (d) => d.action + " · " + (d.customer_name || "—") + " · " + d.document_title,
     cc_evidence_title: "内核证据",
     cc_evidence_note: "下方每个数字都可从你的导出文件中重新验证。此视图只报告内核已证明的事实 —— 不作任何新声明,也不写入任何内容。",
