@@ -118,9 +118,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // `main` renders with Debug, so `?` here would surface
             // "BrokerNotImplemented" and tell a reader nothing.
             let mut input = std::io::stdin().lock();
+            let mut address_out = std::io::stdout();
             let mut diagnostics = std::io::stderr();
             let Err(error) = sovereign_authority::broker::run_owner_effect_fixture_broker(
                 &mut input,
+                &mut address_out,
                 &mut diagnostics,
             );
             eprintln!("{error}");
