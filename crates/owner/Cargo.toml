@@ -39,3 +39,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "exact_approval"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "fixture_loopback"
+required-features = ["owner-effect-fixture"]
