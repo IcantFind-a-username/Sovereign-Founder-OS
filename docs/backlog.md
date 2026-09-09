@@ -805,7 +805,7 @@ while the controller routes eligible design/review cards to the strong role.
   matrix doc exists with the schema and an honest empty-real-matrix note, and
   `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [ ] **P2 | `apps/cli/src/` | Stand up an HTTP-layer test boundary for the loopback API and pin today's posture.**
+- [x] **P2 | `apps/cli/src/` | Stand up an HTTP-layer test boundary for the loopback API and pin today's posture.** Landed 2026-09-09 (`apps/cli/tests/ui_http_boundary.rs`, `tests/support/ui_server.rs`).
   There are no HTTP tests at all — ui.rs has no `#[test]` and no
   `apps/cli/tests/` dir exists, so the exact network surface 1C0 must change
   is untested in both directions; every approve test drives `Store::decide`
