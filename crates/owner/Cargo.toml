@@ -28,3 +28,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "fixture_session"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "fixture_registry"
+required-features = ["owner-effect-fixture"]

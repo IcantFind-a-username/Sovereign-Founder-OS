@@ -142,11 +142,16 @@ impl Sessions {
     /// End a session. Atomic in the sense that matters: after this returns,
     /// there is no state left that a later call could accept — the entry is
     /// gone rather than flagged, so there is no second step to fail.
+    ///
+    /// It does not scrub the removed bytes. Writing zeroes over a value about
+    /// to be dropped is something the compiler is free to elide, so it would
+    /// have been a comforting no-op rather than a guarantee; real scrubbing
+    /// needs a type whose drop is not optimised away. The tokens are random
+    /// per session and the session is unusable the moment the entry is gone,
+    /// so what remains is a dead value in freed memory — worth naming rather
+    /// than papering over.
     pub fn log_out(&mut self, cookie: &[u8; TOKEN_LEN]) {
-        if let Some(mut entry) = self.entries.remove(cookie) {
-            entry.tokens.cookie = [0; TOKEN_LEN];
-            entry.tokens.csrf = [0; TOKEN_LEN];
-        }
+        self.entries.remove(cookie);
     }
 
     /// Drop everything that has expired. Housekeeping only: `authenticate`
