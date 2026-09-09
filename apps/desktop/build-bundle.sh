@@ -94,6 +94,8 @@ echo
 echo "Bundles:"
 find target -maxdepth 4 \( -name '*.dmg' -o -name '*.app' \) -print 2>/dev/null | sed 's/^/  /'
 echo
-echo "Ad-hoc signed, not notarized: macOS quarantines a copy that arrived over"
-echo "the network until you right-click -> Open once, or clear the flag with"
-echo "  xattr -dr com.apple.quarantine '<path to the .app>'"
+echo "Ad-hoc signed, not notarized. Drag the app into /Applications, then clear"
+echo "the quarantine flag on a copy that arrived over the network:"
+echo "  xattr -dr com.apple.quarantine '/Applications/$PRODUCT.app'"
+echo "(macOS 15 and later removed the right-click -> Open bypass; the other way"
+echo " is System Settings > Privacy & Security > Open Anyway.)"
