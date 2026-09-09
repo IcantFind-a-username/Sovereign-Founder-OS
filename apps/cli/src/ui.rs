@@ -58,22 +58,85 @@ const JS_TYPE: &str = "application/javascript; charset=utf-8";
 
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
 
-pub fn run(port: u16, root: PathBuf, open_browser: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let server = Server::http(("127.0.0.1", port))
-        .map_err(|error| format!("cannot bind 127.0.0.1:{port}: {error}"))?;
+/// Marker line printed once the server is listening, carrying the address it
+/// actually bound. A supervising process (the desktop shell) reads this from
+/// stdout instead of guessing a port, which is what makes `--port 0` usable.
+pub const READY_PREFIX: &str = "sovereign-ui listening on ";
+
+pub fn run(
+    port: u16,
+    root: PathBuf,
+    open_browser: bool,
+    supervised: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (server, port) = bind(port)?;
+    if supervised {
+        watch_supervisor();
+    }
     let url = format!("http://127.0.0.1:{port}");
     println!("Sovereign Founder OS · local app");
     println!("  {url}");
     println!("  loopback only · encrypted local state · Ctrl-C to stop");
+    // Machine-readable and flushed, so a parent process can act on it the
+    // moment the socket is accepting rather than polling a guessed port.
+    println!("{READY_PREFIX}{url}");
+    use std::io::Write as _;
+    let _ = std::io::stdout().flush();
     if open_browser {
         launch_browser(&url);
     }
+    serve(server, port, &root);
+    Ok(())
+}
 
+/// Stop when the launching process goes away.
+///
+/// The supervisor holds this program's stdin open and writes nothing. If it
+/// exits — cleanly, crashing, or killed outright — the OS closes the pipe,
+/// the read returns end-of-file, and the runtime stops with it. Without this
+/// a force-killed desktop shell would leave a server running against the
+/// owner's vault. Exiting here is the crash case the storage layer already
+/// handles: commits are audit-first and written atomically, so an interrupted
+/// operation is retryable, never half-applied.
+fn watch_supervisor() {
+    std::thread::spawn(|| {
+        let mut byte = [0u8; 1];
+        loop {
+            match std::io::Read::read(&mut std::io::stdin().lock(), &mut byte) {
+                // End of file: the supervisor is gone.
+                Ok(0) => break,
+                // A supervisor that writes is not part of this protocol;
+                // ignore the bytes and keep watching the pipe.
+                Ok(_) => continue,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+        std::process::exit(0);
+    });
+}
+
+/// Bind the loopback listener and report the port it actually got. Port 0
+/// asks the OS for an ephemeral one, so a supervised launch never collides
+/// with something already on 7787.
+pub fn bind(port: u16) -> Result<(Server, u16), Box<dyn std::error::Error>> {
+    let server = Server::http(("127.0.0.1", port))
+        .map_err(|error| format!("cannot bind 127.0.0.1:{port}: {error}"))?;
+    let bound = server
+        .server_addr()
+        .to_ip()
+        .map(|address| address.port())
+        .ok_or("listener has no IP address")?;
+    Ok((server, bound))
+}
+
+/// Serve until the listener closes. `port` is the bound port, which the
+/// `Host` allow-list checks against.
+pub fn serve(server: Server, port: u16, root: &Path) {
     for mut request in server.incoming_requests() {
-        let response = route(&mut request, port, &root);
+        let response = route(&mut request, port, root);
         let _ = request.respond(response);
     }
-    Ok(())
 }
 
 /// Best-effort convenience only: a failure to open a browser is silent and

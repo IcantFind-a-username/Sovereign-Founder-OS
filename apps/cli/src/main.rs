@@ -3,6 +3,9 @@ mod demo;
 mod gauntlet_report;
 mod ui;
 mod ui_mvp;
+#[cfg(test)]
+#[path = "ui_tests.rs"]
+mod ui_tests;
 mod workspace;
 
 use clap::{Parser, Subcommand};
@@ -53,6 +56,10 @@ enum Commands {
         /// Do not open the browser automatically
         #[arg(long)]
         no_open: bool,
+        /// Exit when whoever launched this closes its stdin. The desktop app
+        /// uses it so the runtime can never outlive the window that owns it.
+        #[arg(long)]
+        supervised: bool,
     },
     /// Run the fixed synthetic consultant Playground on 127.0.0.1
     Playground {
@@ -102,7 +109,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Demo { fast } => demo::run(fast, data_dir())?,
         Commands::SandboxCheck => cmd_sandbox_check()?,
         Commands::Status => cmd_status()?,
-        Commands::Ui { port, no_open } => ui::run(port, data_dir(), !no_open)?,
+        Commands::Ui {
+            port,
+            no_open,
+            supervised,
+        } => ui::run(port, data_dir(), !no_open, supervised)?,
         Commands::Playground { port } => sovereign_consultant_playground::run(port)?,
         Commands::BusinessDemo { port } => business_demo::run(port)?,
         Commands::ModelCheck => cmd_model_check(),

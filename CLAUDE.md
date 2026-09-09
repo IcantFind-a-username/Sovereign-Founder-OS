@@ -18,6 +18,9 @@ Developer Preview maturity.
   (gateway), `effects`, `execution`, `artifact`, `workflow`,
   `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
   `publish = false`, no product path yet).
+- `apps/desktop` — Tauri desktop shell, **its own workspace on purpose** so
+  the webview stack never enters the audited core lock file or CI's
+  `--workspace` runs. Build with `./apps/desktop/build-bundle.sh`.
 - `apps/cli` — `sovereign-cli` binary + zero-dependency web frontend under
   `apps/cli/assets/` (JSDoc-typed JS, checked with `tsc --checkJs`). The
   founder MVP lives in `apps/cli/src/workspace/` (`erp_*` business graph,

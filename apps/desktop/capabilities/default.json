@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core window handling only. The workspace page is served by the local runtime over loopback HTTP and uses no Tauri IPC, so no plugin or filesystem permission is granted here.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

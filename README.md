@@ -221,6 +221,18 @@ directory, not replicated multi-machine failover. See
 [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) for the approved privacy
 implementation target.
 
+Run it as a desktop app (macOS; unsigned Developer Preview):
+
+```bash
+./apps/desktop/build-bundle.sh   # builds "Sovereign Founder OS.app" and a .dmg
+```
+
+The app is a window around the same runtime: it launches the audited
+`sovereign` binary as a child on an ephemeral loopback port and stops it when
+the window closes. It is packaging, not a new trust boundary — still loopback
+only, still no authenticated owner session. See
+[apps/desktop/README.md](apps/desktop/README.md).
+
 Run locally:
 
 ```bash

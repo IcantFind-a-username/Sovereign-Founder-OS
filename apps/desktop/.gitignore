@@ -1,0 +1,4 @@
+# Build output and the CLI binary staged for bundling.
+target/
+binaries/
+gen/

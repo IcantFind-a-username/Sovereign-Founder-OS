@@ -72,23 +72,38 @@ fn playground_help_lists_only_port_and_builtin_help() {
 fn ui_clap_and_dispatch_remain_compatible() {
     let source = include_str!("main.rs");
     assert!(source.contains(
-        "Ui {\n        /// Port to bind on loopback\n        #[arg(long, default_value_t = 7787)]\n        port: u16,\n        /// Do not open the browser automatically\n        #[arg(long)]\n        no_open: bool,\n    }"
+        "Ui {\n        /// Port to bind on loopback\n        #[arg(long, default_value_t = 7787)]\n        port: u16,\n        /// Do not open the browser automatically\n        #[arg(long)]\n        no_open: bool,\n        /// Exit when whoever launched this closes its stdin. The desktop app\n        /// uses it so the runtime can never outlive the window that owns it.\n        #[arg(long)]\n        supervised: bool,\n    }"
     ));
-    assert!(
-        source.contains("Commands::Ui { port, no_open } => ui::run(port, data_dir(), !no_open)?,")
-    );
+    assert!(source.contains(
+        "Commands::Ui {\n            port,\n            no_open,\n            supervised,\n        } => ui::run(port, data_dir(), !no_open, supervised)?,"
+    ));
     assert!(source
         .contains("Commands::Playground { port } => sovereign_consultant_playground::run(port)?,"));
     assert!(!source.contains("Playground { port, "));
     match Cli::try_parse_from(["sovereign", "ui"]).unwrap().command {
-        Commands::Ui { port, no_open } => assert_eq!((port, no_open), (7787, false)),
+        Commands::Ui {
+            port,
+            no_open,
+            supervised,
+        } => assert_eq!((port, no_open, supervised), (7787, false, false)),
         _ => panic!("parsed a different command"),
     }
-    match Cli::try_parse_from(["sovereign", "ui", "--port", "0", "--no-open"])
-        .unwrap()
-        .command
+    match Cli::try_parse_from([
+        "sovereign",
+        "ui",
+        "--port",
+        "0",
+        "--no-open",
+        "--supervised",
+    ])
+    .unwrap()
+    .command
     {
-        Commands::Ui { port, no_open } => assert_eq!((port, no_open), (0, true)),
+        Commands::Ui {
+            port,
+            no_open,
+            supervised,
+        } => assert_eq!((port, no_open, supervised), (0, true, true)),
         _ => panic!("parsed a different command"),
     }
 }
