@@ -76,3 +76,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "fixture_root_lifecycle"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "exact_fixture_prepare"
+required-features = ["owner-effect-fixture"]
