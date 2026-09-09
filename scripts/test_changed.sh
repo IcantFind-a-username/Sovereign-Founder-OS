@@ -151,6 +151,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
     ./scripts/tests/run-owner-effect-tests.sh
   run_step "owner-effect-regression-selftest" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/run-owner-effect-regression.sh
+  # The supervisor MAC is what separates the fixture broker's parent from any
+  # other local process. A silent dependency bump changes that code path
+  # without changing a line here, so the reviewed graph is checked every run.
+  run_step "owner-effect-crypto-profile" ./scripts/check-owner-effect-crypto-profile.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check

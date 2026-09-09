@@ -15,6 +15,7 @@
 pub mod bootstrap;
 pub mod listener;
 pub mod protocol;
+pub mod supervisor;
 
 /// The hidden subcommand the fixture re-execs itself as. Named here so the
 /// CLI and the broker cannot drift apart, and absent from a default build.
@@ -57,10 +58,18 @@ pub fn run_owner_effect_fixture_broker(
         Ok(established) => established,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
     };
-    let _supervisor = match listener::accept_by_deadline(&established) {
+    let mut supervisor = match listener::accept_by_deadline(&established) {
         Ok(stream) => stream,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
     };
+    // The port admits every process on this machine, so the port is not the
+    // boundary — the launch key is. Nothing is locked or opened until this
+    // connection proves it holds it.
+    if let Err(diagnostic) =
+        supervisor::authenticate(&mut supervisor, &frame.launch_key, &frame.nonce)
+    {
+        return Err(emit(diagnostics, diagnostic));
+    }
     Err(BrokerExit::NotImplemented)
 }
 
