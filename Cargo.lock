@@ -1451,6 +1451,7 @@ dependencies = [
  "clap",
  "dirs",
  "hex",
+ "httparse",
  "rand",
  "serde",
  "serde_json",
