@@ -175,6 +175,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # all of it in the release binary, and nothing about a normal day would show
   # it. This checks the artefact.
   run_step "owner-effect-boundary" ./scripts/check-owner-effect-boundary.sh
+  # Code gates catch code. This catches the other way the boundary erodes:
+  # a sentence that is nearly right gets quoted, and later a decision rests
+  # on it.
+  run_step "owner-effect-documentation" ./scripts/check-owner-effect-documentation.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
