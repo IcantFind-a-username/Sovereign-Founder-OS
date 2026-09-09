@@ -1,6 +1,6 @@
 # S1-10 supervised execution
 
-Incomplete; one substantive Luna failure. Revision3 card blob
+Incomplete; two substantive Luna failures. Revision3 card blob
 `874f76dc1c1277a7f5cc31ee1f1414c9c04ba836`; attempt1 claim/base
 `5b7111ba85222f4a7f575f191df126aa7dc34e97`.
 
@@ -45,3 +45,37 @@ supplied, so those completion claims are unproved.
 Attempt2 preserves all candidates/failure history, samecard/fourfileownership,
 30minutes/3targetedrepaircycles. Another substantive failure stops Luna and
 routes to Astra fallback. FullMVP Goal continues; no isolation acceptance yet.
+
+## Attempt2 — changes requested; Astra escalation
+
+Stopped candidate at HEAD `d38bd82ce35be794b760f75d2ebe095d2edc73ca`:
+CLI test `b58da5b86bfc435358357c3bd8df7a7370104df9`, fixture
+`27c984e6accbe31d64eba97d705ec8ea9c4414d5`; manifest/lock/helper unchanged.
+Independent Astra `/root/s1_10_review` rejected the remaining sensitivity
+failure: content must assert recorded before/after bytes; removal must assert
+file/directory absence; additions must assert specific file and empty nested
+directory entries; mode must establish two distinct known modes and assert
+recorded permissions. Whole-tree inequality can pass from unrelated mtime.
+These explicit first-review requirements remained unfulfilled: second failure,
+no third Luna attempt.
+
+Reviewer independently verified the final 44-exchange evidence pair under
+`.harness/s1-10/attempt2/run-a-1788924027234331000` and
+`run-b-1788924027548707000`: macOS PIDs54779/54782, sharedport50002,
+all raw request/response pairs and hashes match, correct Content-Length,
+unchanged before/after inventories, unequal roots, exact stdout/empty stderr,
+canary absence. Full state/error/final/restart assertions are now present;
+fixture fields private. Binary SHA unchanged from attempt1.
+
+Logs were initially written below apps/cli/.harness then moved to the approved
+repository-root evidence directory; final source path is correct. Final
+release test follows that correction and records23passes (18+3+2 as above).
+The supplied full-gate summary predates that final edit and cannot bind final
+candidate status. Root preserves this gap and will run a fresh baseline gate;
+it does not reconstruct any missing historical log. Prior artifacts remain.
+Astra fallback repairs sensitivity within the same four-file card scope and
+must receive independent acceptance before S1-11.
+
+Root fresh baseline gate69499 completed exit0 on the stopped attempt2 source;
+root-baseline-gate.log/full.log preserve actual output. This newly bound pass
+does not resolve sensitivity defects or alter earlier chronology.
