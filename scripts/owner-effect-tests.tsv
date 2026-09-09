@@ -1,0 +1,21 @@
+# The owner-session / exact-effect test manifest.
+#
+# Every test the owner-effect plan requires is registered here with the exact
+# Cargo profile it must run under, so no RED or GREEN block can report success
+# from a command that quietly ran a different feature set — or ran nothing.
+# The runner infers no defaults: a row's profile is the literal flags the
+# command must carry.
+#
+# Columns, tab-separated: task, package, target, profile, test_name
+# profile is exactly one of:
+#   no-default-features
+#   owner-effect-fixture
+#   owner-effect-fixture,fault-injection
+#   fault-injection
+#   legacy-experimental
+#
+# Rows are added by the task that makes them pass, never in advance: a row for
+# a test that does not exist yet fails the runner, which is the point.
+task	package	target	profile	test_name
+2	sovereign-capability	approval_v2	no-default-features	durable_approval_survives_token_expiry_purge_until_approval_expiry
+2	sovereign-capability	approval_v2	no-default-features	expired_approval_purges_at_approval_expiry
