@@ -1578,6 +1578,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-owner"
+version = "0.1.0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "sovereign-policy"
 version = "0.1.0"
 dependencies = [
