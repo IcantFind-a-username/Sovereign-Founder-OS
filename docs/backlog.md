@@ -848,7 +848,7 @@ while the controller routes eligible design/review cards to the strong role.
   pass in `cargo test -p sovereign-adversarial-tests` and the honesty texts
   match the tested reality.
 
-- [ ] **P2 | `crates/fault-testing/` | Stand up the shared fault-injection dev crate.**
+- [x] **P2 | `crates/fault-testing/` | Stand up the shared fault-injection dev crate.** Landed 2026-09-09; unblocks the vault/ledger/effects entries below.
   First slice of ROADMAP v0.1's "add process-kill, concurrency, and
   filesystem-fault tests" (ROADMAP.md:190-191). Today every crate hand-rolls
   corruption helpers, no test injects a *failing write*, and only

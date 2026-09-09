@@ -1520,6 +1520,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-fault-testing"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "sovereign-identity"
 version = "0.1.0"
 dependencies = [
