@@ -286,8 +286,11 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution evidence](handoff/codex/reports/S1-03-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G04 — Admit fixed search and guidance.** `lane:codex` Frozen; depends on S1-03 acceptance.
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G04 — Admit fixed search and guidance.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures).
   Definition and done criteria: [S1-G04](handoff/codex/cards/S1-G04.md).
+  Base `3feb5c0ffeea2539c069703791f37449a637f007`; card blob
+  `7c5454b46e1849bdbd43756ce9c1d63e269ea11d`; exact four test files.
+  S1-03 accepted in `551fbf5`; fresh worker context.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`
