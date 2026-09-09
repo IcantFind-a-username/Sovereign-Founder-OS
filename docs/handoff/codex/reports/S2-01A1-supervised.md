@@ -133,3 +133,59 @@ and root-gate-summary.log under attempt1 retain complete output and terminal
 summary. This passing gate does not overrule the source/behavior rejection.
 `git diff --check` passed. This commit records only backlog and this report;
 product candidate remains explicitly uncommitted and bound by its manifest.
+
+
+## Attempt 2 — changes requested; Astra fallback
+
+Worker stopped. Independent `/root/blueprint_review` confirmed a second
+substantive failure after verifying the exact eight-file attempt2 manifest.
+No third Luna attempt is authorized. Source HEAD remains the records commit
+`b7bb5ba1b0f88f6d4fa5afde86f5c80f5ccabc21`; product is uncommitted and preserved
+under `.harness/s2-01a1/attempt2/root-candidate/`. Manifest SHA256:
+`a9fd45fdbb5da8417e4a533c0b1dfd3db975bcdbd696e48faf35dbc6cd5b6a3d`.
+Backend blob `fa2298d6f93559765751901ba1e11f241eac61a7`; app
+`67df06acc4f7b6902479f92747817fa4b68fd5e7`; HTTP tests
+`9503c666f61b8b4dc62d526b47d9c0f129b791bd`; report
+`0c93e8f29e3bd6c7a72af1f94c62fd1a894538d4`.
+
+Actual improvements: canonical routes/envelopes, Host/Origin/custom header,
+handle/requestFor signatures, fetch redirect/header and grouped money.
+Remaining issues still fail the same frozen A1:
+
+- UI uses interpolated innerHTML, wrong render/dispatch state protocol, missing
+  busy/409/422 handling. Initial failure writes literal button markup through
+  textContent then dereferences a nonexistent Reload control. Reset Confirm and
+  Cancel buttons default to submit, triggering unintended form submission.
+- State clone/limits/reset collision and short-text rules remain incomplete.
+- Request media/framing/strict JSON, exact statuses and CSP remain incomplete.
+- Named tests retain shallow bodies, including save_conflict_and_reset without
+  an actual conflict or reset; required negative matrices remain unproved.
+
+Consolidated independent fallback checklist:
+`.harness/s2-01a1/attempt2/independent-review.md` (reviewer-owned).
+The final gate stdout is now preserved and reports ALL GREEN, with workspace
+clippy/tests, fmt/size/self-test and legacy tsc. Root reverified current file
+hashes against the candidate manifest; that unchanged-source passing evidence
+is reused for this records-only commit. It does not establish acceptance.
+Raw observations describe a post-repair HTTP RED; no historical pre-change
+TDD evidence is inferred or reconstructed. Browser/release acceptance pending.
+
+### Fallback claim
+
+Reuse `/root/s2_design_card_plan`, actual configured **gpt-6-astra / high**, to
+perform bounded fallback implementation of already-frozen A1. New agent thread
+creation was unavailable; this is an explicit existing-actor reuse, not a claim
+that its registered founder_architect role was changed to founder_fallback.
+Its configured instruction prohibits unfrozen product behavior, which remains
+prohibited here. Another Astra reviewer independently reviews its repairs.
+
+Same exact seven source/test paths and worker report as the original claim;
+no dependency, S1 helper, contract, card or gate changes. Both failed snapshots
+and logs stay untouched. New raw path `.harness/s2-01a1/fallback/`. No commits,
+push or self-acceptance. Controller commits only reviewed candidates/records.
+Repair complete behavior and meaningful tests; do not simply make names pass.
+Use existing ChildServer/HTTP/amount helpers, no replacement frameworks.
+First coherent checkpoint within30min; preserve active handles and remaining
+work if more time is needed. No failure-counter reset or unrelated stage work.
+Next: independent code/browser/release review of the fallback candidate, then
+A2 only after A1 implementation acceptance. Full MVP remains incomplete.
