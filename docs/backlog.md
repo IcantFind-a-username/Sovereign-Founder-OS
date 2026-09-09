@@ -243,11 +243,24 @@ while the controller routes eligible design/review cards to the strong role.
   Logs: `.harness/s1-g02/attempt2*`.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
+- [x] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` DONE (independently accepted after two Luna failures)
   Definition and done criteria: [S1-02](handoff/codex/cards/S1-02.md).
   Base `b4935f00dfb06704454bf3b305a2c79ad1402073`; card blob
   `76a00e5b165289e763150674818c75a33bd6cf8d`; domain.rs, leaf Cargo.toml,
   Cargo.lock only. G02 accepted in `5e740b1`.
+  Attempt 1 production matched, but tests omitted most DTO values, search
+  read invariance and snapshot detachment across real session actions.
+  Attempt 2 repaired value/search assertions but reset every case only after
+  normalizing to the corrected/customer state. Controller fallback changed
+  that test to reset each original reachable state; independent strong reviewer
+  accepted final domain blob `bac8ff1597079d18ec7c7fd9a425fdd844c4d994`.
+  Workspace test/clippy, frontend tsc and scoped checks passed. Original test-first
+  evidence was not preserved; later isolated mutation failed/restoration passed.
+  [Execution evidence](handoff/codex/reports/S1-02-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G03 — Admit the static bilingual catalog.** `lane:codex` Frozen; depends on S1-02 acceptance.
+  Definition and done criteria: [S1-G03](handoff/codex/cards/S1-G03.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
