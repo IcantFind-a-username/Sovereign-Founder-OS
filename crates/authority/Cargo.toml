@@ -17,10 +17,15 @@ default = []
 fault-injection = []
 # RFC 0006's synthetic broker. Non-default for the same reason: a default
 # build must contain no broker mode and no entry point.
-owner-effect-fixture = []
+owner-effect-fixture = ["dep:hmac"]
 
 [dependencies]
 hex = { workspace = true }
+# Exact-pinned and optional: it exists only for the fixture broker's supervisor
+# MAC, and `scripts/check-owner-effect-crypto-profile.sh` fails unless the
+# resolved graph is exactly the reviewed one. Default features off — hmac's
+# default pulls std conveniences this does not use.
+hmac = { version = "=0.12.1", default-features = false, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -43,4 +48,8 @@ required-features = ["owner-effect-fixture"]
 
 [[test]]
 name = "broker_listener"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "broker_supervisor"
 required-features = ["owner-effect-fixture"]

@@ -39,6 +39,8 @@ pub enum Diagnostic {
     SupervisorTimeout,
     /// The parent went away between publishing the address and the handshake.
     SupervisorLost,
+    /// Something connected and could not prove it holds the launch key.
+    SupervisorUnauthenticated,
 }
 
 impl Diagnostic {
@@ -54,6 +56,7 @@ impl Diagnostic {
             Diagnostic::AddressMalformed => "E-ADDRESS-MALFORMED",
             Diagnostic::SupervisorTimeout => "E-SUPERVISOR-TIMEOUT",
             Diagnostic::SupervisorLost => "E-SUPERVISOR-LOST",
+            Diagnostic::SupervisorUnauthenticated => "E-SUPERVISOR-UNAUTHENTICATED",
         }
     }
 }
