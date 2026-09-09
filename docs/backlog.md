@@ -387,8 +387,13 @@ while the controller routes eligible design/review cards to the strong role.
   [Full failure/repair record](handoff/codex/reports/S1-06-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G07 — Admit bounded loopback transport.** `lane:codex` Frozen architecture task; depends on S1-06 acceptance.
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G07 — Admit bounded loopback transport.** `lane:codex` IN PROGRESS (Astra architecture; candidate1, no failures).
   Definition and done criteria: [S1-G07](handoff/codex/cards/S1-G07.md).
+  Base `18844cb203faf606ab611b71012704459cc845c2`; revision1 card blob
+  `2423eef503e17aa242ba9657ebb7a1bbfe479eb0`; five exact test files per card.
+  S1-06 accepted in18844cb; fresh founder_architect plus independent reviewer.
+  Logs .harness/s1-g07/, preserve trueRED/GREEN/fixturecompile, no product
+  writes. Runtime token/time accounting unavailable.
   Controller independently reviewed the server design; actual gate/fixture
   implementation and independent code acceptance remain required.
 
