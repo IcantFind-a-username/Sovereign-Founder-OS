@@ -21,7 +21,7 @@ use std::path::Path;
 /// the store would each own a different one and both believe they were alone.
 pub const STORE_FILE: &str = "authority.redb";
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoreError {
     /// Another handle already has this database open.
     AlreadyOpen,
@@ -67,27 +67,42 @@ impl<'lock> OwnedStore<'lock> {
     /// The one write helper. Redb's write transactions are already two-phase
     /// and durable on commit; funnelling every write through here means there
     /// is a single place to reason about, rather than one per call site.
-    pub fn write<T>(
+    /// Generic over the body's error so a transaction can abort for its own
+    /// reasons — a conflict, a replay — without those becoming variants of
+    /// `StoreError`, which describes the store and not what a caller was
+    /// trying to do.
+    ///
+    /// A body returning `Err` drops the transaction without committing, so
+    /// nothing it wrote is visible. That is the atomicity guarantee in one
+    /// line: there is no partial state to clean up because there is no
+    /// partial state.
+    pub fn write<T, E>(
         &self,
-        body: impl FnOnce(&redb::WriteTransaction) -> Result<T, StoreError>,
-    ) -> Result<T, StoreError> {
+        body: impl FnOnce(&redb::WriteTransaction) -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<StoreError>,
+    {
         let transaction = self
             .database
             .begin_write()
-            .map_err(|_| StoreError::Unavailable)?;
+            .map_err(|_| E::from(StoreError::Unavailable))?;
         let value = body(&transaction)?;
         transaction.commit().map_err(|_| StoreError::Unavailable)?;
         Ok(value)
     }
 
-    pub fn read<T>(
+    pub fn read<T, E>(
         &self,
-        body: impl FnOnce(&redb::ReadTransaction) -> Result<T, StoreError>,
-    ) -> Result<T, StoreError> {
+        body: impl FnOnce(&redb::ReadTransaction) -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<StoreError>,
+    {
         let transaction = self
             .database
             .begin_read()
-            .map_err(|_| StoreError::Unavailable)?;
+            .map_err(|_| E::from(StoreError::Unavailable))?;
         body(&transaction)
     }
 }
