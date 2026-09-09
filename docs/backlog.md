@@ -397,14 +397,13 @@ while the controller routes eligible design/review cards to the strong role.
   Independent code review accepted; four matrices and full scoped gate passed.
   [Evidence](handoff/codex/reports/S1-G07-supervised.md).
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-07 — Add exact loopback server routes.** `lane:codex` IN PROGRESS (fresh Luna medium; attempt1, zero failures).
+- [x] **P1 | `crates/consultant-playground/` | S1-07 — Add exact loopback server routes.** `lane:codex` accepted after two Luna failures and Astra fallback.
   Definition and done criteria: [S1-07](handoff/codex/cards/S1-07.md).
-  Base `f65a6ed41d0893acd04a28b2dbabbd4a8b6745d9`; revision1 card blob
-  `66c8705ac5a71c7f5f9345cda9a60c927f5a36b3`; exact six files per card.
-  Fresh founder_worker (Luna medium), independent strong review.
-  S1-G07 accepted in f65a6ed; logs .harness/s1-07/. Card budget30min/3cycles
-  per attempt, two substantive failures then Astra; token accounting unavailable.
-  Complete only when the linked card's checks and independent acceptance pass.
+  Product commit `b7caaadfa52371096292ab45dcba54604d1e8222`; six files +1251/-0.
+  Seven real socket cases, helper/private tests, read/write sensitivity and
+  full scoped workspace gates passed; independent Astra review accepted.
+  [Evidence and retained failure history](handoff/codex/reports/S1-07-supervised.md).
+  Next S1-09; no CLI/browser/full-MVP acceptance implied.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` `needs:fable`
   Definition and done criteria: [S1-08](handoff/codex/cards/S1-08.md) — depends on S1-09 real CLI acceptance.
