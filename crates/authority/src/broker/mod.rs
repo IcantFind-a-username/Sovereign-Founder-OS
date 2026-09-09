@@ -13,6 +13,7 @@
 //! CLI's tests asserts that against the built binary.
 
 pub mod bootstrap;
+pub mod connections;
 pub mod listener;
 pub mod process_lock;
 pub mod protocol;
