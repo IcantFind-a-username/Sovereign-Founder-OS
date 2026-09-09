@@ -1,0 +1,26 @@
+[package]
+name = "sovereign-owner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Never published. This crate will hold the fixture owner ceremony, and RFC
+# 0006 admits no product path for it.
+publish = false
+
+[features]
+# Every type in this crate is fixture-only, so the default build is empty on
+# purpose: a default `sovereign-owner` compiles to nothing that can admit an
+# owner, which is the strongest form of "there is no product path".
+default = []
+owner-effect-fixture = []
+
+[dependencies]
+uuid = { workspace = true }
+
+[dev-dependencies]
+
+[[test]]
+name = "fixture_boundary"
+required-features = ["owner-effect-fixture"]
