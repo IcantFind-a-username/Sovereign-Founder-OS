@@ -259,8 +259,11 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution evidence](handoff/codex/reports/S1-02-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G03 — Admit the static bilingual catalog.** `lane:codex` Frozen; depends on S1-02 acceptance.
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G03 — Admit the static bilingual catalog.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures).
   Definition and done criteria: [S1-G03](handoff/codex/cards/S1-G03.md).
+  Base `e31795e2d9f9c27edfdc56495eb87bfc486ed126`; card blob
+  `b2f529ef84ac195b95e4d2d7e2d45c815fb1809f`; exact three test files.
+  S1-02 accepted in `9e938ef`.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
