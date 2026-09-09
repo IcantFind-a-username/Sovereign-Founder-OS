@@ -1,0 +1,30 @@
+[package]
+name = "sovereign-desktop"
+description = "Native desktop shell for Sovereign Founder OS"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97"
+license = "Apache-2.0"
+repository = "https://github.com/IcantFind-a-username/Sovereign-Founder-OS"
+publish = false
+
+# Deliberately its own workspace. The desktop shell pulls in a webview stack
+# (and, on Linux, system GTK/WebKit headers) that the audited core workspace
+# must not inherit: `cargo clippy/test --workspace --locked` and the
+# dependency audit in CI keep operating on the runtime crates alone.
+[workspace]
+
+[[bin]]
+name = "sovereign-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

@@ -1,0 +1,19 @@
+[package]
+name = "sovereign-privacy"
+description = "Data-sovereignty boundary: trusted values, registered transforms, and the compiler that is the only way to build a public-compute job"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# RFC 0004: this crate must not depend on the model gateway, the policy
+# engine, workflow, UI, or any provider networking. Those may depend on it.
+# Nothing here opens a socket.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }

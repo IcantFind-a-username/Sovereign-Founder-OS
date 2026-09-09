@@ -33,8 +33,29 @@ pub fn raw_request(port: u16, method: &str, target: &str, headers: &str, body: &
 pub fn request(port: u16, bytes: &[u8]) -> io::Result<Response> {
     let mut stream = connect(port)?;
     stream.write_all(bytes)?;
-    stream.shutdown(Shutdown::Write)?;
+    // A server that has already answered and closed leaves nothing to shut
+    // down. Linux reports that as ENOTCONN; macOS lets the call succeed. The
+    // difference says nothing about the server, and the response it sent is
+    // still sitting in our receive buffer, so read it rather than failing on
+    // which side won the race.
+    match stream.shutdown(Shutdown::Write) {
+        Ok(()) => {}
+        Err(error) if peer_is_gone(&error) => {}
+        Err(error) => return Err(error),
+    }
     read_response(&mut stream)
+}
+
+/// Whether an error means the connection is gone, under any of the names the
+/// platforms give it. Asserting one of them pins the host, not the behaviour.
+pub fn peer_is_gone(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::NotConnected
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::ConnectionAborted
+    )
 }
 
 pub fn read_response(stream: &mut TcpStream) -> io::Result<Response> {
@@ -134,6 +155,17 @@ impl ChildServer {
         Self::start_command(command)
     }
 
+    /// How long to wait for a spawned child to report the port it bound.
+    ///
+    /// Generous on purpose. Nothing here asserts that a server starts
+    /// quickly; the budget exists only so a child that reports *nothing*
+    /// fails instead of hanging the suite forever. Three seconds measured
+    /// the machine rather than the code — cargo runs these suites in
+    /// parallel and each test spawns and links its own child, so a busy host
+    /// timed several out at once (2026-09-10). A child that reports
+    /// something invalid still fails immediately, without waiting for this.
+    pub const STARTUP_BUDGET: Duration = Duration::from_secs(30);
+
     pub fn start_command(mut command: Command) -> io::Result<Self> {
         command.stdout(Stdio::piped()).stderr(Stdio::piped());
         let child = command.spawn()?;
@@ -162,7 +194,7 @@ impl ChildServer {
         guard.stdout_reader = Some(thread::spawn(move || capture_pipe(stdout, Some(sender))));
         guard.stderr_reader = Some(thread::spawn(move || capture_pipe(stderr, None)));
         let startup = receiver
-            .recv_timeout(Duration::from_secs(3))
+            .recv_timeout(Self::STARTUP_BUDGET)
             .map_err(|error| io::Error::new(io::ErrorKind::TimedOut, error))?;
         let port = match startup {
             Ok(port) => port,

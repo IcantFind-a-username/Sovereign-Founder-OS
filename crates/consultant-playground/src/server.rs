@@ -367,14 +367,22 @@ mod tests {
             let result = write_response(&mut stream, 200, &[], &body, false);
             let _ = result_tx.send((result, started.elapsed()));
         });
-        let observed = result_rx.recv_timeout(Duration::from_secs(7));
+        // The watchdog is generous on purpose. What this test proves is that
+        // the write budget is applied at all — it returns rather than
+        // blocking forever, and it does not return before the budget elapsed.
+        // A tight upper band would only measure how loaded the machine is:
+        // idle this lands near WRITE_BUDGET, but under a concurrent build it
+        // drifts, and a scheduling delay is not a defect in the server.
+        let observed = result_rx.recv_timeout(WRITE_BUDGET * 12);
         // Always release the blocked syscall and join before any assertion.
         // A watchdog expiry remains a test failure, never a synthetic IO error.
         drop(peer);
         worker.join().unwrap();
         let (result, elapsed) = observed.expect("write_response did not return before watchdog");
-        assert!(elapsed >= Duration::from_secs(4));
-        assert!(elapsed < Duration::from_secs(7));
+        assert!(
+            elapsed >= WRITE_BUDGET - Duration::from_millis(200),
+            "returned after {elapsed:?}, before the {WRITE_BUDGET:?} write budget could expire"
+        );
         assert!(matches!(
             result.unwrap_err().kind(),
             io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock

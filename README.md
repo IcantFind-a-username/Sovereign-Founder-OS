@@ -122,24 +122,33 @@ Xu's maintainership declaration. It makes chronology and attribution claims
 testable; it is not an independent finding of originality and does not claim
 exclusive rights over abstract ideas.
 
-## Tech Stack (Planned)
+## Tech Stack
 
-| Layer | Technology |
-| --- | --- |
-| Sovereign Runtime | Rust |
-| Desktop UI | TypeScript + React + Tauri |
-| Agent Workers | Python (isolated, untrusted boundary) |
-| Protocols | JSON Schema, gRPC, WASI, MCP, A2A |
+| Layer | Technology | State |
+| --- | --- | --- |
+| Sovereign Runtime | Rust (16 crates, one workspace) | Shipped |
+| Local UI | Dependency-free JavaScript, JSDoc types checked with `tsc --checkJs`, no build step | Shipped |
+| Desktop shell | Tauri v2 (macOS), its own workspace so the webview stack stays out of the audited lock file | Shipped, ad-hoc signed |
+| Sandbox | Wasmtime — core Wasm, plus one zero-import WIT world | Experimental |
+| Agent Workers | Python (isolated, untrusted boundary) | Planned |
+| Protocols | JSON Schema, gRPC, WASI, MCP, A2A | Planned |
 
 ## See It
 
-The local app (`sovereign ui`, English/中文) — your business state in an
-encrypted local vault, every send request stopped at an approval decision, and a
-one-click attack gauntlet where every denial is a real enforcement path:
+The local app (`sovereign ui`, English/中文). On the left, the day's business
+state — what the AI team proposes, what only you can decide, and the kernel
+evidence behind it. On the right, the question a local-first product has to
+answer out loud: for this task, on this record, exactly which bytes would leave
+this machine.
 
-| Founder Workspace (工作台) | Security Center |
+| Today (今天) | Privacy — what would leave this device |
 | --- | --- |
-| ![Founder Workspace in Chinese](docs/screenshots/workspace-zh.png) | ![Security Center gauntlet](docs/screenshots/security-center-en.png) |
+| ![The Today view in Chinese](docs/screenshots/today-zh.png) | ![The exposure preview for one task](docs/screenshots/privacy-en.png) |
+
+The right-hand screenshot is the exposure preview: a per-field disposition
+table, the exact outgoing text with the customer's name reduced to `[ORG_1]`
+and the email dropped entirely, its SHA-256, and — because no public provider
+is configured — the note that nothing was sent.
 
 ## Quick Start
 
@@ -162,16 +171,40 @@ release is evidenced in this repository yet. The current product is a narrow,
 local founder workflow backed by substantial security primitives—not the full
 Founder OS and not a production security boundary.
 
-The loopback web app (`sovereign ui`, English/中文) currently provides:
+The loopback web app (`sovereign ui`, English/中文) is the **Founder MVP —
+Consultant Core v1** (Experimental; see the
+[design record](docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md)):
 
-- a business-state read-only **Command Center** with business counts, pending
-  decisions, deterministic guidance, and evidence summaries. Current first/open
-  GET paths may initialize the co-located device/Vault key files, so this is not
+- **Today** — business tiles, the AI team's pending proposals shown as the
+  exact change that approval applies, one-click work suggestions,
+  deterministic guidance, send approvals, and kernel evidence. First/open GET
+  paths may initialize the co-located device/Vault key files, so this is not
   yet an authenticated, side-effect-free read boundary;
-- a **Workspace** for one company profile, append-only customers, fixed local
-  Offer/Invoice templates, a deterministic drafting stand-in, approval or
-  rejection, local RFC 5322 `.eml` composition, revocation of that local file,
-  an unauthenticated local manual-delivery marker, and plaintext JSON export;
+- **Company** — profile with founder-entered registration facts (jurisdiction,
+  currency, UEN, GST, incorporation date, fiscal year end, revenue estimate),
+  plus plaintext export and offline verification;
+- **Customers** — leads and customers with stage, location, and consent; per
+  customer: discovery notes, projects with dated tasks, follow-ups, documents
+  with recorded acceptance, and the signed event timeline;
+- **Documents** — editable drafts with revisions, the signed send approval and
+  local RFC 5322 `.eml` composition, revocation, the manual-delivery marker,
+  and receivables with founder-recorded payments;
+- **Team** — six hireable AI employees (requirements analyst, proposal writer,
+  delivery planner, invoice clerk, quality checker, compliance checker), each
+  with a card stating what it reads, delivers, and cannot decide. Employees
+  only propose; a founder decision applies exactly the recorded change under
+  policy with signed evidence. A real local model (Ollama, loopback only) may
+  produce proposals when its output validates; otherwise a deterministic
+  template does, and the decision says which;
+- **Compliance** — a Singapore demo rule pack (unreviewed, every rule cites
+  its official source) checked against the recorded facts, with findings
+  that are pass / action / review / unknown and never "compliant"; rule
+  search with citations;
+- **Privacy** — the route this device permits for AI work (prefer-local or
+  local-only, a change that writes a signed audit event), and an exposure
+  preview that runs the compiler for a chosen task and record and shows the
+  per-field disposition, the exact outgoing text, and its hash before anything
+  could be sent;
 - a **Security Center** for identity/vault metadata, audit verification,
   disclosure and admission records, state reconciliation, and an in-memory
   adversarial gauntlet.
@@ -192,12 +225,38 @@ hash-chain evidence. Its present boundary is **Experimental**:
   unauthenticated marker that someone says the file was sent manually.
 
 The current Model Gateway and workflow demo are also experimental foundations.
-Model providers are deterministic stand-ins rather than LLMs, and caller-owned
-classification/provider self-reported trust must be removed before any real
-public egress. Workflow recovery is another runner over the same durable
+Model providers are deterministic stand-ins by default. An Experimental
+per-device Ollama adapter can be enabled in `model.json` beside the vault:
+it routes to a separate local process over loopback that this product does
+not sandbox, confine, or audit, and it claims nothing beyond loopback
+routing. Raw model requests are now local-only: a prompt reaches only a
+provider this build itself vouches for, a proof an outside adapter cannot
+construct, so neither a caller's data label nor a provider's self-reported
+trust can route protected data off the device. Reaching a public model at
+all requires a projection compiled by `crates/privacy` and previewed by the
+owner; no cloud adapter exists yet. Workflow recovery is another runner over the same durable
 directory, not replicated multi-machine failover. See
 [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) for the approved privacy
 implementation target.
+
+Run it as a desktop app (macOS; unsigned Developer Preview):
+
+```bash
+./apps/desktop/build-bundle.sh --dmg   # "Sovereign Founder OS.app" + a disk image
+```
+
+Drag the app into `/Applications`. It is ad-hoc signed but not notarized, so
+the first launch is blocked with *"Apple could not verify …"*; clear the
+quarantine flag with
+`xattr -dr com.apple.quarantine "/Applications/Sovereign Founder OS.app"`, or
+allow it in System Settings → Privacy & Security. On macOS 15 and later,
+right-click → Open no longer bypasses this.
+
+The app is a window around the same runtime: it launches the audited
+`sovereign` binary as a child on an ephemeral loopback port and stops it when
+the window closes. It is packaging, not a new trust boundary — still loopback
+only, still no authenticated owner session. See
+[apps/desktop/README.md](apps/desktop/README.md).
 
 Run locally:
 
@@ -221,15 +280,19 @@ Important current limitations:
 - the vault encrypts entries, but its master key is stored beside the data;
 - export is plaintext workspace/audit JSON, not an encrypted backup or restore
   package, and integrity reconciliation does not bind every workspace field;
-- customer/document editing, real models, network effects, clean-machine
-  restore, and broader business modules remain targets; the sandbox can run a
-  component under one zero-import WIT world (Experimental, pure compute only),
-  but the general Component/WIT plugin boundary with host interfaces remains a
-  target; Secure Mesh remains Research.
+- AI employees are bounded proposers (six roles, no tools, no autonomy) and
+  the compliance pack is an unreviewed Singapore demo; cloud models, network
+  effects, clean-machine restore, other jurisdictions, and broader business
+  modules remain targets; the sandbox can run a component under one
+  zero-import WIT world (Experimental, pure compute only), but the general
+  Component/WIT plugin boundary with host interfaces remains a target; Secure
+  Mesh remains Research.
 
-The Rust workspace contains thirteen Runtime crates covering contracts,
-identity, artifacts, policy, capabilities, authority, execution, effects,
-vault, audit, sandboxing, models, and workflows. The detailed maturity and
+The Rust workspace contains sixteen crates covering contracts, identity,
+artifacts, policy, capabilities, authority, execution, effects, vault, audit,
+sandboxing, models, the data-sovereignty boundary, workflows, the consultant
+playground, and the vault-v2 engine skeleton; `cargo test --workspace` runs 494
+tests across 60 test binaries. The detailed maturity and
 release gates live in [ROADMAP.md](ROADMAP.md); sandbox protocol boundaries are
 in [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 

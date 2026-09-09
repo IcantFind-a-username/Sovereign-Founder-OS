@@ -1,3 +1,4 @@
+use super::erp_ops::receivable_rows;
 use super::types::document_status_label;
 use super::util::{now, storage};
 use super::*;
@@ -19,6 +20,8 @@ impl Store {
                 .filter(|document| document.status == status)
                 .count()
         };
+        let now_unix = now();
+        let receivables = receivable_rows(&workspace, now_unix);
         let counts = CommandCenterCounts {
             customers: workspace.customers.len(),
             documents: workspace.documents.len(),
@@ -26,6 +29,35 @@ impl Store {
             pending_approval: count_status(DocumentStatus::PendingApproval),
             approved_pending_delivery: count_status(DocumentStatus::ApprovedPendingDelivery),
             rejected: count_status(DocumentStatus::Rejected),
+            leads: workspace
+                .customers
+                .iter()
+                .filter(|customer| customer.stage == CustomerStage::Lead)
+                .count(),
+            projects_active: workspace
+                .projects
+                .iter()
+                .filter(|project| project.status == ProjectStatus::Active)
+                .count(),
+            tasks_open: workspace
+                .tasks
+                .iter()
+                .filter(|task| task.done_at.is_none())
+                .count(),
+            follow_ups_overdue: workspace
+                .follow_ups
+                .iter()
+                .filter(|follow_up| follow_up.done_at.is_none() && follow_up.due_at < now_unix)
+                .count(),
+            receivable_cents: receivables
+                .iter()
+                .map(|receivable| receivable.outstanding_cents)
+                .sum(),
+            proposals_pending: workspace
+                .decisions
+                .iter()
+                .filter(|decision| decision.status == DecisionStatus::Pending)
+                .count(),
         };
 
         let pending_decisions: Vec<PendingDecision> = workspace
@@ -333,11 +365,56 @@ fn derive_guidance(
     if pending > 0 {
         out.push(Guidance::action("decide_pending").with_count(pending));
     }
+    if counts.proposals_pending > 0 {
+        out.push(Guidance::action("decide_proposals").with_count(counts.proposals_pending));
+    }
+    if counts.follow_ups_overdue > 0 {
+        out.push(Guidance::action("follow_up_overdue").with_count(counts.follow_ups_overdue));
+    }
+    let owed: Vec<_> = receivable_rows(workspace, now())
+        .into_iter()
+        .filter(|receivable| receivable.outstanding_cents > 0)
+        .collect();
+    if !owed.is_empty() {
+        out.push(
+            Guidance::action("collect_receivables")
+                .with_count(owed.len())
+                .with_subject(format_money(
+                    owed.iter()
+                        .map(|receivable| receivable.outstanding_cents)
+                        .sum(),
+                )),
+        );
+    }
     if workspace.customers.is_empty() {
         out.push(Guidance::action("add_customer"));
     }
     if counts.drafts > 0 {
         out.push(Guidance::action("send_drafts").with_count(counts.drafts));
+    }
+    // An accepted offer that no project delivers yet.
+    if let Some(offer) = workspace.documents.iter().find(|document| {
+        document.kind == DocumentKind::Offer
+            && document.accepted_at.is_some()
+            && !workspace
+                .projects
+                .iter()
+                .any(|project| project.offer_id == Some(document.id))
+    }) {
+        let subject = workspace
+            .customer(offer.customer_id)
+            .map(|customer| customer.name.clone())
+            .unwrap_or_default();
+        out.push(Guidance::action("start_project_for").with_subject(subject));
+    }
+    // A finished project with no invoice raised for it.
+    if let Some(project) = workspace.projects.iter().find(|project| {
+        project.status == ProjectStatus::Done
+            && !workspace.documents.iter().any(|document| {
+                document.kind == DocumentKind::Invoice && document.project_id == Some(project.id)
+            })
+    }) {
+        out.push(Guidance::action("invoice_done_project").with_subject(project.name.clone()));
     }
 
     // Risk: a customer who already has documents but no email — a send would be
@@ -366,6 +443,20 @@ fn derive_guidance(
         out.push(Guidance::action("all_clear"));
     }
 
-    out.truncate(5);
+    out.truncate(6);
     out
+}
+
+/// Whole-currency display for guidance text ("1,250.00").
+fn format_money(cents: u64) -> String {
+    let whole = cents / 100;
+    let digits = whole.to_string();
+    let mut grouped = String::new();
+    for (index, ch) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(ch);
+    }
+    format!("{grouped}.{:02}", cents % 100)
 }

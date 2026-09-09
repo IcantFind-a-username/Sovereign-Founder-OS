@@ -1,6 +1,22 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::compliance::ComplianceReport;
+use super::crew_types::{Decision, Employee};
+use super::erp_types::{CustomerStage, FollowUp, Payment, Project, Task};
+
+fn default_currency() -> String {
+    "SGD".to_owned()
+}
+
+fn default_fiscal_year_end_month() -> u8 {
+    12
+}
+
+fn default_revision() -> u32 {
+    1
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum WorkspaceError {
     #[error("{0}")]
@@ -18,6 +34,42 @@ pub struct Venture {
     pub name: String,
     pub service: String,
     pub updated_at: i64,
+    /// Where the company is registered, as a short code the founder entered
+    /// (`SG`, `EU`, `US`, …). Empty means unknown; nothing infers it.
+    #[serde(default)]
+    pub jurisdiction: String,
+    #[serde(default = "default_currency")]
+    pub currency: String,
+    /// Business registration number (Singapore: UEN). Founder-entered.
+    #[serde(default)]
+    pub uen: String,
+    #[serde(default)]
+    pub gst_registered: bool,
+    #[serde(default)]
+    pub incorporated_at: Option<i64>,
+    #[serde(default = "default_fiscal_year_end_month")]
+    pub fiscal_year_end_month: u8,
+    /// Founder's own estimate of annual revenue, for threshold checks.
+    #[serde(default)]
+    pub revenue_estimate_cents: Option<u64>,
+}
+
+impl Venture {
+    /// A profile with every registration fact unknown.
+    pub(super) fn blank() -> Self {
+        Venture {
+            name: String::new(),
+            service: String::new(),
+            updated_at: 0,
+            jurisdiction: String::new(),
+            currency: default_currency(),
+            uen: String::new(),
+            gst_registered: false,
+            incorporated_at: None,
+            fiscal_year_end_month: default_fiscal_year_end_month(),
+            revenue_estimate_cents: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +84,21 @@ pub struct Customer {
     pub email: String,
     pub notes: String,
     pub created_at: i64,
+    /// Funnel stage; records from before stages existed default to customer.
+    #[serde(default)]
+    pub stage: CustomerStage,
+    /// Discovery context: problem, constraints, budget — the founder's own
+    /// notes, the raw material AI employees may analyse.
+    #[serde(default)]
+    pub discovery_notes: String,
+    /// Where the customer is, as a founder-entered code; empty is unknown.
+    #[serde(default)]
+    pub jurisdiction: String,
+    /// The founder recorded a data-protection consent for this contact.
+    #[serde(default)]
+    pub personal_data_consent: bool,
+    #[serde(default)]
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +135,20 @@ pub struct Document {
     pub amount_cents: Option<u64>,
     pub status: DocumentStatus,
     pub created_at: i64,
+    #[serde(default)]
+    pub updated_at: i64,
+    /// Incremented on every draft edit; approvals bind a specific revision.
+    #[serde(default = "default_revision")]
+    pub revision: u32,
+    /// Payment due date for issued invoices.
+    #[serde(default)]
+    pub due_at: Option<i64>,
+    /// The project this document belongs to, when it came from one.
+    #[serde(default)]
+    pub project_id: Option<Uuid>,
+    /// When the founder recorded the customer's acceptance (offers only).
+    #[serde(default)]
+    pub accepted_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,6 +249,23 @@ pub struct Workspace {
     /// practice; `default` keeps vaults written before this field loadable.
     #[serde(default)]
     pub disclosures: Vec<ModelDisclosure>,
+    #[serde(default)]
+    pub projects: Vec<Project>,
+    #[serde(default)]
+    pub tasks: Vec<Task>,
+    #[serde(default)]
+    pub follow_ups: Vec<FollowUp>,
+    #[serde(default)]
+    pub payments: Vec<Payment>,
+    /// AI employees the founder hired; they propose, never act.
+    #[serde(default)]
+    pub employees: Vec<Employee>,
+    /// Every proposal an employee made and what the founder decided.
+    #[serde(default)]
+    pub decisions: Vec<Decision>,
+    /// Compliance check reports, oldest first; bounded.
+    #[serde(default)]
+    pub compliance_reports: Vec<ComplianceReport>,
 }
 
 /// At-a-glance product view: the founder's whole business plus the security
@@ -230,6 +328,15 @@ pub struct CommandCenterCounts {
     pub pending_approval: usize,
     pub approved_pending_delivery: usize,
     pub rejected: usize,
+    /// Contacts still at the lead stage.
+    pub leads: usize,
+    pub projects_active: usize,
+    pub tasks_open: usize,
+    pub follow_ups_overdue: usize,
+    /// Money still owed on issued invoices.
+    pub receivable_cents: u64,
+    /// AI-employee proposals waiting for the founder.
+    pub proposals_pending: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -326,6 +433,41 @@ impl Workspace {
             .iter()
             .find(|customer| customer.id == id)
             .ok_or_else(|| WorkspaceError::NotFound("customer".into()))
+    }
+
+    pub(super) fn customer_mut(&mut self, id: Uuid) -> Result<&mut Customer, WorkspaceError> {
+        self.customers
+            .iter_mut()
+            .find(|customer| customer.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("customer".into()))
+    }
+
+    pub(super) fn project(&self, id: Uuid) -> Result<&Project, WorkspaceError> {
+        self.projects
+            .iter()
+            .find(|project| project.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("project".into()))
+    }
+
+    pub(super) fn project_mut(&mut self, id: Uuid) -> Result<&mut Project, WorkspaceError> {
+        self.projects
+            .iter_mut()
+            .find(|project| project.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("project".into()))
+    }
+
+    pub(super) fn task_mut(&mut self, id: Uuid) -> Result<&mut Task, WorkspaceError> {
+        self.tasks
+            .iter_mut()
+            .find(|task| task.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("task".into()))
+    }
+
+    pub(super) fn follow_up_mut(&mut self, id: Uuid) -> Result<&mut FollowUp, WorkspaceError> {
+        self.follow_ups
+            .iter_mut()
+            .find(|follow_up| follow_up.id == id)
+            .ok_or_else(|| WorkspaceError::NotFound("follow-up".into()))
     }
 
     pub(super) fn approval(&self, id: Uuid) -> Result<&Approval, WorkspaceError> {

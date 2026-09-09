@@ -37,7 +37,15 @@ impl Store {
     pub fn load(&self) -> Result<Workspace, WorkspaceError> {
         let vault = Vault::init(self.root.join("vault")).map_err(storage)?;
         match vault.get(WORKSPACE_VAULT_ENTRY) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
+            Ok(bytes) => serde_json::from_slice::<Workspace>(&bytes)
+                .map(|mut workspace| {
+                    // Forward migration is additive (serde defaults); the
+                    // stamp lands with the next audit-first commit.
+                    if workspace.version < WORKSPACE_VERSION {
+                        workspace.version = WORKSPACE_VERSION;
+                    }
+                    workspace
+                })
                 .map_err(|error| WorkspaceError::Storage(format!("corrupt workspace: {error}"))),
             Err(sovereign_vault::VaultError::NotFound(_)) => Ok(Workspace {
                 version: WORKSPACE_VERSION,

@@ -12,14 +12,23 @@ Developer Preview maturity.
 
 ## Repo map
 
-- `crates/` — 15 workspace crates, package name = `sovereign-<dir>`:
+- `crates/` — 16 workspace crates, package name = `sovereign-<dir>`:
   `contracts` (canonical signed types), `policy`, `capability`, `authority`,
   `identity`, `vault`, `audit-ledger`, `sandbox` (wasmtime), `model`
-  (gateway), `effects`, `execution`, `artifact`, `workflow`,
+  (gateway), `privacy` (RFC 0004 data-sovereignty boundary — the only way to
+  build a public-compute job), `effects`, `execution`, `artifact`, `workflow`,
   `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
   `publish = false`, no product path yet).
+- `apps/desktop` — Tauri desktop shell, **its own workspace on purpose** so
+  the webview stack never enters the audited core lock file or CI's
+  `--workspace` runs. Build with `./apps/desktop/build-bundle.sh`.
 - `apps/cli` — `sovereign-cli` binary + zero-dependency web frontend under
-  `apps/cli/assets/` (JSDoc-typed JS, checked with `tsc --checkJs`).
+  `apps/cli/assets/` (JSDoc-typed JS, checked with `tsc --checkJs`). The
+  founder MVP lives in `apps/cli/src/workspace/` (`erp_*` business graph,
+  `crew_*` AI employees, `compliance*` rule pack and checks,
+  `model_config.rs`), its routes in `apps/cli/src/ui_mvp.rs`, its pages in
+  `assets/{crm,team,compliance,i18n-mvp}.js`; design record under
+  `docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md`.
 - `tests/adversarial` — cross-crate security-invariant suite
   (`sovereign-adversarial-tests`).
 - `rfcs/` — accepted designs; with current code, the source of truth over
@@ -32,7 +41,7 @@ Green on macOS 26.5 arm64 as well, as of 2026-08-15.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
-cargo test --workspace --locked  # full suite (~293 tests as of 2026-09-09)
+cargo test --workspace --locked  # full suite (494 tests, 60 binaries, 2026-09-09)
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 ./scripts/check-file-size.sh     # god-file limit: 1200 rs / 800 frontend
@@ -135,6 +144,10 @@ secret scanning. Toolchain is pinned: 1.97.0.
     `primary_resource() == None` for a rejection-path test, declare the
     manifest operation's `resource_bindings` as `[]` (an empty array is
     valid) and pass no grants — `prepare_grants` then never sets it.
+13. `sovereign ui` has no `--root` flag yet: to test the app without touching
+    the owner's real data, build it and run the binary with `HOME` pointed at
+    a scratch directory (`dirs::data_local_dir()` follows `HOME` on macOS),
+    e.g. `HOME=/tmp/x ./target/debug/sovereign ui --no-open --port 7791`.
 12. To split an inline `#[cfg(test)] mod tests { … }` out of a growing `.rs`
     file, move the body verbatim into a sibling file and declare
     `#[cfg(test)] mod tests;` — Rust module privacy follows the module tree,

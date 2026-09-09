@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sovereign Founder OS</title>
+<style>
+  :root { color-scheme: light dark; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+          "PingFang SC", "Noto Sans SC", sans-serif;
+    background: #f6f4ef; color: #211f1a;
+  }
+  @media (prefers-color-scheme: dark) { body { background: #141412; color: #ece9e1; } }
+  .box { max-width: 460px; padding: 32px; text-align: center; }
+  h1 { font-size: 15px; letter-spacing: .08em; text-transform: uppercase; margin: 18px 0 6px; }
+  p { margin: 6px 0; opacity: .72; }
+  .err { display: none; white-space: pre-wrap; text-align: left; margin-top: 14px;
+         padding: 12px 14px; border-radius: 10px; background: #f9e5e2; color: #a63028; }
+  @media (prefers-color-scheme: dark) { .err { background: #2a1a18; color: #e9a49c; } }
+  .spin { width: 26px; height: 26px; margin: 0 auto; border-radius: 50%;
+          border: 2.5px solid rgba(128,128,128,.28); border-top-color: #96692b;
+          animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spin" id="spin"></div>
+    <h1>Sovereign Founder OS</h1>
+    <p id="status">Starting your local runtime…</p>
+    <p><small>Everything runs on this machine. Nothing is sent anywhere.</small></p>
+    <div class="err" id="error"></div>
+  </div>
+<script>
+  // The shell reports startup failures by navigating here with ?error=…;
+  // there is no IPC and no Tauri API use on this page.
+  const params = new URLSearchParams(location.search);
+  const message = params.get("error");
+  if (message) {
+    document.getElementById("spin").style.display = "none";
+    document.getElementById("status").textContent = "The local runtime did not start.";
+    const box = document.getElementById("error");
+    box.style.display = "block";
+    box.textContent = message;
+  }
+</script>
+</body>
+</html>

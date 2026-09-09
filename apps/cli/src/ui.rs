@@ -49,26 +49,95 @@ const UI_HTML: &str = include_str!("../assets/index.html");
 const UI_CSS: &str = include_str!("../assets/styles.css");
 const UI_I18N_JS: &str = include_str!("../assets/i18n.js");
 const UI_APP_JS: &str = include_str!("../assets/app.js");
+const UI_I18N_MVP_JS: &str = include_str!("../assets/i18n-mvp.js");
+const UI_CRM_JS: &str = include_str!("../assets/crm.js");
+const UI_TEAM_JS: &str = include_str!("../assets/team.js");
+const UI_COMPLIANCE_JS: &str = include_str!("../assets/compliance.js");
+const UI_PRIVACY_JS: &str = include_str!("../assets/privacy.js");
 const UI_FAVICON: &str = include_str!("../assets/favicon.svg");
+const JS_TYPE: &str = "application/javascript; charset=utf-8";
 
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
 
-pub fn run(port: u16, root: PathBuf, open_browser: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let server = Server::http(("127.0.0.1", port))
-        .map_err(|error| format!("cannot bind 127.0.0.1:{port}: {error}"))?;
+/// Marker line printed once the server is listening, carrying the address it
+/// actually bound. A supervising process (the desktop shell) reads this from
+/// stdout instead of guessing a port, which is what makes `--port 0` usable.
+pub const READY_PREFIX: &str = "sovereign-ui listening on ";
+
+pub fn run(
+    port: u16,
+    root: PathBuf,
+    open_browser: bool,
+    supervised: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (server, port) = bind(port)?;
+    if supervised {
+        watch_supervisor();
+    }
     let url = format!("http://127.0.0.1:{port}");
     println!("Sovereign Founder OS · local app");
     println!("  {url}");
     println!("  loopback only · encrypted local state · Ctrl-C to stop");
+    // Machine-readable and flushed, so a parent process can act on it the
+    // moment the socket is accepting rather than polling a guessed port.
+    println!("{READY_PREFIX}{url}");
+    use std::io::Write as _;
+    let _ = std::io::stdout().flush();
     if open_browser {
         launch_browser(&url);
     }
+    serve(server, port, &root);
+    Ok(())
+}
 
+/// Stop when the launching process goes away.
+///
+/// The supervisor holds this program's stdin open and writes nothing. If it
+/// exits — cleanly, crashing, or killed outright — the OS closes the pipe,
+/// the read returns end-of-file, and the runtime stops with it. Without this
+/// a force-killed desktop shell would leave a server running against the
+/// owner's vault. Exiting here is the crash case the storage layer already
+/// handles: commits are audit-first and written atomically, so an interrupted
+/// operation is retryable, never half-applied.
+fn watch_supervisor() {
+    std::thread::spawn(|| {
+        let mut byte = [0u8; 1];
+        loop {
+            match std::io::Read::read(&mut std::io::stdin().lock(), &mut byte) {
+                // End of file: the supervisor is gone.
+                Ok(0) => break,
+                // A supervisor that writes is not part of this protocol;
+                // ignore the bytes and keep watching the pipe.
+                Ok(_) => continue,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => break,
+            }
+        }
+        std::process::exit(0);
+    });
+}
+
+/// Bind the loopback listener and report the port it actually got. Port 0
+/// asks the OS for an ephemeral one, so a supervised launch never collides
+/// with something already on 7787.
+pub fn bind(port: u16) -> Result<(Server, u16), Box<dyn std::error::Error>> {
+    let server = Server::http(("127.0.0.1", port))
+        .map_err(|error| format!("cannot bind 127.0.0.1:{port}: {error}"))?;
+    let bound = server
+        .server_addr()
+        .to_ip()
+        .map(|address| address.port())
+        .ok_or("listener has no IP address")?;
+    Ok((server, bound))
+}
+
+/// Serve until the listener closes. `port` is the bound port, which the
+/// `Host` allow-list checks against.
+pub fn serve(server: Server, port: u16, root: &Path) {
     for mut request in server.incoming_requests() {
-        let response = route(&mut request, port, &root);
+        let response = route(&mut request, port, root);
         let _ = request.respond(response);
     }
-    Ok(())
 }
 
 /// Best-effort convenience only: a failure to open a browser is silent and
@@ -117,11 +186,17 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
         (Method::Get, "/assets/app.js") => {
             asset_response(UI_APP_JS, "application/javascript; charset=utf-8")
         }
+        (Method::Get, "/assets/i18n-mvp.js") => asset_response(UI_I18N_MVP_JS, JS_TYPE),
+        (Method::Get, "/assets/crm.js") => asset_response(UI_CRM_JS, JS_TYPE),
+        (Method::Get, "/assets/team.js") => asset_response(UI_TEAM_JS, JS_TYPE),
+        (Method::Get, "/assets/compliance.js") => asset_response(UI_COMPLIANCE_JS, JS_TYPE),
+        (Method::Get, "/assets/privacy.js") => asset_response(UI_PRIVACY_JS, JS_TYPE),
         (Method::Get, "/favicon.svg") => asset_response(UI_FAVICON, "image/svg+xml"),
         (Method::Get, "/api/state") => json_response(&state_json(root)),
         (Method::Get, "/api/command-center") => json_response(&command_center_json(root)),
         (Method::Get, "/api/workspace") => json_response(&workspace_get(root)),
         (Method::Get, "/api/export") => export_response(root),
+        (Method::Get, "/api/model/status") => json_response(&crate::ui_mvp::model_status(root)),
         (Method::Post, "/api/gauntlet") => match read_json_body(request) {
             Ok(_) => json_response(&gauntlet_json()),
             Err(error) => bad_request(&error),
@@ -134,7 +209,9 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
             Ok(body) => json_response(&verify_export_json(&body)),
             Err(error) => bad_request(&error),
         },
-        (Method::Post, path) if path.starts_with("/api/workspace/") => {
+        (Method::Post, path)
+            if path.starts_with("/api/workspace/") || path.starts_with("/api/privacy/") =>
+        {
             match read_json_body(request) {
                 Ok(body) => json_response(&workspace_post(path, &body, root)),
                 Err(error) => bad_request(&error),
@@ -252,6 +329,9 @@ fn kernel_evidence_json(root: &Path) -> serde_json::Value {
 }
 
 fn workspace_post(path: &str, body: &serde_json::Value, root: &Path) -> serde_json::Value {
+    if let Some(response) = crate::ui_mvp::workspace_post(path, body, root) {
+        return response;
+    }
     let result = (|| {
         let store = workspace::Store::open(root)?;
         match path {
@@ -346,7 +426,7 @@ fn export_response(root: &Path) -> UiResponse {
     }
 }
 
-fn str_field<'a>(
+pub(crate) fn str_field<'a>(
     body: &'a serde_json::Value,
     field: &str,
 ) -> Result<&'a str, workspace::WorkspaceError> {
@@ -355,7 +435,10 @@ fn str_field<'a>(
         .ok_or_else(|| workspace::WorkspaceError::Invalid(format!("{field} is required")))
 }
 
-fn uuid_field(body: &serde_json::Value, field: &str) -> Result<Uuid, workspace::WorkspaceError> {
+pub(crate) fn uuid_field(
+    body: &serde_json::Value,
+    field: &str,
+) -> Result<Uuid, workspace::WorkspaceError> {
     str_field(body, field)?
         .parse()
         .map_err(|_| workspace::WorkspaceError::Invalid(format!("{field} must be a UUID")))

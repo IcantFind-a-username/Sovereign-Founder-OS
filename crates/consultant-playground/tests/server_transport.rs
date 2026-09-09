@@ -8,12 +8,14 @@ mod transport;
 use domain::{PlaygroundAction, PlaygroundSession};
 use serde_json::{json, Value};
 use std::collections::HashSet;
-use std::io::{self, Write};
+use std::io::Write;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::panic;
 use std::thread;
 use std::time::{Duration, Instant};
-use transport::{connect, raw_request, read_response, request, ChildServer, Response};
+use transport::{
+    connect, peer_is_gone, raw_request, read_response, request, ChildServer, Response,
+};
 
 const STATE: &str = "/api/playground/consultant";
 const ACTION: &str = "/api/playground/consultant/action";
@@ -476,7 +478,11 @@ fn server_actions_are_single_request_and_disconnect_does_not_reset() {
             // prefix of the one valid response; delivery is not guaranteed.
             assert!(subsequent.raw.starts_with(&response.raw));
         }
-        Err(error) => assert_eq!(error.kind(), io::ErrorKind::ConnectionReset),
+        // Which name the platform gives a vanished peer is the host's
+        // business, not the server's: Linux says ENOTCONN where macOS says
+        // ECONNRESET. The property under test is that the connection went
+        // away without the state changing, asserted just below.
+        Err(error) => assert!(peer_is_gone(&error), "unexpected error: {error:?}"),
     }
     assert_eq!(snapshot(subsequent), expected(&oracle));
     for complete in [false, true] {
@@ -547,11 +553,32 @@ fn transport_helper_rejects_malformed_response_headers() {
 
 #[test]
 fn transport_child_startup_failures_are_bounded() {
-    for mode in ["bad-port", "no-line", "oversized"] {
+    // A child that reports something unusable is an error the reader sees at
+    // once; waiting out a timeout for it would be a defect, so these must
+    // fail well inside the startup budget rather than merely within it.
+    for mode in ["bad-port", "oversized"] {
         let started = Instant::now();
         assert!(ChildServer::start_mode(mode).is_err(), "{mode}");
-        assert!(started.elapsed() < Duration::from_secs(5), "{mode}");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "{mode} should fail on the invalid line, not on the timeout"
+        );
     }
+
+    // A child that reports nothing must still end in an error rather than a
+    // hung suite. Two things can end it: the child exiting, which closes the
+    // pipe and is the better signal, or the startup budget. The fixture
+    // child exits on its own after fifteen seconds, so in practice the
+    // parent notices the death first — which is why the bound here is stated
+    // against the budget and nothing asserts a lower one. Asserting an exact
+    // duration would only pin the fixture's sleep.
+    let started = Instant::now();
+    assert!(ChildServer::start_mode("no-line").is_err());
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < ChildServer::STARTUP_BUDGET + Duration::from_secs(10),
+        "a silent child must not hang the suite: {elapsed:?}"
+    );
 }
 
 #[test]

@@ -10,6 +10,7 @@ members = [
     "crates/artifact",
     "crates/audit-ledger",
     "crates/policy",
+    "crates/privacy",
     "crates/capability",
     "crates/consultant-playground",
     "crates/vault",
@@ -37,6 +38,7 @@ sovereign-model = { path = "crates/model" }
 sovereign-artifact = { path = "crates/artifact" }
 sovereign-audit-ledger = { path = "crates/audit-ledger" }
 sovereign-policy = { path = "crates/policy" }
+sovereign-privacy = { path = "crates/privacy" }
 sovereign-capability = { path = "crates/capability" }
 sovereign-consultant-playground = { path = "crates/consultant-playground" }
 sovereign-vault = { path = "crates/vault" }

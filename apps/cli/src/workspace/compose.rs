@@ -76,6 +76,11 @@ pub(super) fn render_document(
         amount_cents,
         status: DocumentStatus::Draft,
         created_at: now(),
+        updated_at: now(),
+        revision: 1,
+        due_at: None,
+        project_id: None,
+        accepted_at: None,
     }
 }
 

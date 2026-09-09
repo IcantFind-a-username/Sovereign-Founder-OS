@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Sovereign Founder OS",
+  "version": "0.1.0",
+  "identifier": "os.sovereignfounder.desktop",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": false
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "externalBin": [
+      "binaries/sovereign"
+    ],
+    "copyright": "Apache-2.0",
+    "category": "Business",
+    "shortDescription": "Local-first founder workspace",
+    "longDescription": "Sovereign Founder OS runs your one-person company on your own machine: customers, proposals, delivery, invoices, AI employees that only propose, and a signed audit trail. Developer Preview."
+  }
+}
