@@ -1,6 +1,6 @@
 # S1-08 supervised execution
 
-Incomplete. One substantive Luna failure; no source edits. Original claim
+Incomplete. Two substantive Luna failures; no source edits. Original claim
 `0246b79de8bfdec732edda4b2ac6e7d9ce0fe406`, base5e3a7fb; revision1 card
 `c50171cc49e63d3d3a74f53498450af515e109bf`. Full MVP remains active.
 
@@ -30,3 +30,28 @@ checks, with separately bound engine/state/URL/viewport/locale evidence. No
 cross-engine substitution or omitted tests count as a pass. No production
 relaxation/framework introduced. First failure is retained; second failure
 would stop Luna and route to Astra. Continue actual six-case acceptance.
+
+## Attempt2 — incomplete; escalate to Astra
+
+Worker `/root/s1_08_attempt2` returned terminal incomplete at base `e344ed8`,
+revision2 card blob `14820252b9954a4a731308bc42d12bc3c1e74e9d`.
+No source edits. Partial observations cover bilingual viewport metrics and
+search/reset; the network artifact summarizes startup GETs only. Delayed
+response/busy, injected failures and full keyboard/focus/contrast remain
+unproved. This is the second substantive failure; no third Luna attempt.
+
+Preserved artifacts under `.harness/s1-08/attempt2/`: observations Git blob
+`4720dc240c3ca1a931db0dea7d18de610392113b`, network Git blob
+`20660054c3531e8354af7565eb15b9605f7e2052`. These partial summaries are not a
+complete browser transcript. Worker reports its `:56994` child stopped;
+root process inventory finds only the retained `:7788` preview (PID 95545).
+No test_changed/cargo test process remained in that inventory. Worker-reported
+Node/TypeScript/Rust passes lack bound full gate evidence here and do not
+establish acceptance. Its 30-second observation timeout is not a passing gate.
+Astra fallback must produce the original six groups, preserving both failures.
+
+Root record gate completed exit 0: workspace tests/Clippy, fmt, file-size,
+gate self-test and old frontend TypeScript; log
+`.harness/s1-08/root-record-gate-full.log`. This verifies the unchanged source,
+not missing browser cases. Fallback `/root/s1_08_fallback` dispatched with the
+same source base/card and six-path ownership; root alone owns these records.

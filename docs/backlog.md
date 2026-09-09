@@ -405,7 +405,7 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence and retained failure history](handoff/codex/reports/S1-07-supervised.md).
   Next S1-09; no CLI/browser/full-MVP acceptance implied.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` IN PROGRESS (revision2; Luna attempt2 next, one substantive failure)
+- [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` IN PROGRESS (revision2; two substantive Luna failures, Astra fallback running)
   Definition and done criteria: [S1-08](handoff/codex/cards/S1-08.md) — depends on S1-09 real CLI acceptance.
   Attempt1 rejected: missing browser evidence, preserved in
   [report](handoff/codex/reports/S1-08-supervised.md). Revision2 permits CUA
