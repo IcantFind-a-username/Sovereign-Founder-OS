@@ -91,3 +91,22 @@ separate release work with their own acceptance; see `ROADMAP.md`. Note also
 that the DMG is staged with `ditto` rather than `cp -R`: the latter does not
 preserve the attributes a signed bundle depends on and silently invalidates
 the signature it was just given.
+
+## One accepted advisory
+
+`apps/desktop/Cargo.lock` carries `glib 0.18.5`, which has an open moderate
+advisory ([GHSA-wrw7-89jp-8q8g](https://github.com/advisories/GHSA-wrw7-89jp-8q8g):
+unsoundness in the `Iterator` and `DoubleEndedIterator` impls for
+`VariantStrIter`). It is fixed in glib 0.20.0, and no reachable version is
+patched — Tauri v2's GTK/WebKitGTK stack pins the glib 0.18 series, so
+`cargo update` moves nothing.
+
+We accept it here rather than pretending it is absent. It is a Linux-only
+path: the macOS bundle uses WKWebView and never links glib. This workspace is
+deliberately separate, so the advisory cannot reach the audited core, which is
+also why CI's dependency review scopes the exception to this one GHSA — every
+other advisory in this tree still fails the build. Building the shell for
+Linux does link it, and that risk is real, not waived.
+
+Remove the `allow-ghsas` line in `.github/workflows/ci.yml` as soon as
+Tauri's stack allows glib 0.20 or later.

@@ -94,3 +94,14 @@ jobs:
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
         with:
           fail-on-severity: moderate
+          # GHSA-wrw7-89jp-8q8g — unsoundness in glib's VariantStrIter, fixed
+          # in glib 0.20.0. It reaches us only through apps/desktop, whose
+          # GTK/WebKitGTK stack Tauri v2 pins to the glib 0.18 series, so no
+          # reachable version is patched until Tauri moves. It is a Linux-only
+          # path: the macOS bundle we ship uses WKWebView and never links glib,
+          # and apps/desktop is a separate workspace that the audited core does
+          # not depend on. This is a real, unfixed advisory that we accept for
+          # the desktop shell alone — narrow it to this GHSA so every other
+          # advisory in that tree still fails the build, and drop this line as
+          # soon as Tauri's stack allows glib >= 0.20.
+          allow-ghsas: GHSA-wrw7-89jp-8q8g
