@@ -787,7 +787,21 @@ while the controller routes eligible design/review cards to the strong role.
   when: both self-tests pass, the TSV seeds at least the RFC-gate row, and
   `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [x] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: origin preflight harness and mechanism-matrix doc.** Landed 2026-09-10. Verified green on macOS 26.5/arm64 with Chrome 152; **not yet run on Linux**, so the Linux half of the acceptance is open — the harness handles the root-sandbox case but no Linux run is recorded. The preflight also settled a design question RFC 0006 did not: an IP address cannot be a WebAuthn RP ID, so the browser must reach the fixture as `http://localhost:7787` while the socket still binds 127.0.0.1.
+- [x] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: origin preflight harness and mechanism-matrix doc.**
+
+- [ ] **P2 | `crates/authority/`, `apps/cli/` | Owner-session Task 4 remainder: migration gate and broker-build check.**
+  The broker's core chain landed 2026-09-10 across six slices (#59-#66):
+  bootstrap frame, root classification, loopback bind under one fixed
+  monotonic deadline, launch-key supervisor handshake, process lock, redb
+  store reachable only with the lock, and per-connection credentials. Fifty
+  tests, all registered in `scripts/owner-effect-tests.tsv`.
+  Still open from the plan's Task 4: `platform_publish.rs` and the
+  Linux-x86_64-only synthetic migration gate (`crates/authority/tests/migration.rs`),
+  and `scripts/check-owner-effect-broker-build.sh`. A `BrokerClient` in the CLI
+  was written and removed — nothing in the product starts a broker yet, so it
+  would have been unreachable code holding a launch key; the end-to-end tests
+  implement the parent's half against the protocol instead, which is stronger.
+ Landed 2026-09-10. Verified green on macOS 26.5/arm64 with Chrome 152; **not yet run on Linux**, so the Linux half of the acceptance is open — the harness handles the root-sandbox case but no Linux run is recorded. The preflight also settled a design question RFC 0006 did not: an IP address cannot be a WebAuthn RP ID, so the browser must reach the fixture as `http://localhost:7787` while the socket still binds 127.0.0.1.
   Blocked on nothing but pairs with the runners entry above. Deliver
   `scripts/owner-auth-origin-preflight.sh` plus a zero-dependency
   `scripts/owner-auth-origin-preflight.mjs` that binds only `127.0.0.1:7787`,
