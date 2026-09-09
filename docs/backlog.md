@@ -344,8 +344,13 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S1-06](handoff/codex/cards/S1-06.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G07 — Admit bounded loopback transport.** `lane:codex` Frozen architecture task; depends on S1-06 acceptance.
+  Definition and done criteria: [S1-G07](handoff/codex/cards/S1-G07.md).
+  Controller independently reviewed the server design; actual gate/fixture
+  implementation and independent code acceptance remain required.
+
 - [ ] **P1 | `crates/consultant-playground/` | S1-07 — Add exact loopback server routes.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-07](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-07](handoff/codex/cards/S1-07.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` `needs:fable`
