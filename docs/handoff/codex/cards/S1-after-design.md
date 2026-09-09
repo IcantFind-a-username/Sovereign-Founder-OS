@@ -14,7 +14,9 @@ S1-00 首个增量冻结 [动作契约](../playground-contract.md) 及以下配�
 [G03卡](S1-G03.md) 已冻结；精确接口见 [catalog契约](../playground-catalog-contract.md)，
 等待S1-02接受后再认领。
 
-S1-04–11 及其他依赖开放仍 **Blocked design**：检索/guidance、HTTP、
+[S1-04](S1-04.md) 的只读检索/guidance接口已冻结；等待S1-03和先行G04实际接受。
+
+S1-05–11 及其他依赖开放仍 **Blocked design**：HTTP、
 assets、server、浏览器、CLI、进程隔离及最终验收未冻结。沿用 standalone-v2
 目标；需要时另给精确接口、依赖/源码门迁移、写集和测试，不能提前施工。
 这里不维护第二份详细接口，也不因两张动作卡完成就声明 Playground 已可用。
