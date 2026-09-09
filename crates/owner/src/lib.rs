@@ -26,6 +26,9 @@
 //! from the product's dependency graph.
 
 #[cfg(feature = "owner-effect-fixture")]
+pub mod approval;
+
+#[cfg(feature = "owner-effect-fixture")]
 pub mod config;
 
 #[cfg(feature = "owner-effect-fixture")]

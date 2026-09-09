@@ -17,6 +17,9 @@ default = []
 owner-effect-fixture = []
 
 [dependencies]
+# Already in the workspace lock; adds nothing new. Used for the binding
+# digest, which is a hash and not a signature — the module says so.
+sha2 = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
@@ -31,4 +34,8 @@ required-features = ["owner-effect-fixture"]
 
 [[test]]
 name = "fixture_registry"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "exact_approval"
 required-features = ["owner-effect-fixture"]
