@@ -766,7 +766,7 @@ while the controller routes eligible design/review cards to the strong role.
   NOT present, stop and release with a diagnosis instead of implementing —
   that would be the authority entries' scope.
 
-- [ ] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: the checked test-manifest runners and their self-tests.**
+- [x] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: the checked test-manifest runners and their self-tests.** Landed 2026-09-09; both self-tests run in `test_changed.sh`'s always-on block. The TSV is seeded with the two Task 2 approval-retention rows, which are the only owner-effect tests that exist yet.
   RFC 0006 and its freeze gate landed 2026-08-26; this is the mechanical
   scaffolding re-sliced out of plan Task 1. Follow
   `docs/superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md`

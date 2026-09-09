@@ -144,6 +144,13 @@ fi
 if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   run_step "gate-self-test" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/gate_portability_test.sh
+  # The owner-effect runners exist to stop a vacuous cargo success from being
+  # read as a pass. A checked runner nobody checks is worth nothing, so their
+  # self-tests run here, on every session, not only when someone remembers.
+  run_step "owner-effect-runner-selftests" env GATE_SELFTEST_RUNNING=1 \
+    ./scripts/tests/run-owner-effect-tests.sh
+  run_step "owner-effect-regression-selftest" env GATE_SELFTEST_RUNNING=1 \
+    ./scripts/tests/run-owner-effect-regression.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
