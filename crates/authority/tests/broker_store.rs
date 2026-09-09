@@ -110,31 +110,35 @@ fn a_committed_write_survives_reopening() {
         let lock = acquire(dir.path()).unwrap();
         let store = OwnedStore::open(dir.path(), &lock).unwrap();
         store
-            .write(|transaction| {
-                let mut table = transaction
-                    .open_table(TABLE)
-                    .map_err(|_| StoreError::Unavailable)?;
-                table
-                    .insert("key", "value")
-                    .map_err(|_| StoreError::Unavailable)?;
-                Ok(())
-            })
+            .write(
+                |transaction: &redb::WriteTransaction| -> Result<(), StoreError> {
+                    let mut table = transaction
+                        .open_table(TABLE)
+                        .map_err(|_| StoreError::Unavailable)?;
+                    table
+                        .insert("key", "value")
+                        .map_err(|_| StoreError::Unavailable)?;
+                    Ok(())
+                },
+            )
             .expect("the write must commit");
     }
 
     let lock = acquire(dir.path()).unwrap();
     let store = OwnedStore::open(dir.path(), &lock).unwrap();
     let value = store
-        .read(|transaction| {
-            let table = transaction
-                .open_table(TABLE)
-                .map_err(|_| StoreError::Unavailable)?;
-            let found = table
-                .get("key")
-                .map_err(|_| StoreError::Unavailable)?
-                .map(|entry| entry.value().to_owned());
-            Ok(found)
-        })
+        .read(
+            |transaction: &redb::ReadTransaction| -> Result<Option<String>, StoreError> {
+                let table = transaction
+                    .open_table(TABLE)
+                    .map_err(|_| StoreError::Unavailable)?;
+                let found = table
+                    .get("key")
+                    .map_err(|_| StoreError::Unavailable)?
+                    .map(|entry| entry.value().to_owned());
+                Ok(found)
+            },
+        )
         .unwrap();
     assert_eq!(value.as_deref(), Some("value"));
 }

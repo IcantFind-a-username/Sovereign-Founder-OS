@@ -20,6 +20,7 @@ pub mod fixture_root;
 pub mod listener;
 pub mod process_lock;
 pub mod protocol;
+pub mod reservation;
 pub mod store;
 pub mod supervisor;
 
