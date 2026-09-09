@@ -52,30 +52,110 @@ fn default_binary_has_no_hidden_broker_mode_or_symbols() {
     );
 }
 
-/// Under the fixture feature the mode exists, and — for now — fails closed
-/// while saying exactly why.
+/// A valid frame naming a valid fixture root passes every check this slice
+/// implements and then stops, saying exactly that.
 ///
-/// A stub that exited successfully would be indistinguishable from a working
-/// broker to anything written against it, which is how scaffolding turns into
-/// a false claim that a store is owned.
+/// The stub must not exit successfully: to anything written against it, a
+/// successful broker that owns no store is indistinguishable from a working
+/// one, which is how scaffolding becomes a false claim.
 #[cfg(feature = "owner-effect-fixture")]
 #[test]
-fn the_fixture_build_has_the_mode_and_it_fails_closed() {
-    let output = Command::new(env!("CARGO_BIN_EXE_sovereign"))
+fn a_valid_bootstrap_and_root_reach_the_not_implemented_boundary() {
+    use sovereign_authority::broker::bootstrap::FIXTURE_MARKER;
+    use sovereign_authority::broker::protocol::encode;
+    use std::io::Write;
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("fixture-root");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join(FIXTURE_MARKER), b"synthetic").unwrap();
+
+    let frame = encode(&[1; 32], &[2; 16], &root);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_sovereign"))
         .arg(HIDDEN)
-        .output()
-        .expect("run the CLI");
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn the hidden mode");
+    child.stdin.take().unwrap().write_all(&frame).unwrap();
+    let output = child.wait_with_output().unwrap();
+
     assert!(
         !output.status.success(),
         "the scaffolding broker must not report success — it owns no store"
     );
-    let combined = format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("not implemented"),
+        "a valid bootstrap and root must reach the boundary and say so, got: {stderr}"
     );
     assert!(
-        combined.contains("not implemented"),
-        "the stub must say what it is, got: {combined}"
+        !stderr.contains("E-"),
+        "no check should have refused this input: {stderr}"
+    );
+}
+
+/// The claim this slice exists to make good on, tested through the real
+/// binary rather than the library: a same-account caller can reach the hidden
+/// mode with a syntactically perfect frame — RFC 0006 says so and calls it
+/// unqualified fixture control, never product admission — and it still cannot
+/// aim the broker at the owner's data.
+#[cfg(feature = "owner-effect-fixture")]
+#[test]
+fn direct_valid_bootstrap_rejects_a_product_root_before_opening_anything() {
+    use sovereign_authority::broker::bootstrap::FIXTURE_MARKER;
+    use sovereign_authority::broker::protocol::encode;
+    use std::io::Write;
+
+    let dir = tempfile::tempdir().unwrap();
+
+    // A root the caller has marked as a fixture, which also holds product
+    // state — the shape of "point the broker at my real vault".
+    let root = dir.path().join("looks-like-product");
+    std::fs::create_dir(&root).unwrap();
+    std::fs::write(root.join(FIXTURE_MARKER), b"synthetic").unwrap();
+    std::fs::write(root.join("device.json"), b"{}").unwrap();
+
+    let frame = encode(&[3; 32], &[4; 16], &root);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_sovereign"))
+        .arg(HIDDEN)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn the hidden mode");
+    child.stdin.take().unwrap().write_all(&frame).unwrap();
+    let output = child.wait_with_output().unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("E-ROOT-REJECTED"),
+        "a product-looking root must be refused, got: {stderr}"
+    );
+    // The diagnostic is a fixed code and nothing else: an error channel that
+    // echoed its input would be a disclosure channel.
+    assert!(
+        !stderr.contains(&root.display().to_string()),
+        "the diagnostic leaked the path it was given: {stderr}"
+    );
+}
+
+/// Running the hidden mode with nothing on stdin — what a curious caller does
+/// first — ends it before it looks at any root.
+#[cfg(feature = "owner-effect-fixture")]
+#[test]
+fn direct_hidden_broker_without_valid_stdin_exits_before_examining_a_root() {
+    let output = Command::new(env!("CARGO_BIN_EXE_sovereign"))
+        .arg(HIDDEN)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("run the hidden mode");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("E-BOOTSTRAP-MISSING"),
+        "expected the missing-bootstrap code, got: {stderr}"
     );
 }

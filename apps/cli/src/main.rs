@@ -117,10 +117,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Print the sentence, not the type name: `Box<dyn Error>` from
             // `main` renders with Debug, so `?` here would surface
             // "BrokerNotImplemented" and tell a reader nothing.
-            if let Err(error) = sovereign_authority::broker::run_owner_effect_fixture_broker() {
-                eprintln!("{error}");
-                std::process::exit(1);
-            }
+            let mut input = std::io::stdin().lock();
+            let mut diagnostics = std::io::stderr();
+            let Err(error) = sovereign_authority::broker::run_owner_effect_fixture_broker(
+                &mut input,
+                &mut diagnostics,
+            );
+            eprintln!("{error}");
+            std::process::exit(1);
         }
         Commands::Demo { fast } => demo::run(fast, data_dir())?,
         Commands::SandboxCheck => cmd_sandbox_check()?,

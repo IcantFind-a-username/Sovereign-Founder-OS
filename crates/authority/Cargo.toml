@@ -36,3 +36,7 @@ tempfile = "3"
 [[test]]
 name = "subprocess_claims"
 required-features = ["fault-injection"]
+
+[[test]]
+name = "broker_bootstrap_frame"
+required-features = ["owner-effect-fixture"]
