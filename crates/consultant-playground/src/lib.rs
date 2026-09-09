@@ -10,3 +10,8 @@ mod http;
 // Compile-time assets follow the pure handler.
 #[cfg_attr(not(test), allow(dead_code))]
 mod assets;
+mod server;
+
+pub fn run(port: u16) -> std::io::Result<()> {
+    server::run(port)
+}
