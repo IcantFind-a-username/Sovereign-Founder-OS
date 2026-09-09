@@ -33,8 +33,29 @@ pub fn raw_request(port: u16, method: &str, target: &str, headers: &str, body: &
 pub fn request(port: u16, bytes: &[u8]) -> io::Result<Response> {
     let mut stream = connect(port)?;
     stream.write_all(bytes)?;
-    stream.shutdown(Shutdown::Write)?;
+    // A server that has already answered and closed leaves nothing to shut
+    // down. Linux reports that as ENOTCONN; macOS lets the call succeed. The
+    // difference says nothing about the server, and the response it sent is
+    // still sitting in our receive buffer, so read it rather than failing on
+    // which side won the race.
+    match stream.shutdown(Shutdown::Write) {
+        Ok(()) => {}
+        Err(error) if peer_is_gone(&error) => {}
+        Err(error) => return Err(error),
+    }
     read_response(&mut stream)
+}
+
+/// Whether an error means the connection is gone, under any of the names the
+/// platforms give it. Asserting one of them pins the host, not the behaviour.
+pub fn peer_is_gone(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::NotConnected
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::ConnectionAborted
+    )
 }
 
 pub fn read_response(stream: &mut TcpStream) -> io::Result<Response> {

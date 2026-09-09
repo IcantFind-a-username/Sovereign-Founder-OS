@@ -8,12 +8,14 @@ mod transport;
 use domain::{PlaygroundAction, PlaygroundSession};
 use serde_json::{json, Value};
 use std::collections::HashSet;
-use std::io::{self, Write};
+use std::io::Write;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::panic;
 use std::thread;
 use std::time::{Duration, Instant};
-use transport::{connect, raw_request, read_response, request, ChildServer, Response};
+use transport::{
+    connect, peer_is_gone, raw_request, read_response, request, ChildServer, Response,
+};
 
 const STATE: &str = "/api/playground/consultant";
 const ACTION: &str = "/api/playground/consultant/action";
@@ -476,7 +478,11 @@ fn server_actions_are_single_request_and_disconnect_does_not_reset() {
             // prefix of the one valid response; delivery is not guaranteed.
             assert!(subsequent.raw.starts_with(&response.raw));
         }
-        Err(error) => assert_eq!(error.kind(), io::ErrorKind::ConnectionReset),
+        // Which name the platform gives a vanished peer is the host's
+        // business, not the server's: Linux says ENOTCONN where macOS says
+        // ECONNRESET. The property under test is that the connection went
+        // away without the state changing, asserted just below.
+        Err(error) => assert!(peer_is_gone(&error), "unexpected error: {error:?}"),
     }
     assert_eq!(snapshot(subsequent), expected(&oracle));
     for complete in [false, true] {
