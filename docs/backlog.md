@@ -405,16 +405,12 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence and retained failure history](handoff/codex/reports/S1-07-supervised.md).
   Next S1-09; no CLI/browser/full-MVP acceptance implied.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` IN PROGRESS (revision2; two substantive Luna failures, Astra fallback running)
-  Definition and done criteria: [S1-08](handoff/codex/cards/S1-08.md) — depends on S1-09 real CLI acceptance.
-  Attempt1 rejected: missing browser evidence, preserved in
-  [report](handoff/codex/reports/S1-08-supervised.md). Revision2 permits CUA
-  visual supplement after actual ego screenshot failures; same six repair paths.
-  founder_worker Luna medium + independent Astra review, normal bounded attempts.
-  Logs .harness/s1-08/; existing ego-browser task space16 Founder OS MVP.
-  Root preview process46719 at127.0.0.1:7788 is live, initial browser render observed.
-  Worker owns separate test server lifecycle; root keeps preview available.
-  Complete only when the linked card's checks and independent acceptance pass.
+- [x] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` accepted.
+  Astra fallback after two retained Luna failures; no source edits.
+  Independent review accepted HEAD672cd23 and the bound 45-artifact manifest:
+  all six browser groups, four viewport/locale pairs, actual network/fault/
+  keyboard/visual observations. [Evidence](handoff/codex/reports/S1-08-supervised.md).
+  Root preview at127.0.0.1:7788 retained. Next S1-10A; full MVP remains unfinished.
 
 - [x] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` accepted.
   Product commit `6e0976c630f091f46aa51f64c11044b5f2a2fc6d`; four files +106/-0.
@@ -423,9 +419,13 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence and RED chronology limitation](handoff/codex/reports/S1-09-supervised.md).
   Next S1-08; no browser/fullMVP acceptance implied.
 
-- [ ] **P1 | `crates/consultant-playground/tests/support/transport.rs` | S1-10A — Extend shared test process capture.** `lane:codex` Frozen; waits for S1-08.
+- [ ] **P1 | `crates/consultant-playground/tests/support/transport.rs` | S1-10A — Extend shared test process capture.** `lane:codex` CLAIMED; Luna attempt1, zero failures.
   Definition and done criteria: [S1-10A](handoff/codex/cards/S1-10A.md).
   One helper file, two capture regressions; preserve existing S1-07 transport checks.
+  Source base672cd236a064d9095fdff2eb5c93be1ef81000ee; revision1 card blob
+  5a2ea0c3b71bb65db12a5535c49a3a588cead2c9. Exact write set is the helper above.
+  Budget30minutes/3targeted repair cycles; logs .harness/s1-10a/attempt1/.
+  All prior writers stopped; controller binds dispatch base to this claim commit.
 
 - [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` Frozen; waits for S1-10A.
   Definition and done criteria: [S1-10](handoff/codex/cards/S1-10.md).
