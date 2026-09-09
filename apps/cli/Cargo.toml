@@ -11,6 +11,13 @@ repository.workspace = true
 name = "sovereign"
 path = "src/main.rs"
 
+[features]
+default = []
+# Explicit forwarding, so the only way the CLI gains a broker mode is by
+# someone naming it here. Cargo features are additive, so this edge is the
+# thing scripts/check-fault-injection-excluded.sh's sibling check watches.
+owner-effect-fixture = ["sovereign-authority/owner-effect-fixture"]
+
 [dependencies]
 sovereign-artifact = { workspace = true }
 sovereign-audit-ledger = { workspace = true }
