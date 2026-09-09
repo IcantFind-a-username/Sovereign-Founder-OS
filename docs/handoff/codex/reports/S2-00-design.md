@@ -123,3 +123,61 @@ stops at this candidate. Independent reviewer should inspect interfaces and
 finite write sets, especially the initial visible slice and reuse boundary.
 On acceptance controller records admissible cards and claims S2-01A1; the
 architect does not dispatch implementation or declare the continuing goal done.
+
+## Focused repair 1 — same design attempt 1
+
+Latest status: repair candidate for exact-delta independent review. The first
+candidate remains committed at `ef5440a71bd0e0451969fa8d4d3a81a8d1567ec0`;
+all preceding validation/blobs above describe that preserved candidate, not this
+repair. Its independent review was changes_requested with three P2 findings
+recorded in `.harness/s2-00/design-review.md`. No Luna implementation failure,
+new attempt, budget reset or replacement stage plan was introduced.
+
+Repair scope is exactly the three findings:
+
+1. Contract revision2 explicitly maps Currency/RegionCode/TransactionKind code
+   variants to SGD, SG/EU/US, B2B/B2C and lowercase unknown; ordinary enums remain
+   snake_case. S2-01A2 revision2 pins input/output roundtrips, null subdivisions
+   and lowercase alias rejection with a named test.
+2. Application HTTP guarantees now apply only after tiny_http delivers a request.
+   Unknown Expect is a pre-handler417/empty response; library framing errors/
+   disconnects and other direct transport responses do not promise application
+   JSON/headers. S2-01A1 revision2 names tests separating library and handler
+   behavior. No parser, library or S1 change is introduced.
+3. Ordered total next-step table now includes valid draft→submit, completed
+   tasks→acceptance draft, and expiry before review/plan. S2-06 revision2 names
+   every branch/mixed-state fixture under its existing table-driven summary test,
+   including bounds advice; no planner framework or new card is added.
+
+Current write delta: contract, S2-01A1, S2-01A2, S2-06 and this report only.
+No source/test/dependency/RFC/gate/backlog/controller writes. No new tools,
+product implementation or runtime/browser claim. Reuse inventory is unchanged.
+
+Repair validation and new file bindings are recorded below after checking the
+final document delta. Raw repair artifacts use `.harness/s2-00/design-repair1/`;
+original design/review evidence is retained unchanged.
+
+Repair checks:
+
+- `git diff --check`: exit0.
+- Local link target check: 17 references in the five changed documents,
+  zero missing targets; exact changed-file whitelist matched, zero new files.
+- `TEST_CHANGED_BASE=ef5440a71bd0e0451969fa8d4d3a81a8d1567ec0 TEST_CHANGED_LOG=.harness/s2-00/design-repair1/full-gate.log ./scripts/test_changed.sh`:
+  exit0; gate-self-test, file-size and fmt ran. Docs-only delta selected no
+  cargo-test scope. No additional full product or browser test was needed or
+  claimed for this documentation repair.
+- Gate SHA256: `98b5726139612603584352a7f90c03e312af70e0e5331424e3f88eaa9b2985fd`.
+
+Repair candidate Git blobs (report excluded to avoid recursive self-hash):
+
+| File | Git blob |
+| --- | --- |
+| `docs/handoff/codex/business-demo-contract.md` | `1a8047774ddef8ea4fe7827fe93336d306486d4c` |
+| `docs/handoff/codex/cards/S2-01A1.md` | `e627fa838a73fe1ea3f535f2134965d98601af99` |
+| `docs/handoff/codex/cards/S2-01A2.md` | `41998f862e85804530f7e7b6c8dc68452327e3cf` |
+| `docs/handoff/codex/cards/S2-06.md` | `cb8e8d075064f579b4e2b42d86135e2810f3d421` |
+
+Raw bindings/scope: `.harness/s2-00/design-repair1/candidate-files.json`;
+final diff stat: `.harness/s2-00/design-repair1/diff-stat.txt`.
+Independent reviewer should inspect the exact delta from the retained first
+candidate. Architect stops here; no implementation dispatch or self-acceptance.

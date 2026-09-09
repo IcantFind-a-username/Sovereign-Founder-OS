@@ -1,6 +1,6 @@
 # S2 business experiment contract
 
-**Revision 1 · Design candidate; implementation admission requires independent S2-00 acceptance.**
+**Revision 2 · Design candidate; implementation admission requires independent S2-00 acceptance.**
 This is the sole S2 behavior/interface specification. Cards assign work and tests;
 they do not duplicate these definitions. Stage status lives in [backlog](../../backlog.md).
 The complete goal remains [models-and-goals §13.1](models-and-goals.md).
@@ -68,8 +68,21 @@ listed below have exactly those fields. Optional values serialize as `null`,
 not absent. Sets use duplicate-free arrays in insertion order. IDs are strings;
 no UUIDs or business timestamps. Enums serialize to the literal names below.
 Amounts/revisions/indices are integers within JavaScript's exact integer range.
-Every enum except Currency uses serde rename_all="snake_case"; Currency's sole
-output value has explicit serde rename="SGD". All input `currency` fields are
+Ordinary status, origin, role and command enums use serde
+`rename_all="snake_case"`. The following code enums use explicit per-variant
+serde renames on both serialization and deserialization, overriding that default:
+
+| Rust enum / variant | Exact wire spelling |
+| --- | --- |
+| Currency::Sgd | `SGD` |
+| RegionCode::Sg / Eu / Us / Unknown | `SG` / `EU` / `US` / `unknown` |
+| TransactionKind::B2b / B2c / Unknown | `B2B` / `B2C` / `unknown` |
+
+`Region.region` and `Coverage.region` use RegionCode; Coverage is constructed
+only for Sg/Eu/Us. `JurisdictionFacts.transaction` uses TransactionKind. Lowercase
+aliases such as `sg`, `eu`, `us`, `b2b` and `b2c` are rejected; `unknown` remains
+lowercase. A Region remains the two-field object in§9, with explicit null
+subdivision preserved on the wire. All input `currency` fields are
 String, validated to SGD in domain code, so unsupported currency returns its
 specified domain error rather than a JSON enum parse error. Type declarations
 below omit String on human text and Id on identifiers; numeric/enum/container
@@ -429,12 +442,45 @@ no hashes/signatures/timestamps, and is cleared by reset.
 `simulated_outstanding_cents`, `open_clarifications`, `pending_reviews`,
 `open_tasks`, `due_followups`, `next_step: String`. Count only current engagement
 tasks; pending_reviews is1 iff the latest proposal is current, unexpired and
-submitted, otherwise0; open_clarifications counts status open. Count due open followups with due_day<=demo_day. Next step deterministic
-priority: stale latest proposal -> revise; submitted -> review; returned/rejected
--> revise; no proposal -> draft; accepted without current engagement -> plan;
-current open tasks -> delivery; acceptance-draft milestone without invoice ->
-draft invoice; draft invoice -> issue in exercise; outstanding -> review
-receivables; due followup -> follow up; otherwise current opportunity.next_step.
+submitted, otherwise0; open_clarifications counts status open. Count due open
+followups with due_day<=demo_day.
+
+`next_step` uses this ordered first-match table over valid exercise states.
+"Current" means the version/input binding in§5; "unexpired" additionally means
+`demo_day <= valid_through_day`. They are separate checks. A current engagement
+means the latest engagement bound to the latest/current accepted proposal.
+For vectors, choose the first matching record in insertion order. No planner,
+model, inference or additional mutable next-step state is introduced.
+
+| Priority / case name | Predicate (all earlier rows false) | Exact next_step / destination |
+| --- | --- | --- |
+| 1 `stale_proposal` | Latest proposal exists but is not current | `Revise the quotation for changed inputs` / #proposal |
+| 2 `expired_proposal` | Latest proposal exists and is expired, regardless of review outcome or engagement | `Revise the expired quotation` / #proposal |
+| 3 `no_proposal` | No proposal exists | `Draft a quotation` / #proposal |
+| 4 `draft_to_submit` | Latest current unexpired proposal is draft | `Submit this quotation for review` / #review |
+| 5 `submitted_to_review` | Latest current unexpired proposal is submitted | `Review this quotation` / #review |
+| 6 `returned_or_rejected` | Latest current unexpired proposal is returned or rejected | `Revise the returned or rejected quotation` / #proposal |
+| 7 `accepted_to_plan` | Latest current unexpired proposal is accepted and has no current engagement | `Plan delivery from the accepted quotation` / #delivery |
+| 8 `open_delivery_task` | Current engagement has a todo task | `Record the next delivery task result` / #delivery |
+| 9 `completed_tasks_to_acceptance` | Current engagement has a planned milestone and all of that milestone's tasks are done_in_exercise | `Draft milestone acceptance` / #delivery |
+| 10 `acceptance_to_invoice` | Current engagement has an acceptance_draft milestone with no invoice | `Draft the milestone invoice` / #billing |
+| 11 `draft_to_issue` | Current engagement has a draft invoice | `Issue the invoice in this exercise` / #billing |
+| 12 `outstanding_receivable` | Any issued invoice has positive remaining_cents | `Review simulated receivables` / #billing |
+| 13 `due_followup` | Any open followup has due_day<=demo_day | `Complete the due follow-up` / #today |
+| 14 `case_fallback` | Otherwise | current opportunity.next_step / #case |
+
+This table selects navigation/advice, never executes a command. For rows1–11,
+if that row's required mutation cannot be offered because the relevant existing
+record/revision bound is already reached (or row10 has no remaining
+positive invoice allowance), keep its destination but replace next_step with
+`Review exercise limits before restarting`. These checks are finite: global
+revision10,000; proposal count16 for rows1/2/6; review count32 for rows4/5;
+engagement count16 for row7; invoice count16 or zero remaining engagement
+allowance for row10. Rows8/9/11 only need the global revision-cap check here.
+Do not advertise an unavailable mutation. Normal form validation and backend checks remain mandatory. In
+particular, expired submitted/accepted states always select row2 rather than
+review/plan, and completed tasks still require row9's explicit acceptance draft.
+The fallback is a manual case note, not a promised backend operation.
 
 `JurisdictionFacts { company_registration: Region, company_operation: Region,
 customer_region: Region, data_regions: Vec<Region>, transaction: "B2B"|"B2C"|"unknown",
@@ -498,23 +544,43 @@ errors ->422; stale epoch/revision/input and invalid transition ->409;
 unknown_reference ->422; limit_reached ->409. Missing custom header ->403.
 GET with no Content-Length and no Transfer-Encoding is the normal empty-body
 request and is accepted. GET Content-Length:0 is also accepted; any positive
-length or Transfer-Encoding rejects400. Duplicate Content-Length, any
-Transfer-Encoding, Expect or Connection:upgrade rejects400 before application
-body reading; no claim is made about tiny_http pre-handler buffering. Failed requests never
-change state. A reply lost after commit is indeterminate to the browser; reload
-GET state before any next action. Never retry POST automatically.
+length or Transfer-Encoding rejects400. For a request delivered to the
+application handler, duplicate Content-Length, any Transfer-Encoding,
+`Expect: 100-continue` or Connection:upgrade rejects400 before application body
+reading. The handler does not read that Expect request body and does not send
+an interim100 response. Other Expect values are preempted by tiny_http as below.
+No claim is made about tiny_http pre-handler buffering. A failed delivered
+request never changes state. A reply lost after commit is indeterminate to the
+browser; reload GET state before any next action. Never retry POST automatically.
 
-All responses: `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`,
-`Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'none';
-script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'none';
-base-uri 'none'; form-action 'none'; frame-ancestors 'none'`. Header value is one
-line, no newline. HTML UTF-8, JS application/javascript UTF-8, JSON application/json.
-tiny_http's Date/Server/Content-Length are library transport metadata, not
-business clocks. No Set-Cookie/Access-Control-Allow-Origin. Error JSON exactly
+The fixed application status/error/header rules in this section apply only to
+requests delivered to `handle` and responses produced by it. They do not describe
+responses emitted directly by tiny_http before the handler runs. With unchanged
+tiny_http0.12, unknown Expect (for example `Expect: unsupported-demo`) emits417
+with an empty body and closes the connection, before application validation.
+Malformed request/header framing can similarly produce a library400 with empty
+body; transport read errors can close without an HTTP response (a library
+read-timeout response, when produced, is408/empty). HTTP versions above1.1 can
+produce the library's505 text response. These library responses do not carry
+the application's JSON schema or fixed security-header guarantee. Do not add a
+replacement parser, rewrite library output or relax S1 to make those claims true.
+Pre-handler rejection cannot mutate exercise state because handle never runs.
+
+All application-generated responses: `Cache-Control: no-store`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+`Content-Security-Policy: default-src 'none'; script-src 'self';
+style-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; base-uri 'none';
+form-action 'none'; frame-ancestors 'none'`. Header value is one line, no newline.
+HTML UTF-8, JS application/javascript UTF-8, JSON application/json. tiny_http's
+Date/Server/Content-Length are library transport metadata, not business clocks.
+Application responses have no Set-Cookie/Access-Control-Allow-Origin.
+Application error JSON exactly
 `{ ok: false, error: { code: <fixed code>, field: <fixed path or null> } }`;
-transport codes: `forbidden_origin`, `not_found`, `method_not_allowed`,
-`length_required`, `payload_too_large`, `invalid_json`, `unsupported_media_type`,
-`invalid_request`, `internal_error`. 500 has only internal_error and null field.
+application transport codes: `forbidden_origin`, `not_found`,
+`method_not_allowed`, `length_required`, `payload_too_large`, `invalid_json`,
+`unsupported_media_type`, `invalid_request`, `internal_error`. An application500
+has only internal_error and null field. Browser error handling must also accept
+non-JSON/empty library responses or disconnect as failure, never success.
 
 ## 11. Browser contract
 
