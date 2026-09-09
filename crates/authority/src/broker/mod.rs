@@ -13,6 +13,7 @@
 //! CLI's tests asserts that against the built binary.
 
 pub mod bootstrap;
+pub mod listener;
 pub mod protocol;
 
 /// The hidden subcommand the fixture re-execs itself as. Named here so the
@@ -38,6 +39,7 @@ pub const BROKER_SUBCOMMAND: &str = "__owner-effect-broker";
 /// than merely written.
 pub fn run_owner_effect_fixture_broker(
     input: &mut impl std::io::Read,
+    address_out: &mut impl std::io::Write,
     diagnostics: &mut impl std::io::Write,
 ) -> Result<std::convert::Infallible, BrokerExit> {
     let frame = match protocol::read_frame(input) {
@@ -46,6 +48,17 @@ pub fn run_owner_effect_fixture_broker(
     };
     let _root = match bootstrap::classify(&frame.root) {
         Ok(root) => root,
+        Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
+    };
+    // Bind, capture the one deadline, publish the address. Nothing is locked
+    // or opened yet, and nothing may be until a supervisor authenticates
+    // within that deadline.
+    let established = match listener::bind_and_publish(&frame.nonce, address_out) {
+        Ok(established) => established,
+        Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
+    };
+    let _supervisor = match listener::accept_by_deadline(&established) {
+        Ok(stream) => stream,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
     };
     Err(BrokerExit::NotImplemented)

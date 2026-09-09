@@ -33,6 +33,12 @@ pub enum Diagnostic {
     BootstrapTruncated,
     BootstrapVersionUnsupported,
     RootRejected,
+    BindFailed,
+    AddressMalformed,
+    /// No supervisor authenticated before the fixed deadline.
+    SupervisorTimeout,
+    /// The parent went away between publishing the address and the handshake.
+    SupervisorLost,
 }
 
 impl Diagnostic {
@@ -44,6 +50,10 @@ impl Diagnostic {
             Diagnostic::BootstrapTruncated => "E-BOOTSTRAP-TRUNCATED",
             Diagnostic::BootstrapVersionUnsupported => "E-BOOTSTRAP-VERSION",
             Diagnostic::RootRejected => "E-ROOT-REJECTED",
+            Diagnostic::BindFailed => "E-BIND-FAILED",
+            Diagnostic::AddressMalformed => "E-ADDRESS-MALFORMED",
+            Diagnostic::SupervisorTimeout => "E-SUPERVISOR-TIMEOUT",
+            Diagnostic::SupervisorLost => "E-SUPERVISOR-LOST",
         }
     }
 }
@@ -152,4 +162,43 @@ pub fn read_frame(reader: &mut impl std::io::Read) -> Result<Bootstrap, Diagnost
         .read_to_end(&mut bytes)
         .map_err(|_| Diagnostic::BootstrapMalformed)?;
     decode(&bytes)
+}
+
+// ------------------------------------------------------------- address ----
+
+/// Published on stdout once the listener is bound, so the parent learns where
+/// to connect. Non-secret by construction: a port, the version, and the nonce
+/// the parent already sent. The launch key is never echoed — a parent that
+/// needed it back would be a parent that had lost it.
+pub const ADDRESS_MAGIC: &[u8; 14] = b"SFO-ADDRESS-1\n";
+pub const ADDRESS_FRAME_LEN: usize = ADDRESS_MAGIC.len() + 2 + 2 + NONCE_LEN;
+
+pub fn encode_address(port: u16, nonce: &[u8; NONCE_LEN]) -> Vec<u8> {
+    let mut frame = Vec::with_capacity(ADDRESS_FRAME_LEN);
+    frame.extend_from_slice(ADDRESS_MAGIC);
+    frame.extend_from_slice(&VERSION.to_le_bytes());
+    frame.extend_from_slice(&port.to_le_bytes());
+    frame.extend_from_slice(nonce);
+    frame
+}
+
+/// Decode an address frame. Used by the parent and by tests.
+pub fn decode_address(bytes: &[u8]) -> Result<(u16, [u8; NONCE_LEN]), Diagnostic> {
+    if bytes.len() != ADDRESS_FRAME_LEN {
+        return Err(Diagnostic::AddressMalformed);
+    }
+    if &bytes[..ADDRESS_MAGIC.len()] != ADDRESS_MAGIC.as_slice() {
+        return Err(Diagnostic::AddressMalformed);
+    }
+    let mut at = ADDRESS_MAGIC.len();
+    let version = u16::from_le_bytes(bytes[at..at + 2].try_into().expect("2 bytes"));
+    at += 2;
+    if version != VERSION {
+        return Err(Diagnostic::BootstrapVersionUnsupported);
+    }
+    let port = u16::from_le_bytes(bytes[at..at + 2].try_into().expect("2 bytes"));
+    at += 2;
+    let mut nonce = [0u8; NONCE_LEN];
+    nonce.copy_from_slice(&bytes[at..at + NONCE_LEN]);
+    Ok((port, nonce))
 }
