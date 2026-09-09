@@ -1467,6 +1467,7 @@ dependencies = [
  "sovereign-identity",
  "sovereign-model",
  "sovereign-policy",
+ "sovereign-privacy",
  "sovereign-sandbox",
  "sovereign-vault",
  "sovereign-workflow",

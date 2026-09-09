@@ -122,24 +122,33 @@ Xu's maintainership declaration. It makes chronology and attribution claims
 testable; it is not an independent finding of originality and does not claim
 exclusive rights over abstract ideas.
 
-## Tech Stack (Planned)
+## Tech Stack
 
-| Layer | Technology |
-| --- | --- |
-| Sovereign Runtime | Rust |
-| Desktop UI | TypeScript + React + Tauri |
-| Agent Workers | Python (isolated, untrusted boundary) |
-| Protocols | JSON Schema, gRPC, WASI, MCP, A2A |
+| Layer | Technology | State |
+| --- | --- | --- |
+| Sovereign Runtime | Rust (16 crates, one workspace) | Shipped |
+| Local UI | Dependency-free JavaScript, JSDoc types checked with `tsc --checkJs`, no build step | Shipped |
+| Desktop shell | Tauri v2 (macOS), its own workspace so the webview stack stays out of the audited lock file | Shipped, ad-hoc signed |
+| Sandbox | Wasmtime — core Wasm, plus one zero-import WIT world | Experimental |
+| Agent Workers | Python (isolated, untrusted boundary) | Planned |
+| Protocols | JSON Schema, gRPC, WASI, MCP, A2A | Planned |
 
 ## See It
 
-The local app (`sovereign ui`, English/中文) — your business state in an
-encrypted local vault, every send request stopped at an approval decision, and a
-one-click attack gauntlet where every denial is a real enforcement path:
+The local app (`sovereign ui`, English/中文). On the left, the day's business
+state — what the AI team proposes, what only you can decide, and the kernel
+evidence behind it. On the right, the question a local-first product has to
+answer out loud: for this task, on this record, exactly which bytes would leave
+this machine.
 
-| Founder Workspace (工作台) | Security Center |
+| Today (今天) | Privacy — what would leave this device |
 | --- | --- |
-| ![Founder Workspace in Chinese](docs/screenshots/workspace-zh.png) | ![Security Center gauntlet](docs/screenshots/security-center-en.png) |
+| ![The Today view in Chinese](docs/screenshots/today-zh.png) | ![The exposure preview for one task](docs/screenshots/privacy-en.png) |
+
+The right-hand screenshot is the exposure preview: a per-field disposition
+table, the exact outgoing text with the customer's name reduced to `[ORG_1]`
+and the email dropped entirely, its SHA-256, and — because no public provider
+is configured — the note that nothing was sent.
 
 ## Quick Start
 
@@ -191,6 +200,11 @@ Consultant Core v1** (Experimental; see the
   its official source) checked against the recorded facts, with findings
   that are pass / action / review / unknown and never "compliant"; rule
   search with citations;
+- **Privacy** — the route this device permits for AI work (prefer-local or
+  local-only, a change that writes a signed audit event), and an exposure
+  preview that runs the compiler for a chosen task and record and shows the
+  per-field disposition, the exact outgoing text, and its hash before anything
+  could be sent;
 - a **Security Center** for identity/vault metadata, audit verification,
   disclosure and admission records, state reconciliation, and an in-memory
   adversarial gauntlet.
@@ -274,10 +288,11 @@ Important current limitations:
   Component/WIT plugin boundary with host interfaces remains a target; Secure
   Mesh remains Research.
 
-The Rust workspace contains fifteen crates covering contracts, identity,
+The Rust workspace contains sixteen crates covering contracts, identity,
 artifacts, policy, capabilities, authority, execution, effects, vault, audit,
-sandboxing, models, workflows, the consultant playground, and the vault-v2
-engine skeleton. The detailed maturity and
+sandboxing, models, the data-sovereignty boundary, workflows, the consultant
+playground, and the vault-v2 engine skeleton; `cargo test --workspace` runs 494
+tests across 60 test binaries. The detailed maturity and
 release gates live in [ROADMAP.md](ROADMAP.md); sandbox protocol boundaries are
 in [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 

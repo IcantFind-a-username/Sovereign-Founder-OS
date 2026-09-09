@@ -12,10 +12,11 @@ Developer Preview maturity.
 
 ## Repo map
 
-- `crates/` — 15 workspace crates, package name = `sovereign-<dir>`:
+- `crates/` — 16 workspace crates, package name = `sovereign-<dir>`:
   `contracts` (canonical signed types), `policy`, `capability`, `authority`,
   `identity`, `vault`, `audit-ledger`, `sandbox` (wasmtime), `model`
-  (gateway), `effects`, `execution`, `artifact`, `workflow`,
+  (gateway), `privacy` (RFC 0004 data-sovereignty boundary — the only way to
+  build a public-compute job), `effects`, `execution`, `artifact`, `workflow`,
   `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
   `publish = false`, no product path yet).
 - `apps/desktop` — Tauri desktop shell, **its own workspace on purpose** so
@@ -40,7 +41,7 @@ Green on macOS 26.5 arm64 as well, as of 2026-08-15.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
-cargo test --workspace --locked  # full suite (~463 tests as of 2026-09-10)
+cargo test --workspace --locked  # full suite (494 tests, 60 binaries, 2026-09-09)
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 ./scripts/check-file-size.sh     # god-file limit: 1200 rs / 800 frontend
