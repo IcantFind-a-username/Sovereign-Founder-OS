@@ -155,6 +155,12 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # other local process. A silent dependency bump changes that code path
   # without changing a line here, so the reviewed graph is checked every run.
   run_step "owner-effect-crypto-profile" ./scripts/check-owner-effect-crypto-profile.sh
+  # Clippy below runs on default features, so every fixture-gated module —
+  # the whole broker and the whole owner crate — would otherwise never be
+  # linted at all. Lint them under their own feature.
+  run_step "clippy(owner-effect-fixture)" cargo clippy \
+    -p sovereign-authority -p sovereign-owner -p sovereign-cli --all-targets \
+    --features owner-effect-fixture --locked -- -D warnings
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check

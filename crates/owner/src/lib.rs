@@ -29,10 +29,13 @@
 pub mod config;
 
 #[cfg(feature = "owner-effect-fixture")]
+pub mod registry;
+
+#[cfg(feature = "owner-effect-fixture")]
 pub mod session;
 
 #[cfg(feature = "owner-effect-fixture")]
-mod bootstrap;
+pub mod bootstrap;
 
 #[cfg(feature = "owner-effect-fixture")]
 pub use bootstrap::{FixtureBootstrap, Qualification};

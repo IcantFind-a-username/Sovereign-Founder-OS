@@ -167,7 +167,7 @@ fn logging_out_an_unknown_session_is_harmless() {
     let tokens = sessions.issue(Uuid::new_v4(), now, counter());
 
     sessions.log_out(&[0x99; TOKEN_LEN]);
-    assert_eq!(sessions.authenticate(&tokens, now).is_ok(), true);
+    assert!(sessions.authenticate(&tokens, now).is_ok());
 }
 
 /// Sessions live in memory and nowhere else, so a restart is a revocation.
