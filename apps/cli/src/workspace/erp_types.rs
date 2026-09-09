@@ -49,6 +49,9 @@ pub struct Project {
     pub updated_at: i64,
     #[serde(default)]
     pub done_at: Option<i64>,
+    /// Checkable conditions for calling the project done.
+    #[serde(default)]
+    pub acceptance_criteria: Vec<String>,
 }
 
 /// One unit of delivery work. `origin` records who proposed it: `founder`,

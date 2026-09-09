@@ -314,6 +314,7 @@ impl Store {
             created_at: at,
             updated_at: at,
             done_at: None,
+            acceptance_criteria: Vec::new(),
         };
         let resource = format!("project:{}", project.id);
         workspace.projects.push(project);

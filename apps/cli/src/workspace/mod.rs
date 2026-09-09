@@ -27,6 +27,9 @@
 //! live in the prototype vault.
 
 mod compose;
+mod crew_ops;
+mod crew_roles;
+mod crew_types;
 mod erp_ops;
 mod erp_types;
 mod kernel_exec;
@@ -40,12 +43,16 @@ mod util;
 mod verify;
 
 #[cfg(test)]
+mod crew_tests;
+#[cfg(test)]
 mod erp_tests;
 #[cfg(test)]
 mod stage1_suite;
 #[cfg(test)]
 mod tests;
 
+pub use crew_roles::role_cards;
+pub use crew_types::*;
 pub use erp_types::*;
 pub use model_config::{provider_status, MODEL_CONFIG_FILE};
 pub use types::*;
@@ -72,6 +79,8 @@ const MAX_PROJECTS: usize = 500;
 const MAX_TASKS: usize = 5_000;
 const MAX_FOLLOW_UPS: usize = 2_000;
 const MAX_PAYMENTS: usize = 5_000;
+const MAX_EMPLOYEES: usize = 12;
+const MAX_DECISIONS: usize = 5_000;
 
 // The built-in delivery-preparation tool is authored by the application
 // itself; its publisher key is a build constant, not a secret. Owner keys

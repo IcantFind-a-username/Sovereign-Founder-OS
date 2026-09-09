@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::crew_types::{Decision, Employee};
 use super::erp_types::{CustomerStage, FollowUp, Payment, Project, Task};
 
 fn default_currency() -> String {
@@ -255,6 +256,12 @@ pub struct Workspace {
     pub follow_ups: Vec<FollowUp>,
     #[serde(default)]
     pub payments: Vec<Payment>,
+    /// AI employees the founder hired; they propose, never act.
+    #[serde(default)]
+    pub employees: Vec<Employee>,
+    /// Every proposal an employee made and what the founder decided.
+    #[serde(default)]
+    pub decisions: Vec<Decision>,
 }
 
 /// At-a-glance product view: the founder's whole business plus the security
@@ -324,6 +331,8 @@ pub struct CommandCenterCounts {
     pub follow_ups_overdue: usize,
     /// Money still owed on issued invoices.
     pub receivable_cents: u64,
+    /// AI-employee proposals waiting for the founder.
+    pub proposals_pending: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]

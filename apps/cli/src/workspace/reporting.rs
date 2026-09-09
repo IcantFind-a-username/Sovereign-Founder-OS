@@ -53,6 +53,11 @@ impl Store {
                 .iter()
                 .map(|receivable| receivable.outstanding_cents)
                 .sum(),
+            proposals_pending: workspace
+                .decisions
+                .iter()
+                .filter(|decision| decision.status == DecisionStatus::Pending)
+                .count(),
         };
 
         let pending_decisions: Vec<PendingDecision> = workspace
@@ -359,6 +364,9 @@ fn derive_guidance(
     // The founder is the bottleneck for pending decisions: surface them first.
     if pending > 0 {
         out.push(Guidance::action("decide_pending").with_count(pending));
+    }
+    if counts.proposals_pending > 0 {
+        out.push(Guidance::action("decide_proposals").with_count(counts.proposals_pending));
     }
     if counts.follow_ups_overdue > 0 {
         out.push(Guidance::action("follow_up_overdue").with_count(counts.follow_ups_overdue));

@@ -9,7 +9,7 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::ui::{str_field, uuid_field};
-use crate::workspace::{self, ProjectStatus, WorkspaceError};
+use crate::workspace::{self, EmployeeStatus, ProjectStatus, RoleId, RunSubject, WorkspaceError};
 
 type Body = serde_json::Value;
 
@@ -115,6 +115,47 @@ pub(crate) fn workspace_post(path: &str, body: &Body, root: &Path) -> Option<Bod
             store
                 .customer_timeline(uuid_field(body, "customer_id")?)
                 .map(|rows| serde_json::json!({ "ok": true, "timeline": rows }))
+        }),
+        "/api/workspace/roles" => {
+            serde_json::json!({ "ok": true, "roles": workspace::role_cards() })
+        }
+        "/api/workspace/employee/hire" => mutate(root, |store| {
+            let role = RoleId::parse(str_field(body, "role")?)
+                .ok_or_else(|| WorkspaceError::Invalid("unknown role".into()))?;
+            store.hire_employee(role, str_field(body, "name")?)
+        }),
+        "/api/workspace/employee/status" => mutate(root, |store| {
+            let status = match str_field(body, "status")? {
+                "hired" => EmployeeStatus::Hired,
+                "paused" => EmployeeStatus::Paused,
+                other => {
+                    return Err(WorkspaceError::Invalid(format!(
+                        "unknown employee status {other}"
+                    )))
+                }
+            };
+            store.set_employee_status(uuid_field(body, "employee_id")?, status)
+        }),
+        "/api/workspace/employee/run" => read(root, |store| {
+            let subject: RunSubject = serde_json::from_value(body.clone())
+                .map_err(|error| WorkspaceError::Invalid(format!("subject: {error}")))?;
+            let lang = body.get("lang").and_then(|v| v.as_str()).unwrap_or("en");
+            store
+                .run_employee(uuid_field(body, "employee_id")?, subject, lang)
+                .map(|decision| serde_json::json!({ "ok": true, "decision": decision }))
+        }),
+        "/api/workspace/decision" => mutate(root, |store| {
+            store.decide_proposal(
+                uuid_field(body, "decision_id")?,
+                body.get("approve")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+            )
+        }),
+        "/api/workspace/work-suggestions" => read(root, |store| {
+            store
+                .work_suggestions()
+                .map(|rows| serde_json::json!({ "ok": true, "suggestions": rows }))
         }),
         _ => return None,
     };
