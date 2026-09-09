@@ -364,7 +364,7 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence](handoff/codex/reports/S1-G06-supervised.md).
   Strong implementation and independent strong review precede the Luna UI card.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` IN PROGRESS (Luna medium; attempt2 pending, one substantive failure).
+- [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` IN PROGRESS (Astra fallback pending; two Luna substantive failures).
   Definition and done criteria: [S1-06](handoff/codex/cards/S1-06.md).
   Base `da47f15d167e4f41cdf2aa48182fbc6f0575ab98`; revision1 card blob
   `0b801adb59f596ccb7089b3c501e144e29d80f2a`; exact ten files per card.
@@ -378,6 +378,11 @@ while the controller routes eligible design/review cards to the strong role.
   equality, unreadable compressed JS. app9f15acb1/UI6d874bae/tests004c7036.
   Root reran Node3tests EXIT0 and tsc EXIT2, logs attempt1-node/tsc.log;
   no preimplementation RED log exists. Attempt2 retains same ten-file scope.
+  Attempt2 independently rejected: first-render missing key persists, validation
+  regressed to shallow checks, busy state incomplete, Node tests unchanged.
+  tsc now green but widened locale type; no functional acceptance.
+  Astra fallback takes same ten files; no third Luna attempt.
+  [Full failure/repair record](handoff/codex/reports/S1-06-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G07 — Admit bounded loopback transport.** `lane:codex` Frozen architecture task; depends on S1-06 acceptance.
