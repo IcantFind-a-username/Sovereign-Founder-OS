@@ -26,6 +26,8 @@
 //! remains the founder's own action, and no network effect exists. Owner keys
 //! live in the prototype vault.
 
+mod compliance;
+mod compliance_pack;
 mod compose;
 mod crew_ops;
 mod crew_roles;
@@ -43,14 +45,20 @@ mod util;
 mod verify;
 
 #[cfg(test)]
+mod compliance_tests;
+#[cfg(test)]
 mod crew_tests;
 #[cfg(test)]
 mod erp_tests;
 #[cfg(test)]
 mod stage1_suite;
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;
 
+pub use compliance::ComplianceSubject;
+pub use compliance_pack::packs;
 pub use crew_roles::role_cards;
 pub use crew_types::*;
 pub use erp_types::*;
@@ -81,6 +89,7 @@ const MAX_FOLLOW_UPS: usize = 2_000;
 const MAX_PAYMENTS: usize = 5_000;
 const MAX_EMPLOYEES: usize = 12;
 const MAX_DECISIONS: usize = 5_000;
+const MAX_COMPLIANCE_REPORTS: usize = 500;
 
 // The built-in delivery-preparation tool is authored by the application
 // itself; its publisher key is a build constant, not a secret. Owner keys

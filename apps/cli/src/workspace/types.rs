@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::compliance::ComplianceReport;
 use super::crew_types::{Decision, Employee};
 use super::erp_types::{CustomerStage, FollowUp, Payment, Project, Task};
 
@@ -262,6 +263,9 @@ pub struct Workspace {
     /// Every proposal an employee made and what the founder decided.
     #[serde(default)]
     pub decisions: Vec<Decision>,
+    /// Compliance check reports, oldest first; bounded.
+    #[serde(default)]
+    pub compliance_reports: Vec<ComplianceReport>,
 }
 
 /// At-a-glance product view: the founder's whole business plus the security

@@ -1,9 +1,8 @@
 use super::crew_roles::{build_input, parse_model_change};
+use super::test_support::fake_ollama;
 use super::*;
 use sovereign_audit_ledger::AuditLedger;
 use sovereign_identity::DeviceIdentity;
-use std::io::{Read, Write};
-use std::net::TcpListener;
 use tempfile::tempdir;
 use uuid::Uuid;
 
@@ -463,7 +462,7 @@ fn rejection_records_the_decision_and_changes_nothing() {
 }
 
 #[test]
-fn a_paused_employee_cannot_run_and_the_compliance_checker_runs_elsewhere() {
+fn a_paused_employee_cannot_run_and_the_compliance_checker_reports_through_a_decision() {
     let (_dir, store, customer_id) = seeded();
     let analyst = hired(&store, RoleId::Analyst);
     store
@@ -474,10 +473,24 @@ fn a_paused_employee_cannot_run_and_the_compliance_checker_runs_elsewhere() {
         .unwrap_err();
     assert!(error.to_string().contains("paused"));
     let checker = hired(&store, RoleId::ComplianceChecker);
-    let error = store
+    let decision = store
         .run_employee(checker, RunSubject::default(), "en")
-        .unwrap_err();
-    assert!(error.to_string().contains("Compliance page"));
+        .unwrap();
+    let report_id = match decision.change {
+        ProposedChange::ComplianceReport { report_id } => report_id,
+        other => panic!("unexpected change {other:?}"),
+    };
+    let workspace = store.load().unwrap();
+    assert_eq!(workspace.compliance_reports.last().unwrap().id, report_id);
+    let workspace = store.decide_proposal(decision.id, true).unwrap();
+    assert!(workspace
+        .decisions
+        .last()
+        .unwrap()
+        .outcome
+        .as_deref()
+        .unwrap()
+        .starts_with("acknowledged:compliance_report:"));
     assert!(store
         .run_employee(Uuid::new_v4(), RunSubject::default(), "en")
         .is_err());
@@ -553,49 +566,6 @@ fn model_output_is_validated_before_it_becomes_a_proposal() {
         r#"{"findings":[{"kind":"GAP","detail":"no price"}]}"#
     )
     .is_some());
-}
-
-/// A fake Ollama daemon: answers each connection with the next canned body.
-fn fake_ollama(bodies: Vec<String>) -> u16 {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-    std::thread::spawn(move || {
-        for body in bodies {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut request = vec![0u8; 65_536];
-            let mut total = 0;
-            loop {
-                let read = stream.read(&mut request[total..]).unwrap_or(0);
-                if read == 0 {
-                    break;
-                }
-                total += read;
-                let head_end = request[..total].windows(4).position(|w| w == b"\r\n\r\n");
-                if let Some(end) = head_end {
-                    let head = String::from_utf8_lossy(&request[..end]).to_string();
-                    let length = head
-                        .lines()
-                        .find_map(|line| {
-                            let (name, value) = line.split_once(':')?;
-                            name.trim()
-                                .eq_ignore_ascii_case("content-length")
-                                .then(|| value.trim().parse::<usize>().ok())
-                                .flatten()
-                        })
-                        .unwrap_or(0);
-                    if total >= end + 4 + length {
-                        break;
-                    }
-                }
-            }
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            );
-            stream.write_all(response.as_bytes()).unwrap();
-        }
-    });
-    port
 }
 
 #[test]

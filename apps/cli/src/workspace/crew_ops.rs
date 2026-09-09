@@ -4,6 +4,7 @@
 //! applied under policy with signed evidence. Employees hold no keys and
 //! change nothing until the founder approves.
 
+use super::compliance::{ComplianceSubject, FindingStatus};
 use super::crew_roles::{
     build_input, deterministic_change, parse_model_change, prompt_for, role_card, summarize_change,
 };
@@ -141,9 +142,7 @@ impl Store {
             return Err(invalid("this employee is paused"));
         }
         if employee.role == RoleId::ComplianceChecker {
-            return Err(invalid(
-                "run the compliance checker from the Compliance page",
-            ));
+            return self.run_compliance_employee(&employee, subject, lang);
         }
         let input = build_input(&workspace, employee.role, subject, lang)?;
         let resource = subject_resource(&subject);
@@ -291,6 +290,121 @@ impl Store {
         Ok(decision)
     }
 
+    /// The compliance checker runs the rule pack (which stores and audits
+    /// its own report) and wraps the report in a decision so it lands in the
+    /// same inbox as every other employee's work.
+    fn run_compliance_employee(
+        &self,
+        employee: &Employee,
+        subject: RunSubject,
+        lang: &str,
+    ) -> Result<Decision, WorkspaceError> {
+        let zh = lang.starts_with("zh");
+        let report = self.run_compliance_check(
+            ComplianceSubject {
+                document_id: subject.document_id,
+            },
+            lang,
+        )?;
+        let mut persisted = self.load()?;
+        if persisted.decisions.len() >= MAX_DECISIONS {
+            return Err(invalid("decision limit reached"));
+        }
+        let at = now();
+        let attention = report
+            .findings
+            .iter()
+            .filter(|finding| finding.status == FindingStatus::Attention)
+            .count();
+        let review = report
+            .findings
+            .iter()
+            .filter(|finding| finding.status == FindingStatus::NeedsReview)
+            .count();
+        let card = role_card(employee.role);
+        let subject_name = persisted
+            .venture
+            .as_ref()
+            .map(|venture| venture.name.clone())
+            .unwrap_or_default();
+        let summary = match &report.model_summary {
+            Some(text) => text.clone(),
+            None => {
+                if zh {
+                    format!(
+                        "覆盖:{};{} 项需要处理,{} 项需要复核。这是未经专业审阅的演示规则包,不是法律或税务意见。",
+                        report.coverage, attention, review
+                    )
+                } else {
+                    format!(
+                        "Coverage: {}; {} finding(s) need action, {} need review. Unreviewed demo pack; not legal or tax advice.",
+                        report.coverage, attention, review
+                    )
+                }
+            }
+        };
+        let decision = Decision {
+            id: Uuid::new_v4(),
+            employee_id: employee.id,
+            role: employee.role,
+            title: format!(
+                "{} · {}",
+                if zh { card.title_zh } else { card.title_en },
+                subject_name
+            ),
+            summary,
+            change: ProposedChange::ComplianceReport {
+                report_id: report.id,
+            },
+            evidence: vec![
+                "venture.jurisdiction".into(),
+                "venture.registration".into(),
+                "customers.jurisdiction".into(),
+                "customers.personal_data_consent".into(),
+                "documents.sent".into(),
+            ],
+            provider_id: report.provider_id.clone(),
+            provider_trust: if report.provider_id == "none" {
+                "none".into()
+            } else {
+                "local".into()
+            },
+            model_backed: report.model_backed,
+            status: DecisionStatus::Pending,
+            created_at: at,
+            decided_at: None,
+            outcome: None,
+        };
+        let staffed = persisted
+            .employees
+            .iter_mut()
+            .find(|candidate| candidate.id == employee.id)
+            .ok_or_else(|| WorkspaceError::NotFound("employee".into()))?;
+        staffed.runs += 1;
+        staffed.last_run_at = Some(at);
+        let events = vec![
+            AuditEntry {
+                action: "employee.ran".into(),
+                resource: format!("employee:{}", employee.id),
+                payload: serde_json::json!({
+                    "role": employee.role.as_str(),
+                    "task": "crew.compliance_checker",
+                    "provider": decision.provider_id,
+                    "model_backed": decision.model_backed,
+                    "report_id": report.id,
+                }),
+            },
+            AuditEntry {
+                action: "decision.proposed".into(),
+                resource: format!("decision:{}", decision.id),
+                payload: serde_json::json!({ "role": employee.role.as_str(), "kind": decision.change.kind() }),
+            },
+        ];
+        persisted.decisions.push(decision.clone());
+        self.commit(&persisted, events)?;
+        Ok(decision)
+    }
+
     /// The founder decides. Approving applies exactly the recorded change in
     /// one audit-first commit together with the decision itself; rejecting
     /// records the decision and changes nothing else.
@@ -412,7 +526,30 @@ impl Store {
                         out.push(suggestion(employee, document.customer_id, Some(document.id), None, &document.title, "check_draft"));
                     }
                 }
-                RoleId::ComplianceChecker => {}
+                RoleId::ComplianceChecker => {
+                    let recent = workspace.compliance_reports.last().is_some_and(|report| {
+                        report.at >= chrono::Utc::now().timestamp() - 30 * DAY_SECONDS
+                    });
+                    if let Some(venture) = workspace
+                        .venture
+                        .as_ref()
+                        .filter(|venture| !venture.jurisdiction.is_empty())
+                    {
+                        if !recent {
+                            out.push(WorkSuggestion {
+                                employee_id: employee.id,
+                                role: employee.role,
+                                subject: RunSubjectRef {
+                                    customer_id: None,
+                                    document_id: None,
+                                    project_id: None,
+                                },
+                                subject_name: venture.name.clone(),
+                                reason: "run_compliance",
+                            });
+                        }
+                    }
+                }
             }
         }
         out.truncate(20);

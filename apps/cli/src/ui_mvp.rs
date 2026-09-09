@@ -9,7 +9,9 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::ui::{str_field, uuid_field};
-use crate::workspace::{self, EmployeeStatus, ProjectStatus, RoleId, RunSubject, WorkspaceError};
+use crate::workspace::{
+    self, ComplianceSubject, EmployeeStatus, ProjectStatus, RoleId, RunSubject, WorkspaceError,
+};
 
 type Body = serde_json::Value;
 
@@ -156,6 +158,23 @@ pub(crate) fn workspace_post(path: &str, body: &Body, root: &Path) -> Option<Bod
             store
                 .work_suggestions()
                 .map(|rows| serde_json::json!({ "ok": true, "suggestions": rows }))
+        }),
+        "/api/workspace/compliance/check" => read(root, |store| {
+            let subject: ComplianceSubject = serde_json::from_value(body.clone())
+                .map_err(|error| WorkspaceError::Invalid(format!("subject: {error}")))?;
+            let lang = body.get("lang").and_then(|v| v.as_str()).unwrap_or("en");
+            store
+                .run_compliance_check(subject, lang)
+                .map(|report| serde_json::json!({ "ok": true, "report": report }))
+        }),
+        "/api/workspace/compliance/rules" => read(root, |store| {
+            let lang = body.get("lang").and_then(|v| v.as_str()).unwrap_or("en");
+            let query = body.get("query").and_then(|v| v.as_str()).unwrap_or("");
+            Ok(serde_json::json!({
+                "ok": true,
+                "packs": workspace::packs(),
+                "hits": store.search_rules(query, lang),
+            }))
         }),
         _ => return None,
     };
