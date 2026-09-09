@@ -431,10 +431,13 @@ while the controller routes eligible design/review cards to the strong role.
   complete44exchange realrelease proof and specific snapshot sensitivity.
   [Evidence](handoff/codex/reports/S1-10-supervised.md). Next S1-11.
 
-- [ ] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` IN REVIEW; Astra reviewer-only, no worker attempt.
+- [x] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` accepted; Astra reviewer-only.
   Definition and done criteria: [S1-11](handoff/codex/cards/S1-11.md).
   Revision2 blob4903767318fc35a3c79d7b2d9419df394c3c59db; sourcebase1d4da24;
-  review base is this record commit. All product writers stopped; raw .harness/s1-11/.
+  Independently accepted36efdf28a3dad44499228a3345cf0288d4b77527; all writers stopped.
+  [Stage verdict](handoff/codex/reports/S1-11-review.md): actual browser/reload,
+  12legacyroute pairs, releaseisolation and gates passed. Raw .harness/s1-11/.
+  Next S2-00 design; fixed S1 does not complete fullMVP.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` `needs:fable`
