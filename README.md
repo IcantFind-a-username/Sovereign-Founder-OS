@@ -228,8 +228,15 @@ implementation target.
 Run it as a desktop app (macOS; unsigned Developer Preview):
 
 ```bash
-./apps/desktop/build-bundle.sh   # builds "Sovereign Founder OS.app" and a .dmg
+./apps/desktop/build-bundle.sh --dmg   # "Sovereign Founder OS.app" + a disk image
 ```
+
+Drag the app into `/Applications`. It is ad-hoc signed but not notarized, so
+the first launch is blocked with *"Apple could not verify …"*; clear the
+quarantine flag with
+`xattr -dr com.apple.quarantine "/Applications/Sovereign Founder OS.app"`, or
+allow it in System Settings → Privacy & Security. On macOS 15 and later,
+right-click → Open no longer bypasses this.
 
 The app is a window around the same runtime: it launches the audited
 `sovereign` binary as a child on an ephemeral loopback port and stops it when

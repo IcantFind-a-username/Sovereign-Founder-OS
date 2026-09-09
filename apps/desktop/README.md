@@ -68,13 +68,23 @@ unsigned app. `codesign --verify --deep --strict` now passes.
 
 What remains is distribution trust, and no amount of local signing supplies
 it: the bundle carries no Developer ID and no notarization ticket, so a copy
-that arrived over the network is quarantined and Gatekeeper refuses it until
-you open it once by hand:
+that arrived over the network is quarantined and refused with *"Apple could
+not verify …"*.
+
+Install it first — drag it out of the disk image into `/Applications`,
+because a read-only mounted image is the wrong place to run from — then
+either clear the flag:
 
 ```bash
-# either right-click → Open the first time, or:
 xattr -dr com.apple.quarantine "/Applications/Sovereign Founder OS.app"
 ```
+
+or open **System Settings → Privacy & Security**, scroll to Security, and
+press **Open Anyway** after the blocked attempt.
+
+Right-click → Open is **not** an option on macOS 15 and later: Apple removed
+that bypass, which is why the block dialog offers only *Done*. Any
+instruction that still says to right-click is written for an older macOS.
 
 Developer ID signing, notarization, stapling, updates, and uninstall are
 separate release work with their own acceptance; see `ROADMAP.md`. Note also
