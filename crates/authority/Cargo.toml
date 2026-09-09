@@ -72,3 +72,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "broker_corpus"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "fixture_root_lifecycle"
+required-features = ["owner-effect-fixture"]
