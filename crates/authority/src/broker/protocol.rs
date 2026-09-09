@@ -41,6 +41,10 @@ pub enum Diagnostic {
     SupervisorLost,
     /// Something connected and could not prove it holds the launch key.
     SupervisorUnauthenticated,
+    /// Another broker already owns this root.
+    BrokerAlreadyRunning,
+    /// Exclusivity could not be established, which is not permission.
+    LockUnavailable,
 }
 
 impl Diagnostic {
@@ -57,6 +61,8 @@ impl Diagnostic {
             Diagnostic::SupervisorTimeout => "E-SUPERVISOR-TIMEOUT",
             Diagnostic::SupervisorLost => "E-SUPERVISOR-LOST",
             Diagnostic::SupervisorUnauthenticated => "E-SUPERVISOR-UNAUTHENTICATED",
+            Diagnostic::BrokerAlreadyRunning => "E-BROKER-ALREADY-RUNNING",
+            Diagnostic::LockUnavailable => "E-LOCK-UNAVAILABLE",
         }
     }
 }
