@@ -364,8 +364,14 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence](handoff/codex/reports/S1-G06-supervised.md).
   Strong implementation and independent strong review precede the Luna UI card.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` `needs:fable`
+- [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` IN PROGRESS (fresh Luna medium; attempt1, zero failures).
   Definition and done criteria: [S1-06](handoff/codex/cards/S1-06.md).
+  Base `da47f15d167e4f41cdf2aa48182fbc6f0575ab98`; revision1 card blob
+  `0b801adb59f596ccb7089b3c501e144e29d80f2a`; exact ten files per card.
+  S1-G06 accepted in da47f15. Node22.23.1 available. Worker founder_worker
+  (Luna medium), independent strong review; logs .harness/s1-06/.
+  Up to3 focused repair cycles per candidate, second substantive rejection
+  escalates to Astra; token/time accounting unavailable, preserve attempts.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G07 — Admit bounded loopback transport.** `lane:codex` Frozen architecture task; depends on S1-06 acceptance.
