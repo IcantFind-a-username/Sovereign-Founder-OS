@@ -11,7 +11,8 @@ S1-00 首个增量冻结 [动作契约](../playground-contract.md) 及以下配�
 仅配对source/manifest窄门与单向DTO；不声称已实施。
 
 [S1-03](S1-03.md) 的双语catalog接口已冻结，依赖S1-02及先行G03实际接受；
-G03的精确建议见 [catalog契约](../playground-catalog-contract.md)，尚不可施工。
+[G03卡](S1-G03.md) 已冻结；精确接口见 [catalog契约](../playground-catalog-contract.md)，
+等待S1-02接受后再认领。
 
 S1-04–11 及其他依赖开放仍 **Blocked design**：检索/guidance、HTTP、
 assets、server、浏览器、CLI、进程隔离及最终验收未冻结。沿用 standalone-v2

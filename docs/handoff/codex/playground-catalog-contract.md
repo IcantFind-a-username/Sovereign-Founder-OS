@@ -1,6 +1,6 @@
 # Playground 双语 catalog 契约
 
-**Revision 1 · 主线程独立审阅接受；S1-03接口Frozen，G03仍需独立卡与实际验收。**仅S1-G03建议与S1-03增量；不改既有动作/DTO契约。
+**Revision 1 · 主线程独立审阅接受；S1-03接口Frozen，G03已形成独立卡，仍需实际验收。**仅S1-G03建议与S1-03增量；不改既有动作/DTO契约。
 依 [standalone-v2](../../superpowers/plans/2026-08-14-consultant-playground-standalone-v2-implementation.md)
 和 [Playground契约](playground-contract.md)。S1-02目前Frozen但未获本设计确认实现；
 S1-03必须等待S1-02、先行G03实际接受。真实业务/AI后续Goal不变。
@@ -65,10 +65,11 @@ key及本地en/zh选择文字，用textContent显示；语言选择不写graph/s
 本表是实际内容验收源；生产仅CATALOG一份运行数据，测试的冻结预期不作为运行词典。
 后续错误、反馈、guidance等新key等待相关行为冻结，不能为尚未确定的route错误预铺文案。
 
-## 必需的先行S1-G03窄门建议（供主线程裁决，未创建卡）
+## 先行S1-G03窄门契约
 
-现有精确两文件闭包不允许catalog.rs；S1-03不能同时修改自己的验收门。需先将本节
-冻结为独立G03简报，独立审阅接受后才执行S1-03。本建议不允许触碰当前G02兜底写集。
+现有精确两文件闭包不允许catalog.rs；S1-03不能同时修改自己的验收门。需先
+按 [S1-G03卡](cards/S1-G03.md) 执行并独立审阅接受后才执行S1-03。
+G03依赖S1-02接受，不得与尚未停止的先前gate writer并行修改。
 未来G03精确写集仅：
 
 - `crates/consultant-playground/tests/support/boundary.rs`
