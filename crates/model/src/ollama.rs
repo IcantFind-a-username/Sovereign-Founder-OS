@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
-use crate::{Health, ModelProvider, ModelRequest, ProviderError, ProviderTrust};
+use crate::{Health, LocalVouch, ModelProvider, ModelRequest, ProviderError, ProviderTrust};
 
 /// Why a provider could not be constructed from its configuration.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -184,6 +184,14 @@ impl ModelProvider for OllamaProvider {
 
     fn trust(&self) -> ProviderTrust {
         ProviderTrust::Local
+    }
+
+    /// Carries the vouch because the constructor already refused every
+    /// non-loopback base URL: this adapter cannot have been pointed at
+    /// another machine. It still does not confine the daemon itself — the
+    /// product routes to that process, it does not sandbox it.
+    fn local_vouch(&self) -> Option<LocalVouch> {
+        Some(LocalVouch::core_reviewed())
     }
 
     /// `GET /api/tags` answers 200 when the daemon is up; anything else,

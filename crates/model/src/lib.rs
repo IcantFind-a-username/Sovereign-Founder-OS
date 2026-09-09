@@ -100,6 +100,36 @@ pub enum SkipCause {
     Unhealthy,
     /// The provider was tried and returned an error.
     Failed,
+    /// A raw request may only reach a provider this crate vouches for as
+    /// running on this device. Reaching anything else requires a compiled
+    /// projection (RFC 0004).
+    RawRequestIsLocalOnly,
+}
+
+/// Proof that a provider is one this crate itself vouches for as local.
+///
+/// RFC 0004 forbids a trait method or a caller string from establishing local
+/// trust: an adapter that self-reported `local` would be self-authorizing raw
+/// access to protected data. So the proof is a value only this module can
+/// construct. An implementor outside this crate cannot name the constructor,
+/// cannot build one, and therefore cannot claim the vouch however it
+/// implements the trait or whatever it calls itself.
+///
+/// Two kinds qualify today: the core-reviewed deterministic stand-ins built
+/// into this crate, and the Ollama adapter, which refuses any non-loopback
+/// base URL at construction. An ordinary process does not become trusted by
+/// listening on localhost.
+#[derive(Debug, Clone, Copy)]
+pub struct LocalVouch(PhantomNotConstructible);
+
+#[derive(Debug, Clone, Copy)]
+struct PhantomNotConstructible;
+
+impl LocalVouch {
+    /// Callable only from inside this crate.
+    pub(crate) fn core_reviewed() -> Self {
+        LocalVouch(PhantomNotConstructible)
+    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -121,9 +151,18 @@ pub struct ProviderError(pub String);
 /// broker; the deterministic providers here implement it locally.
 pub trait ModelProvider: Send + Sync {
     fn id(&self) -> &str;
+    /// Where the provider says it runs. A display fact for the founder's
+    /// disclosure log — never an authorization. See [`LocalVouch`].
     fn trust(&self) -> ProviderTrust;
     fn health(&self) -> Health;
     fn complete(&self, request: &ModelRequest) -> Result<String, ProviderError>;
+
+    /// Return the vouch when this crate itself established the provider runs
+    /// on this device. The default is `None`, and an outside implementor
+    /// cannot do better: [`LocalVouch`] has no constructor it can reach.
+    fn local_vouch(&self) -> Option<LocalVouch> {
+        None
+    }
 }
 
 impl fmt::Debug for dyn ModelProvider {
@@ -214,8 +253,17 @@ impl ModelGateway {
         request: &ModelRequest,
         allow_degraded: bool,
     ) -> Eligibility {
-        // Red data may only be disclosed to local providers, regardless of
-        // health. This check comes first: confidentiality is not negotiable.
+        // A raw request carries whatever the caller put in it, so it may only
+        // reach a provider this crate vouches for. This is the route RFC 0004
+        // requires closing: previously a caller could label protected data
+        // Amber and an adapter could claim local trust, and between them they
+        // reached the cloud. Confidentiality is decided here, before health,
+        // and never by the provider's own word.
+        if provider.local_vouch().is_none() {
+            return Eligibility::Skip(SkipCause::RawRequestIsLocalOnly);
+        }
+        // Kept as defence in depth: a vouched provider that nonetheless
+        // reports non-local trust never sees Red data.
         if request.data_class == DataClass::Red && provider.trust() != ProviderTrust::Local {
             return Eligibility::Skip(SkipCause::RedDataConfidentiality);
         }
@@ -335,6 +383,13 @@ impl ModelProvider for DeterministicProvider {
         self.trust
     }
 
+    /// A deterministic stand-in is core-reviewed code in this crate, so the
+    /// local ones carry the vouch. `cloud` exists to simulate a provider this
+    /// product does not vouch for, and must not.
+    fn local_vouch(&self) -> Option<LocalVouch> {
+        (self.trust == ProviderTrust::Local).then(LocalVouch::core_reviewed)
+    }
+
     fn health(&self) -> Health {
         self.health
     }
@@ -378,16 +433,46 @@ mod tests {
     }
 
     #[test]
-    fn amber_data_may_use_a_cloud_provider() {
-        // The confidentiality guard is Red-specific: it must not over-block
-        // Amber. With no local provider available, Amber routes to the cloud.
+    fn a_raw_request_never_reaches_a_provider_this_product_does_not_vouch_for() {
+        // This inverts the previous rule on purpose (RFC 0004, "Current
+        // gap"): an Amber label used to be enough to route a raw request to a
+        // cloud provider. A caller can mislabel data and an adapter can claim
+        // local trust, so a raw prompt now stops at the closed local list.
+        // Reaching anything else takes a compiled projection.
         let gateway = ModelGateway::new(vec![
-            Box::new(DeterministicProvider::local("local", Health::Down)),
+            Box::new(DeterministicProvider::local("local-drafter", Health::Down)),
             Box::new(DeterministicProvider::cloud("cloud", Health::Healthy)),
         ]);
-        let (response, disclosure) = gateway.complete(&request(DataClass::Amber)).unwrap();
-        assert_eq!(response.provider_id, "cloud");
-        assert_eq!(response.provider_trust, ProviderTrust::Cloud);
+        assert_eq!(
+            gateway.complete(&request(DataClass::Amber)),
+            Err(ModelError::AllProvidersFailed)
+        );
+
+        // Nor does a provider get in by naming itself like a local one: the
+        // vouch is a value only this crate can construct, so a cloud stand-in
+        // wearing a local-sounding id is still refused.
+        let disguised = ModelGateway::new(vec![Box::new(DeterministicProvider::cloud(
+            "local-drafter",
+            Health::Healthy,
+        ))]);
+        assert_eq!(
+            disguised.complete(&request(DataClass::Red)),
+            Err(ModelError::AllProvidersFailed)
+        );
+        assert!(DeterministicProvider::cloud("anything", Health::Healthy)
+            .local_vouch()
+            .is_none());
+        assert!(DeterministicProvider::local("anything", Health::Healthy)
+            .local_vouch()
+            .is_some());
+
+        // A vouched local provider serves it.
+        let local = ModelGateway::new(vec![Box::new(DeterministicProvider::local(
+            "local-drafter",
+            Health::Healthy,
+        ))]);
+        let (response, disclosure) = local.complete(&request(DataClass::Amber)).unwrap();
+        assert_eq!(response.provider_id, "local-drafter");
         assert_eq!(disclosure.data_class, DataClass::Amber);
     }
 
@@ -426,7 +511,11 @@ mod tests {
 
     #[test]
     fn removing_primary_does_not_stop_the_workflow() {
-        // Stage 2 exit criterion: primary down → backup serves the request.
+        // Stage 2 exit criterion: primary down → work continues. Since RFC
+        // 0004 closed raw egress, "continues" means a vouched local provider
+        // takes over. Losing the primary must not become a reason to widen
+        // the confidentiality route, so the cloud stand-in in the middle is
+        // passed over for what it is, not tried and rejected later.
         let gateway = ModelGateway::new(vec![
             Box::new(DeterministicProvider::local("primary", Health::Down)),
             Box::new(DeterministicProvider::cloud(
@@ -439,10 +528,15 @@ mod tests {
             )),
         ]);
         let (response, disclosure) = gateway.complete(&request(DataClass::Green)).unwrap();
-        assert_eq!(response.provider_id, "cloud-backup");
-        assert_eq!(disclosure.provider_index, 1);
+        assert_eq!(response.provider_id, "local-fallback");
+        assert_eq!(disclosure.provider_index, 2);
         assert_eq!(disclosure.skipped[0].provider_id, "primary");
         assert_eq!(disclosure.skipped[0].reason, SkipCause::Unhealthy);
+        assert_eq!(disclosure.skipped[1].provider_id, "cloud-backup");
+        assert_eq!(
+            disclosure.skipped[1].reason,
+            SkipCause::RawRequestIsLocalOnly
+        );
     }
 
     #[test]
@@ -484,9 +578,13 @@ mod tests {
         let (response, disclosure) = gateway.complete(&request(DataClass::Red)).unwrap();
         assert_eq!(response.provider_id, "local");
         assert_eq!(response.provider_trust, ProviderTrust::Local);
+        // The unvouched provider is now refused one step earlier — for being
+        // unvouched at all, rather than for the data class of this particular
+        // request. The Red guard remains behind it as defence in depth for a
+        // vouched provider that nonetheless reports non-local trust.
         assert_eq!(
             disclosure.skipped[0].reason,
-            SkipCause::RedDataConfidentiality
+            SkipCause::RawRequestIsLocalOnly
         );
     }
 

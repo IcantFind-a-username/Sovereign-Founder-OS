@@ -260,15 +260,14 @@ fn cmd_workflow_demo() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn cmd_model_check() {
-    use sovereign_model::{
-        DeterministicProvider, Health, ModelGateway, ModelRequest, ProviderTrust,
-    };
+    use sovereign_model::{DeterministicProvider, Health, ModelGateway, ModelRequest};
 
-    println!("Model gateway · health-aware failover + Red-data guard");
-    println!("(providers are deterministic local stand-ins, not LLMs)\n");
+    println!("Model gateway · raw requests stay on this device");
+    println!("(the built-in providers are deterministic stand-ins, not LLMs)\n");
 
-    // Primary local model is down; a cloud backup is healthy; a local
-    // fallback is healthy. Removing/downing the primary must not stop work.
+    // The primary is down and a cloud stand-in sits between the two local
+    // providers. Work continues, and it continues *locally*: losing local
+    // capacity is not a reason to widen who sees the data.
     let gateway = ModelGateway::new(vec![
         Box::new(DeterministicProvider::local("local-primary", Health::Down)),
         Box::new(DeterministicProvider::cloud(
@@ -282,48 +281,43 @@ fn cmd_model_check() {
     ]);
     println!("providers: {:?}", gateway.provider_ids());
 
-    let amber = ModelRequest {
-        task: "draft_outreach".into(),
-        prompt: "Draft a short note to Dr. Tan.".into(),
-        data_class: DataClass::Amber,
-        max_output_chars: 4096,
-    };
-    match gateway.complete(&amber) {
-        Ok((response, disclosure)) => {
-            println!("\n== Amber request ==");
-            println!(
-                "  primary down -> served by {} ({:?})",
-                response.provider_id, response.provider_trust
-            );
-            println!("  failover path: {:?}", disclosure.skipped);
+    for (label, data_class) in [
+        (
+            "Amber (business data about a named customer)",
+            DataClass::Amber,
+        ),
+        ("Red (the most sensitive class)", DataClass::Red),
+    ] {
+        let request = ModelRequest {
+            task: "draft_outreach".into(),
+            prompt: "Draft a short note to a customer.".into(),
+            data_class,
+            max_output_chars: 4096,
+        };
+        println!("\n== {label} ==");
+        match gateway.complete(&request) {
+            Ok((response, disclosure)) => {
+                println!(
+                    "  served by {} ({:?})",
+                    response.provider_id, response.provider_trust
+                );
+                for skip in &disclosure.skipped {
+                    println!("  skipped {}: {:?}", skip.provider_id, skip.reason);
+                }
+            }
+            Err(error) => println!("  denied: {error}"),
         }
-        Err(error) => println!("  unexpected: {error}"),
     }
 
-    let red = ModelRequest {
-        task: "classify_customer_pii".into(),
-        prompt: "<red-zone customer record>".into(),
-        data_class: DataClass::Red,
-        max_output_chars: 4096,
-    };
-    match gateway.complete(&red) {
-        Ok((response, disclosure)) => {
-            println!("\n== Red request ==");
-            println!(
-                "  cloud backup skipped for confidentiality; served locally by {} ({:?})",
-                response.provider_id, response.provider_trust
-            );
-            let leaked = disclosure.provider_trust != ProviderTrust::Local;
-            println!("  red data left the device: {leaked}");
-        }
-        Err(error) => println!("  Red request denied (no local provider): {error}"),
-    }
+    println!("\nA raw prompt reaches only a provider this build vouches for as");
+    println!("local (RFC 0004). A provider cannot claim that for itself, and a");
+    println!("cloud one is passed over before the data class is even consulted.");
+    println!("Reaching a public model at all takes a compiled projection the");
+    println!("owner previewed first — no such adapter exists yet.");
 
-    println!("\nModels are replaceable. Red data stays local. Output is a draft, never authority.");
-
-    // The providers this device actually routes to (model.json beside the
-    // vault), with live health — so "is my local model connected?" has a
-    // command-line answer that never claims more than it probed.
+    // The providers this device is actually configured to use, with live
+    // health, so "is my local model connected?" has a command-line answer
+    // that never claims more than it probed.
     println!("\n== Configured providers on this device ==");
     match workspace::provider_status(&data_dir()) {
         Ok(providers) => {

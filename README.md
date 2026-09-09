@@ -215,8 +215,12 @@ Model providers are deterministic stand-ins by default. An Experimental
 per-device Ollama adapter can be enabled in `model.json` beside the vault:
 it routes to a separate local process over loopback that this product does
 not sandbox, confine, or audit, and it claims nothing beyond loopback
-routing. Cloud adapters do not exist; caller-owned classification/provider
-self-reported trust must be removed before any real public egress. Workflow recovery is another runner over the same durable
+routing. Raw model requests are now local-only: a prompt reaches only a
+provider this build itself vouches for, a proof an outside adapter cannot
+construct, so neither a caller's data label nor a provider's self-reported
+trust can route protected data off the device. Reaching a public model at
+all requires a projection compiled by `crates/privacy` and previewed by the
+owner; no cloud adapter exists yet. Workflow recovery is another runner over the same durable
 directory, not replicated multi-machine failover. See
 [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) for the approved privacy
 implementation target.

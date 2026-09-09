@@ -200,9 +200,11 @@ fn red_data_may_be_served_by_the_local_ollama_provider_and_never_by_cloud() {
     assert_eq!(response.text, "Local answer.");
     assert_eq!(disclosure.skipped.len(), 1);
     assert_eq!(disclosure.skipped[0].provider_id, "cloud-first");
+    // Since RFC 0004 closed raw egress, an unvouched provider is passed over
+    // for being unvouched, before the data class is even consulted.
     assert_eq!(
         disclosure.skipped[0].reason,
-        SkipCause::RedDataConfidentiality
+        SkipCause::RawRequestIsLocalOnly
     );
     daemon.join().unwrap();
 }

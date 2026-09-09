@@ -1472,17 +1472,13 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 - [ ] **P3 | `apps/cli/src/` | `--root` flag so `sovereign ui` can run against a throwaway data directory.**
   Manual and browser testing currently overrides `HOME` to isolate data; a
   flag is honest and simpler. Keep the CLI pin tests (`cli_tests.rs`) green.
-- [ ] **P2 | `crates/consultant-playground/src/server.rs` | The write-timeout test flakes under load.**
-  `write_response_times_out_against_nonreading_peer` asserts the blocked write
-  returns between 4 and 7 seconds and gives its watchdog 7 seconds. Idle it
-  lands at ~5.0s — about two seconds of headroom — and it failed during this
-  session's gate run while a release build and an app bundling ran alongside
-  it (2026-09-10). A loaded CI runner will hit the same edge. Done when the
-  test no longer depends on wall-clock headroom that thin: drive the timeout
-  through the configured socket deadline rather than a fixed window, or widen
-  the watchdog and assert the ordering (returned before the watchdog, error
-  kind is TimedOut/WouldBlock) instead of a 4–7s band. It must still fail if
-  the write blocks forever.
+- [x] **P2 | `crates/consultant-playground/src/server.rs` | The write-timeout test flakes under load.**
+  It asserted the blocked write returned inside a 4–7s band with a 7s
+  watchdog; idle that lands at ~5.0s, and it failed twice during this
+  session's gate runs while a release build ran alongside it. Fixed
+  2026-09-10 by keying off `WRITE_BUDGET` and asserting the property that
+  matters — the write returns rather than blocking forever, and not before
+  the budget could elapse — instead of a band that measures machine load.
 
 - [ ] **P3 | `apps/cli/src/ui.rs` | Split `ui.rs` (1087 lines) along its concerns before it hits the limit.**
   Move the gauntlet and admission views out; `ui_mvp.rs` already holds the
