@@ -1,6 +1,6 @@
 # Playground 固定检索与教学建议契约
 
-**Revision 2 · 主线程独立审阅接受，接口Frozen；G04仍需独立卡及实际验收。**只覆盖S1-G04建议→S1-04；不宣称前置卡已完成。
+**Revision 2 · 主线程独立审阅接受，接口Frozen；G04已形成独立卡，仍需实际验收。**只覆盖S1-G04建议→S1-04；不宣称前置卡已完成。
 依据 [standalone-v2 Task 2](../../superpowers/plans/2026-08-14-consultant-playground-standalone-v2-implementation.md)、
 [现有domain/DTO契约](playground-contract.md)与[统一catalog](playground-catalog-contract.md)。
 主线程分派/独立验收；真实业务与AI后续Goal不变，不要求自动S0 harness。
@@ -98,9 +98,9 @@ JSON字段名/声明顺序与上块一致，Option::None显式为null，不skip/
 | guidance_review_scoping_call | Consider the recorded scoping call as a suggested next step. | 将已记录的需求范围沟通作为建议的下一步。 |
 | guidance_example_changes_complete | The two changes in this example are complete. No client call has been scheduled or made. | 本示例的两项修改已完成。尚未安排或进行任何客户沟通。 |
 
-## 先行S1-G04窄门建议（供主线程冻结；未创建卡）
+## 先行S1-G04窄门契约
 
-G04必须在S1-03实际接受、先前gate writer停止后独立执行并接受；不能与当前G03
+[S1-G04卡](cards/S1-G04.md) 必须在S1-03实际接受、先前gate writer停止后独立执行并接受；不能与当前G03
 并发争写，也不能让S1-04放宽自己的验收。G04未来精确写集仅：
 
 - `crates/consultant-playground/tests/support/boundary.rs`
