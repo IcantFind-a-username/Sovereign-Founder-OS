@@ -49,18 +49,40 @@ cd apps/desktop
 # shellcheck disable=SC2086  # deliberately word-split: the flag may be empty
 npx --yes @tauri-apps/cli@2 build $TAURI_FLAG
 
+APP_BUNDLE="target/$PROFILE/bundle/macos/$PRODUCT.app"
+
+# Seal the bundle with an ad-hoc signature.
+#
+# Without this the only signature present is the one the linker put on the
+# inner executable, so the bundle reports "code has no resources but signature
+# indicates they must be present": Info.plist is unbound and no resources are
+# sealed. Gatekeeper treats that as a broken signature and tells the user the
+# app is *damaged*, which is both alarming and untrue. Signing inner binaries
+# first and the bundle last is the supported order; `--deep` is deprecated for
+# signing.
+#
+# Ad-hoc is not Developer ID: a downloaded copy still needs one right-click ->
+# Open, or the quarantine flag cleared. It only makes the bundle internally
+# valid so the failure is the honest "unidentified developer" one.
+echo "==> ad-hoc signing the bundle"
+codesign --force --sign - --timestamp=none "$APP_BUNDLE/Contents/MacOS/sovereign"
+codesign --force --sign - --timestamp=none "$APP_BUNDLE"
+codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+
 if [ -n "$DMG" ]; then
   # Built with hdiutil rather than Tauri's bundler on purpose: that one styles
   # the disk-image window through Finder, and the AppleScript step hangs
   # forever unless the calling shell already holds Automation access to
   # Finder. hdiutil needs no permission and produces the same drag-to-install
   # image: the app plus a shortcut to /Applications.
-  APP_PATH="target/$PROFILE/bundle/macos/$PRODUCT.app"
   DMG_PATH="target/$PROFILE/bundle/dmg/$PRODUCT.dmg"
   STAGE=$(mktemp -d)
   trap 'rm -rf "$STAGE"' EXIT
   echo "==> building the disk image"
-  cp -R "$APP_PATH" "$STAGE/"
+  # `ditto`, not `cp -R`: it preserves the extended attributes and resource
+  # layout a signed bundle depends on. `cp -R` can invalidate the signature
+  # it just took to produce.
+  ditto "$APP_BUNDLE" "$STAGE/$PRODUCT.app"
   ln -s /Applications "$STAGE/Applications"
   mkdir -p "$(dirname "$DMG_PATH")"
   rm -f "$DMG_PATH"
@@ -72,6 +94,6 @@ echo
 echo "Bundles:"
 find target -maxdepth 4 \( -name '*.dmg' -o -name '*.app' \) -print 2>/dev/null | sed 's/^/  /'
 echo
-echo "The bundle is unsigned: macOS quarantines a downloaded copy until you"
-echo "right-click -> Open once, or clear the flag with"
+echo "Ad-hoc signed, not notarized: macOS quarantines a copy that arrived over"
+echo "the network until you right-click -> Open once, or clear the flag with"
 echo "  xattr -dr com.apple.quarantine '<path to the .app>'"

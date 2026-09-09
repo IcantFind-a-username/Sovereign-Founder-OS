@@ -58,9 +58,26 @@ headers with it. Keeping it out of the core workspace means
 the dependency audit in CI keep operating on the runtime crates alone. CI
 does not build this crate; it is built on the machine that ships a release.
 
-## Not signed or notarized yet
+## Signing: ad-hoc today, not notarized
 
-The bundle is unsigned. macOS will refuse a downloaded copy until you clear
-the quarantine attribute or right-click → Open. Signing, notarization,
-updates, and uninstall are separate release work with their own acceptance;
-see `ROADMAP.md`.
+The build script ad-hoc signs the bundle, sealing its resources and binding
+`Info.plist`. That is not cosmetic. Without it the only signature present is
+the one the linker leaves on the inner executable, and macOS reports the
+bundle as **damaged** — an alarming and untrue message for what is really an
+unsigned app. `codesign --verify --deep --strict` now passes.
+
+What remains is distribution trust, and no amount of local signing supplies
+it: the bundle carries no Developer ID and no notarization ticket, so a copy
+that arrived over the network is quarantined and Gatekeeper refuses it until
+you open it once by hand:
+
+```bash
+# either right-click → Open the first time, or:
+xattr -dr com.apple.quarantine "/Applications/Sovereign Founder OS.app"
+```
+
+Developer ID signing, notarization, stapling, updates, and uninstall are
+separate release work with their own acceptance; see `ROADMAP.md`. Note also
+that the DMG is staged with `ditto` rather than `cp -R`: the latter does not
+preserve the attributes a signed bundle depends on and silently invalidates
+the signature it was just given.
