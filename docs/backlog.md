@@ -353,13 +353,15 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution and acceptance](handoff/codex/reports/S1-05-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G06 — Admit closed embedded assets.** `lane:codex` IN PROGRESS (Astra architecture; candidate1, no failures).
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G06 — Admit closed embedded assets.** `lane:codex` Accepted (Astra architecture; candidate1, no failures).
   Definition and done criteria: [S1-G06](handoff/codex/cards/S1-G06.md).
   Base `fecab4c824c90e986a81be802f1fefd402905b9e`; card revision1 blob
   `96b29a3fcdfd988035137f17b554bb994b725819`; exact five test files per card.
   S1-05 accepted in fecab4c. Fresh founder_architect implements, independent
   strong reviewer accepts; logs .harness/s1-g06/. Preserve extraction baseline
   and true new-stage RED/GREEN; runtime token/time budget unavailable.
+  Independent review accepted; final full scoped gate passed.
+  [Evidence](handoff/codex/reports/S1-G06-supervised.md).
   Strong implementation and independent strong review precede the Luna UI card.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` `needs:fable`

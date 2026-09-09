@@ -11,6 +11,8 @@ pub(crate) const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_co
 pub(crate) const EXPECTED_LIB_CATALOG_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;";
 
 pub(crate) const EXPECTED_LIB_HTTP_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;";
+pub(crate) const EXPECTED_LIB_ASSETS_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;\n// Compile-time assets follow the pure handler.\n#[cfg_attr(not(test), allow(dead_code))]\nmod assets;\n";
+pub(crate) const ASSETS_PRODUCTION: &str = include_str!("fixtures/assets-production.rs.txt");
 pub(crate) const HTTP_PRODUCTION: &str = include_str!("fixtures/http-production.rs.txt");
 
 pub(crate) const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
@@ -123,6 +125,8 @@ pub(crate) enum SourceBoundaryKind {
     CatalogTestModuleShape,
     HttpProductionShape,
     HttpTestModuleShape,
+    AssetsProductionShape,
+    AssetsTestModuleShape,
     UnexpectedSourceFile,
 }
 
@@ -155,6 +159,7 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
         Some("domain.rs") => validate_domain_shape(&tokens),
         Some("catalog.rs") => validate_catalog_shape(&tokens),
         Some("http.rs") => validate_http_shape(&tokens),
+        Some("assets.rs") => validate_assets_shape(&tokens),
         Some(name) => Err(SourceBoundaryError::new(
             SourceBoundaryKind::UnexpectedSourceFile,
             format!("unexpected Task 1 source file `{name}`"),
@@ -163,6 +168,21 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
             SourceBoundaryKind::UnexpectedSourceFile,
             "source path has no UTF-8 file name",
         )),
+    }
+}
+
+fn validate_assets_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production =
+        strip_exact_test_module(tokens, "assets", SourceBoundaryKind::AssetsTestModuleShape)?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(ASSETS_PRODUCTION).expect("complete asset fixture must lex");
+    if production == expected {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::AssetsProductionShape,
+            token_mismatch("assets.rs production", &expected, production),
+        ))
     }
 }
 
@@ -235,7 +255,8 @@ fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
     let expected = RustLexer::lex(EXPECTED_LIB_SHAPE).expect("expected lib shape must lex");
     let catalog = RustLexer::lex(EXPECTED_LIB_CATALOG_SHAPE).expect("catalog lib shape must lex");
     let http = RustLexer::lex(EXPECTED_LIB_HTTP_SHAPE).expect("HTTP lib shape must lex");
-    if tokens == expected || tokens == catalog || tokens == http {
+    let assets = RustLexer::lex(EXPECTED_LIB_ASSETS_SHAPE).expect("asset lib shape must lex");
+    if tokens == expected || tokens == catalog || tokens == http || tokens == assets {
         return Ok(());
     }
     let module = RustLexer::lex("mod domain;").expect("expected module shape must lex");

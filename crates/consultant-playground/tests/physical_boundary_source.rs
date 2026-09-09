@@ -16,130 +16,31 @@ mod manifest;
 mod production_sources;
 #[path = "support/rust_lexer.rs"]
 mod rust_lexer;
+#[path = "support/source_closure.rs"]
+mod source_closure;
 #[path = "support/source_root.rs"]
 mod source_root;
 #[path = "support/symlink_fixture.rs"]
 mod symlink_fixture;
 
 use boundary::{
-    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, CATALOG_GUIDANCE_PRODUCTION,
-    CATALOG_PRODUCTION, EXPECTED_DOMAIN_PRODUCTION, EXPECTED_LIB_CATALOG_SHAPE,
-    EXPECTED_LIB_HTTP_SHAPE, EXPECTED_LIB_SHAPE, HTTP_PRODUCTION, READ_MODEL_DOMAIN_PRODUCTION,
-    TEACHING_DOMAIN_PRODUCTION,
+    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, CATALOG_PRODUCTION,
+    EXPECTED_DOMAIN_PRODUCTION, READ_MODEL_DOMAIN_PRODUCTION,
 };
 use manifest::{crate_root, manifest_boundary, ManifestFixture};
 use production_sources::production_sources;
 use rust_lexer::{RustLexer, RustToken};
+use source_closure::{
+    assert_source_rejection, asset_source_fixture, catalog_source_fixture, source_closure_boundary,
+    SourceClosureError,
+};
 use source_root::SourceRootError;
-use std::collections::BTreeSet;
 
 #[test]
 fn task_one_production_source_closure_has_no_persistence_or_product_surface() {
     source_closure_boundary(&crate_root().join("src")).expect("production source closure");
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum SourceClosureError {
-    Root(SourceRootError),
-    Inventory,
-    LibInventoryPair,
-    Source(SourceBoundaryKind),
-    Unreadable,
-}
-
-// The real inventory and adversarial fixtures use this same boundary. Traversal
-// and symlink handling remain owned by production_sources/source_root.
-fn source_closure_boundary(source_root: &Path) -> Result<(), SourceClosureError> {
-    let actual = production_sources(source_root).map_err(SourceClosureError::Root)?;
-    let catalog = actual.contains(&source_root.join("catalog.rs"));
-    let http = actual.contains(&source_root.join("http.rs"));
-    if http && !catalog {
-        return Err(SourceClosureError::Inventory);
-    }
-    let mut expected = BTreeSet::from([source_root.join("domain.rs"), source_root.join("lib.rs")]);
-    if catalog {
-        expected.insert(source_root.join("catalog.rs"));
-    }
-    if http {
-        expected.insert(source_root.join("http.rs"));
-    }
-    if actual != expected {
-        return Err(SourceClosureError::Inventory);
-    }
-    for path in actual {
-        let source = fs::read_to_string(&path).map_err(|_| SourceClosureError::Unreadable)?;
-        source_boundary(&path, &source).map_err(|error| SourceClosureError::Source(error.kind))?;
-        if path == source_root.join("lib.rs") {
-            let expected_lib = if http {
-                EXPECTED_LIB_HTTP_SHAPE
-            } else if catalog {
-                EXPECTED_LIB_CATALOG_SHAPE
-            } else {
-                EXPECTED_LIB_SHAPE
-            };
-            if RustLexer::lex(&source).expect("validated lib must lex")
-                != RustLexer::lex(expected_lib).expect("frozen lib must lex")
-            {
-                return Err(SourceClosureError::LibInventoryPair);
-            }
-        }
-    }
-    Ok(())
-}
-
-fn catalog_source_fixture(
-    catalog_file: bool,
-    catalog_lib: bool,
-    http_file: bool,
-    http_lib: bool,
-) -> ManifestFixture {
-    let fixture = ManifestFixture::new("");
-    let source_root = fixture.root.join("src");
-    fs::write(
-        source_root.join("lib.rs"),
-        if http_lib {
-            EXPECTED_LIB_HTTP_SHAPE
-        } else if catalog_lib {
-            EXPECTED_LIB_CATALOG_SHAPE
-        } else {
-            EXPECTED_LIB_SHAPE
-        },
-    )
-    .expect("fixture lib");
-    fs::write(
-        source_root.join("domain.rs"),
-        format!(
-            "{READ_MODEL_DOMAIN_PRODUCTION}\n{}\n#[cfg(test)] mod tests {{}}",
-            if http_file {
-                TEACHING_DOMAIN_PRODUCTION
-            } else {
-                ""
-            }
-        ),
-    )
-    .expect("fixture domain");
-    if catalog_file {
-        fs::write(
-            source_root.join("catalog.rs"),
-            format!(
-                "{}\n#[cfg(test)] mod tests {{}}",
-                if http_file {
-                    CATALOG_GUIDANCE_PRODUCTION
-                } else {
-                    CATALOG_PRODUCTION
-                }
-            ),
-        )
-        .expect("fixture catalog");
-    }
-    if http_file {
-        fs::write(
-            source_root.join("http.rs"),
-            format!("{HTTP_PRODUCTION}\n#[cfg(test)] mod tests {{}}"),
-        )
-        .expect("fixture HTTP");
-    }
-    fixture
+    let assets = asset_source_fixture();
+    source_closure_boundary(&assets.root.join("src")).expect("next asset source closure");
 }
 
 #[test]
@@ -1150,15 +1051,4 @@ fn action_fixture_with_extra(extra: &str) -> String {
     let marker = "#[cfg(test)]\nmod tests";
     let offset = source.find(marker).expect("fixture wrapper");
     format!("{}\n{extra}\n{}", &source[..offset], &source[offset..])
-}
-
-fn assert_source_rejection(name: &str, path: &Path, source: &str, expected: SourceBoundaryKind) {
-    let error = match source_boundary(path, source) {
-        Ok(()) => panic!("source mutation `{name}` was accepted"),
-        Err(error) => error,
-    };
-    assert_eq!(
-        error.kind, expected,
-        "source mutation `{name}` hit the wrong guard: {error}"
-    );
 }

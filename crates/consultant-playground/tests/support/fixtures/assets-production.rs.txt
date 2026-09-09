@@ -1,0 +1,35 @@
+use crate::http::AssetRoute;
+
+pub(crate) struct EmbeddedAsset {
+    pub(crate) content_type: &'static str,
+    pub(crate) bytes: &'static [u8],
+}
+
+pub(crate) fn asset(route: AssetRoute) -> EmbeddedAsset {
+    match route {
+        AssetRoute::Index => EmbeddedAsset {
+            content_type: "text/html; charset=utf-8",
+            bytes: include_bytes!("../assets/index.html"),
+        },
+        AssetRoute::Styles => EmbeddedAsset {
+            content_type: "text/css; charset=utf-8",
+            bytes: include_bytes!("../assets/styles.css"),
+        },
+        AssetRoute::I18n => EmbeddedAsset {
+            content_type: "text/javascript; charset=utf-8",
+            bytes: include_bytes!("../assets/i18n.js"),
+        },
+        AssetRoute::App => EmbeddedAsset {
+            content_type: "text/javascript; charset=utf-8",
+            bytes: include_bytes!("../assets/app.js"),
+        },
+        AssetRoute::ConsultantUi => EmbeddedAsset {
+            content_type: "text/javascript; charset=utf-8",
+            bytes: include_bytes!("../assets/consultant-ui.js"),
+        },
+        AssetRoute::Favicon => EmbeddedAsset {
+            content_type: "image/svg+xml",
+            bytes: include_bytes!("../assets/favicon.svg"),
+        },
+    }
+}
