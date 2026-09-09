@@ -166,6 +166,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # file. Cheap to scan for, and the way it happens is someone pasting one in
   # while debugging and not taking it out.
   run_step "owner-effect-canaries" ./scripts/check-owner-effect-canaries.sh
+  # Each secret-bearing type has a hand-written Debug and a test for it. This
+  # is what keeps that true for the next one, which will otherwise reach for
+  # derive because every other struct in the file has it.
+  run_step "owner-effect-value-free" ./scripts/check-owner-effect-value-free.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
