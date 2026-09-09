@@ -276,8 +276,11 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution evidence](handoff/codex/reports/S1-G03-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
+- [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
   Definition and done criteria: [S1-03](handoff/codex/cards/S1-03.md).
+  Base `1122087691b3adde60c1db178f0af3d44daee8c5`; card blob
+  `7799e89b394ece03b75f9e9058036e3da754dd11`. New catalog.rs plus lib.rs only.
+  G03 accepted in `4274b13`; a fresh worker context implements this card.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`
