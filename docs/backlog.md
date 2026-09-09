@@ -440,9 +440,12 @@ while the controller routes eligible design/review cards to the strong role.
   Next S2-00 design; fixed S1 does not complete fullMVP.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S2-00](handoff/codex/milestones.md).
-  Design only; release implementation cards after the linked stage is frozen.
+- [ ] **P1 | `docs/handoff/codex/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` claimed; Astra architect.
+  Definition and done criteria: [S2-00](handoff/codex/cards/S2-00.md).
+  Revision1 blob9a14ba3d45295db32fa16bf1bc66ea16232176f1;
+  base ac4e09d759c5f1beebd8e3837d06ddd50d98fb59; design attempt1, no implementation failures.
+  [Admission and ownership](handoff/codex/reports/S2-00-supervised.md).
+  Design only; independent design review precedes executable Luna card registration.
 
 - [ ] **P2 | `rfcs/, docs/handoff/codex/` | S3-00 — Freeze synthetic employee execution contracts.** `lane:codex` `needs:fable`
   Definition and done criteria: [S3-00](handoff/codex/milestones.md).
