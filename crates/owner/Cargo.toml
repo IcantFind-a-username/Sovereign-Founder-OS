@@ -24,3 +24,7 @@ uuid = { workspace = true }
 [[test]]
 name = "fixture_boundary"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "fixture_session"
+required-features = ["owner-effect-fixture"]
