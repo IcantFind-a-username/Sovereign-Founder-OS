@@ -65,6 +65,13 @@ else
   echo "FAIL  hmac must be taken with default-features = false"
   fail=1
 fi
+checked=$((checked + 1))
+if grep -Fq 'redb = { version = "=4.1.0"' crates/authority/Cargo.toml; then
+  echo "ok    redb is pinned with ="
+else
+  echo "FAIL  crates/authority/Cargo.toml must pin redb as =4.1.0"
+  fail=1
+fi
 
 # --- 2. the lock holds those versions --------------------------------------
 echo "== lock file"
@@ -121,12 +128,15 @@ default_tree=$(cargo tree -p sovereign-authority -e normal --locked 2>&1) || {
   echo "check-owner-effect-crypto-profile: cargo tree (default) failed" >&2
   exit 2
 }
-if printf '%s' "$default_tree" | grep -qE '^[^a-zA-Z]*hmac v'; then
-  echo "FAIL  hmac is in the default dependency graph; it must be fixture-only"
-  fail=1
-else
-  echo "ok    hmac is absent from a default build"
-fi
+for crate in hmac redb; do
+  checked=$((checked + 1))
+  if printf '%s' "$default_tree" | grep -qE "^[^a-zA-Z]*$crate v"; then
+    echo "FAIL  $crate is in the default dependency graph; it must be fixture-only"
+    fail=1
+  else
+    echo "ok    $crate is absent from a default build"
+  fi
+done
 
 echo
 if [ "$checked" -lt 8 ]; then

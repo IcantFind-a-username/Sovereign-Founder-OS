@@ -16,6 +16,7 @@ pub mod bootstrap;
 pub mod listener;
 pub mod process_lock;
 pub mod protocol;
+pub mod store;
 pub mod supervisor;
 
 /// The hidden subcommand the fixture re-execs itself as. Named here so the
@@ -83,6 +84,21 @@ pub fn run_owner_effect_fixture_broker(
         }
         Err(process_lock::LockError::Unavailable) => {
             return Err(emit(diagnostics, protocol::Diagnostic::LockUnavailable))
+        }
+    };
+    // Only with the lock in hand. `OwnedStore::open` takes a `&HeldLock` and
+    // has no other constructor, so this ordering cannot be skipped by a later
+    // caller who did not read the comment.
+    let _store = match store::OwnedStore::open(root.path(), &_lock) {
+        Ok(store) => store,
+        Err(store::StoreError::AlreadyOpen) => {
+            return Err(emit(
+                diagnostics,
+                protocol::Diagnostic::BrokerAlreadyRunning,
+            ))
+        }
+        Err(store::StoreError::Unavailable) => {
+            return Err(emit(diagnostics, protocol::Diagnostic::StoreUnavailable))
         }
     };
     Err(BrokerExit::NotImplemented)

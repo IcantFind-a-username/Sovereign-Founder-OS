@@ -17,7 +17,7 @@ default = []
 fault-injection = []
 # RFC 0006's synthetic broker. Non-default for the same reason: a default
 # build must contain no broker mode and no entry point.
-owner-effect-fixture = ["dep:hmac"]
+owner-effect-fixture = ["dep:hmac", "dep:redb"]
 
 [dependencies]
 hex = { workspace = true }
@@ -26,6 +26,9 @@ hex = { workspace = true }
 # resolved graph is exactly the reviewed one. Default features off — hmac's
 # default pulls std conveniences this does not use.
 hmac = { version = "=0.12.1", default-features = false, optional = true }
+# Exact-pinned and optional, like hmac. Redb is ACID: it gives the fixture a
+# transactional store, and nothing about authenticity or encryption.
+redb = { version = "=4.1.0", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -56,4 +59,8 @@ required-features = ["owner-effect-fixture"]
 
 [[test]]
 name = "broker_process_lock"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "broker_store"
 required-features = ["owner-effect-fixture"]

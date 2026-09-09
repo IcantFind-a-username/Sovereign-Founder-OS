@@ -45,6 +45,8 @@ pub enum Diagnostic {
     BrokerAlreadyRunning,
     /// Exclusivity could not be established, which is not permission.
     LockUnavailable,
+    /// The store could not be opened; ownership is unknown, not granted.
+    StoreUnavailable,
 }
 
 impl Diagnostic {
@@ -63,6 +65,7 @@ impl Diagnostic {
             Diagnostic::SupervisorUnauthenticated => "E-SUPERVISOR-UNAUTHENTICATED",
             Diagnostic::BrokerAlreadyRunning => "E-BROKER-ALREADY-RUNNING",
             Diagnostic::LockUnavailable => "E-LOCK-UNAVAILABLE",
+            Diagnostic::StoreUnavailable => "E-STORE-UNAVAILABLE",
         }
     }
 }
