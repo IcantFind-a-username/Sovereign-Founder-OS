@@ -425,12 +425,13 @@ while the controller routes eligible design/review cards to the strong role.
   32transport tests/full gate green; exact capture and cleanup evidence in
   [report](handoff/codex/reports/S1-10A-supervised.md). Next S1-10.
 
-- [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` CLAIMED; Luna attempt1, zero failures.
+- [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` CLAIMED; Luna attempt2 next, one substantive failure.
   Definition and done criteria: [S1-10](handoff/codex/cards/S1-10.md).
   Revision3 blob874f76dc1c1277a7f5cc31ee1f1414c9c04ba836, sourcebase73cd9b2;
   dispatch base is this claim commit. Four-file write set frozen in card;
   accepted helper read-only. Budget30minutes/3targeted repair cycles.
-  Logs .harness/s1-10/attempt1/; all prior writers stopped.
+  Attempt1 rejected; retained [review](handoff/codex/reports/S1-10-supervised.md).
+  Logs .harness/s1-10/attempt2/; all prior writers stopped.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` Frozen; waits for S1-10.
