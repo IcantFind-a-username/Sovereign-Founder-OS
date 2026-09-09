@@ -409,8 +409,14 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S1-08](handoff/codex/cards/S1-08.md) — depends on S1-09 real CLI acceptance.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` `needs:fable`
+- [ ] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` IN PROGRESS (Luna medium attempt1, zero failures)
   Definition and done criteria: [S1-09](handoff/codex/cards/S1-09.md) — depends on S1-07.
+  Base `961db08a50ab60c1408a1c4049797b533b9a2317`, revision1 card blob
+  `e95a914701abcdbc5cdf705cf21e9f0cafd69386`; four exact files per card.
+  S1-07 accepted b7caaad; founder_worker Luna medium + independent Astra review.
+  30min/three targeted cycles per attempt, two failures then Astra.
+  Logs .harness/s1-09/; root owns recorded release process/HTTP smoke.
+  Existing CLI baseline saved baseline/sovereign and baseline-ui-help.* there.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` `needs:fable`
