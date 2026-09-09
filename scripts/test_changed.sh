@@ -170,6 +170,11 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # is what keeps that true for the next one, which will otherwise reach for
   # derive because every other struct in the file has it.
   run_step "owner-effect-value-free" ./scripts/check-owner-effect-value-free.sh
+  # The whole fixture is behind non-default features, which is an arrangement
+  # rather than a guarantee: one crate naming the feature in its defaults puts
+  # all of it in the release binary, and nothing about a normal day would show
+  # it. This checks the artefact.
+  run_step "owner-effect-boundary" ./scripts/check-owner-effect-boundary.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
