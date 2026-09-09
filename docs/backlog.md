@@ -302,11 +302,14 @@ while the controller routes eligible design/review cards to the strong role.
   passed on final gate. [Execution evidence](handoff/codex/reports/S1-G04-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
+- [x] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` DONE (attempt 1 accepted, no substantive failures)
   Definition and done criteria: [S1-04](handoff/codex/cards/S1-04.md).
   Base `7deb0eeed8273ac02d6a2cc0a84710470b0cbfc3`; card blob
   `55c5aa6873b92c9219448f9d5ab8dc19f3467e08`; domain.rs + catalog.rs only.
-  G04 accepted in `59c0d7e`; fresh worker context.
+  G04 accepted in `59c0d7e`; fresh worker `/root/s1_04_luna`.
+  Controller repaired approved fixture rustfmt mismatch and strengthened two
+  assertions; independent strong reviewer accepted. Full workspace/scoped gate
+  passed (process56333). [Evidence and RED limitation](handoff/codex/reports/S1-04-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G05 — Freeze and admit the pure HTTP boundary.** `lane:codex` Frozen architecture task; depends on S1-04 acceptance.

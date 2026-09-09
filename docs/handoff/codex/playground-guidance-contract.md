@@ -1,6 +1,6 @@
 # Playground 固定检索与教学建议契约
 
-**Revision 2 · 主线程独立审阅接受，接口Frozen；G04已形成独立卡，仍需实际验收。**只覆盖S1-G04建议→S1-04；不宣称前置卡已完成。
+**Revision 3 · 主线程独立审阅接受，接口Frozen；G04已形成独立卡，仍需实际验收。**只覆盖S1-G04建议→S1-04；不宣称前置卡已完成。
 依据 [standalone-v2 Task 2](../../superpowers/plans/2026-08-14-consultant-playground-standalone-v2-implementation.md)、
 [现有domain/DTO契约](playground-contract.md)与[统一catalog](playground-catalog-contract.md)。
 主线程分派/独立验收；真实业务与AI后续Goal不变，不要求自动S0 harness。
@@ -36,9 +36,17 @@ DTO及方法crate可见，所有字段/内部类型私有。派生Serialize，�
 
 ```rust
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
-struct ReportingHit { section_key: &'static str, fact_key: &'static str }
+struct ReportingHit {
+    section_key: &'static str,
+    fact_key: &'static str,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
-struct ReportingSearch { query_key: &'static str, hits: [ReportingHit; 2] }
+struct ReportingSearch {
+    query_key: &'static str,
+    hits: [ReportingHit; 2],
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 struct Guidance {
     next_step_key: &'static str,
@@ -46,6 +54,7 @@ struct Guidance {
     detail_key: Option<&'static str>,
     completion_key: Option<&'static str>,
 }
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
 pub(crate) struct PlaygroundTeachingReadModel {
     profile: &'static str,
@@ -54,25 +63,48 @@ pub(crate) struct PlaygroundTeachingReadModel {
     search: ReportingSearch,
     guidance: Guidance,
 }
+
 impl PlaygroundSession {
     pub(crate) fn teaching_read_model(&self) -> PlaygroundTeachingReadModel {
         let guidance = if self.graph.offer.price_usd_cents != 350_000 {
-            Guidance { next_step_key: "guidance_correct_price",
-                suggested_action: Some("CorrectOfferPrice"), detail_key: None, completion_key: None }
+            Guidance {
+                next_step_key: "guidance_correct_price",
+                suggested_action: Some("CorrectOfferPrice"),
+                detail_key: None,
+                completion_key: None,
+            }
         } else if self.graph.relationship.stage == RelationshipStage::Lead {
-            Guidance { next_step_key: "guidance_promote_customer",
-                suggested_action: Some("PromoteAcmeToCustomer"), detail_key: None, completion_key: None }
+            Guidance {
+                next_step_key: "guidance_promote_customer",
+                suggested_action: Some("PromoteAcmeToCustomer"),
+                detail_key: None,
+                completion_key: None,
+            }
         } else {
-            Guidance { next_step_key: "guidance_review_scoping_call", suggested_action: None,
+            Guidance {
+                next_step_key: "guidance_review_scoping_call",
+                suggested_action: None,
                 detail_key: Some("thirty_minute_scoping_call"),
-                completion_key: Some("guidance_example_changes_complete") }
+                completion_key: Some("guidance_example_changes_complete"),
+            }
         };
         PlaygroundTeachingReadModel {
-            profile: "synthetic_playground", real_data_enabled: false, persistence: "none",
-            search: ReportingSearch { query_key: "reporting_search_query", hits: [
-                ReportingHit { section_key: "offer_label", fact_key: "reporting_clarity_sprint" },
-                ReportingHit { section_key: "discovery_label", fact_key: "weekly_reporting_takes_six_hours" },
-            ] },
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            search: ReportingSearch {
+                query_key: "reporting_search_query",
+                hits: [
+                    ReportingHit {
+                        section_key: "offer_label",
+                        fact_key: "reporting_clarity_sprint",
+                    },
+                    ReportingHit {
+                        section_key: "discovery_label",
+                        fact_key: "weekly_reporting_takes_six_hours",
+                    },
+                ],
+            },
             guidance,
         }
     }
@@ -139,3 +171,6 @@ git diff --check
 复用内部graph/semantic key/serde/read_model、统一catalog、RustLexer/boundary/
 source closure与test_changed；无检索框架/JSON工具/新依赖，IO/模型/产品授权边界不变。
 复用以上，禁止重新实现同类工具；需要新工具先在简报回复中申报。
+
+Revision 3只将已批准teaching代码块规范化为rustfmt输出（空白与尾逗号），
+不改变字段、分支、值或动作。修复由原固定fixture生成，不从产品候选刷新expected。

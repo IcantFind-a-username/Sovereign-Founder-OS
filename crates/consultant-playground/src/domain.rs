@@ -162,6 +162,81 @@ impl PlaygroundSession {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+struct ReportingHit {
+    section_key: &'static str,
+    fact_key: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+struct ReportingSearch {
+    query_key: &'static str,
+    hits: [ReportingHit; 2],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+struct Guidance {
+    next_step_key: &'static str,
+    suggested_action: Option<&'static str>,
+    detail_key: Option<&'static str>,
+    completion_key: Option<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+pub(crate) struct PlaygroundTeachingReadModel {
+    profile: &'static str,
+    real_data_enabled: bool,
+    persistence: &'static str,
+    search: ReportingSearch,
+    guidance: Guidance,
+}
+
+impl PlaygroundSession {
+    pub(crate) fn teaching_read_model(&self) -> PlaygroundTeachingReadModel {
+        let guidance = if self.graph.offer.price_usd_cents != 350_000 {
+            Guidance {
+                next_step_key: "guidance_correct_price",
+                suggested_action: Some("CorrectOfferPrice"),
+                detail_key: None,
+                completion_key: None,
+            }
+        } else if self.graph.relationship.stage == RelationshipStage::Lead {
+            Guidance {
+                next_step_key: "guidance_promote_customer",
+                suggested_action: Some("PromoteAcmeToCustomer"),
+                detail_key: None,
+                completion_key: None,
+            }
+        } else {
+            Guidance {
+                next_step_key: "guidance_review_scoping_call",
+                suggested_action: None,
+                detail_key: Some("thirty_minute_scoping_call"),
+                completion_key: Some("guidance_example_changes_complete"),
+            }
+        };
+        PlaygroundTeachingReadModel {
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            search: ReportingSearch {
+                query_key: "reporting_search_query",
+                hits: [
+                    ReportingHit {
+                        section_key: "offer_label",
+                        fact_key: "reporting_clarity_sprint",
+                    },
+                    ReportingHit {
+                        section_key: "discovery_label",
+                        fact_key: "weekly_reporting_takes_six_hours",
+                    },
+                ],
+            },
+            guidance,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{PlaygroundAction, PlaygroundSession, RelationshipStage, SemanticKey};
@@ -389,5 +464,138 @@ mod tests {
             SemanticKey::ThirtyMinuteScopingCall => 3,
         });
         assert_eq!(ordinals, [0, 1, 2, 3]);
+    }
+
+    fn expected_reporting_search() -> serde_json::Value {
+        serde_json::json!({
+            "query_key": "reporting_search_query",
+            "hits": [
+                {"section_key": "offer_label", "fact_key": "reporting_clarity_sprint"},
+                {"section_key": "discovery_label", "fact_key": "weekly_reporting_takes_six_hours"}
+            ]
+        })
+    }
+
+    #[test]
+    fn teaching_guidance_matches_all_four_reachable_states() {
+        let expected = [
+            (
+                "guidance_correct_price",
+                Some("CorrectOfferPrice"),
+                None,
+                None,
+            ),
+            (
+                "guidance_correct_price",
+                Some("CorrectOfferPrice"),
+                None,
+                None,
+            ),
+            (
+                "guidance_promote_customer",
+                Some("PromoteAcmeToCustomer"),
+                None,
+                None,
+            ),
+            (
+                "guidance_review_scoping_call",
+                None,
+                Some("thirty_minute_scoping_call"),
+                Some("guidance_example_changes_complete"),
+            ),
+        ];
+        for (session, (next, action, detail, completion)) in
+            reachable_states().into_iter().zip(expected)
+        {
+            let value = serde_json::to_value(session.teaching_read_model())
+                .expect("teaching DTO serializes");
+            assert_eq!(
+                value["guidance"],
+                serde_json::json!({
+                    "next_step_key": next, "suggested_action": action,
+                    "detail_key": detail, "completion_key": completion,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn reporting_search_is_fixed_and_teaching_reads_preserve_session() {
+        let initial = PlaygroundSession::new().teaching_read_model();
+        for session in reachable_states() {
+            let before = session;
+            let first = serde_json::to_value(session.teaching_read_model())
+                .expect("teaching DTO serializes");
+            let second = serde_json::to_value(session.teaching_read_model())
+                .expect("teaching DTO serializes");
+            assert_eq!(first, second);
+            assert_eq!(first["search"], expected_reporting_search());
+            let mut searched = session;
+            searched.apply(PlaygroundAction::ShowReportingSearch);
+            assert_eq!(
+                serde_json::to_value(searched.teaching_read_model())
+                    .expect("teaching DTO serializes"),
+                first
+            );
+            assert_eq!(searched, before);
+            searched.apply(PlaygroundAction::Reset);
+            assert_eq!(searched.teaching_read_model(), initial);
+        }
+    }
+
+    #[test]
+    fn teaching_read_model_serializes_exact_shape() {
+        let value = serde_json::to_value(PlaygroundSession::new().teaching_read_model())
+            .expect("teaching DTO serializes");
+        let serde_json::Value::Object(root) = value else {
+            panic!("teaching DTO must be an object")
+        };
+        assert_eq!(root.len(), 5);
+        assert_eq!(root["profile"], "synthetic_playground");
+        assert_eq!(root["real_data_enabled"], false);
+        assert_eq!(root["persistence"], "none");
+        assert_eq!(root["search"], expected_reporting_search());
+        assert_eq!(root["guidance"].as_object().map(|o| o.len()), Some(4));
+    }
+
+    #[test]
+    fn teaching_output_keys_resolve_once_in_unified_catalog() {
+        let catalog_value =
+            serde_json::to_value(crate::catalog::CATALOG).expect("catalog serializes");
+        let catalog_keys: Vec<_> = catalog_value
+            .as_array()
+            .expect("catalog is an array")
+            .iter()
+            .map(|entry| entry["key"].as_str().expect("catalog key is a string"))
+            .collect();
+        for session in reachable_states() {
+            let value = serde_json::to_value(session.teaching_read_model())
+                .expect("teaching DTO serializes");
+            let guidance = &value["guidance"];
+            for key in ["next_step_key", "detail_key", "completion_key"] {
+                if let Some(raw) = guidance[key].as_str() {
+                    assert!(catalog_keys.contains(&raw), "missing catalog key {raw}");
+                    assert_eq!(catalog_keys.iter().filter(|key| **key == raw).count(), 1);
+                }
+            }
+            assert!(matches!(
+                guidance["suggested_action"].as_str(),
+                None | Some("CorrectOfferPrice") | Some("PromoteAcmeToCustomer")
+            ));
+            let search = &value["search"];
+            for raw in [
+                search["query_key"].as_str().expect("query key"),
+                search["hits"][0]["section_key"]
+                    .as_str()
+                    .expect("section key"),
+                search["hits"][0]["fact_key"].as_str().expect("fact key"),
+                search["hits"][1]["section_key"]
+                    .as_str()
+                    .expect("section key"),
+                search["hits"][1]["fact_key"].as_str().expect("fact key"),
+            ] {
+                assert_eq!(catalog_keys.iter().filter(|key| **key == raw).count(), 1);
+            }
+        }
     }
 }

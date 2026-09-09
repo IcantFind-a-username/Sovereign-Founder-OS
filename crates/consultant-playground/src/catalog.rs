@@ -5,7 +5,7 @@ pub(crate) struct CatalogEntry {
     zh: &'static str,
 }
 
-pub(crate) const CATALOG: [CatalogEntry; 27] = [
+pub(crate) const CATALOG: [CatalogEntry; 32] = [
     CatalogEntry { key: "page_title", en: "Consultant Playground", zh: "顾问练习场" },
     CatalogEntry { key: "boundary_notice", en: "Practice with this example only. You cannot enter or save your own business or customer data here. Real-data setup is unavailable in this preview.", zh: "请仅使用此示例练习。你无法在此输入或保存自己的业务或客户数据。此预览版尚不支持真实数据设置。" },
     CatalogEntry { key: "company_label", en: "Company", zh: "公司" },
@@ -33,6 +33,11 @@ pub(crate) const CATALOG: [CatalogEntry; 27] = [
     CatalogEntry { key: "action_reset", en: "Reset example", zh: "重置示例" },
     CatalogEntry { key: "language_en", en: "English", zh: "英语" },
     CatalogEntry { key: "language_zh", en: "Simplified Chinese", zh: "简体中文" },
+    CatalogEntry { key: "reporting_search_query", en: "reporting", zh: "报告" },
+    CatalogEntry { key: "guidance_correct_price", en: "Correct the offer price to match this example.", zh: "修正服务价格，使其符合本示例。" },
+    CatalogEntry { key: "guidance_promote_customer", en: "Mark the lead as a customer in this example.", zh: "将本示例中的潜在客户标记为客户。" },
+    CatalogEntry { key: "guidance_review_scoping_call", en: "Consider the recorded scoping call as a suggested next step.", zh: "将已记录的需求范围沟通作为建议的下一步。" },
+    CatalogEntry { key: "guidance_example_changes_complete", en: "The two changes in this example are complete. No client call has been scheduled or made.", zh: "本示例的两项修改已完成。尚未安排或进行任何客户沟通。" },
 ];
 
 #[cfg(test)]
@@ -43,7 +48,7 @@ mod tests {
 
     use super::CATALOG;
 
-    const EXPECTED: [(&str, &str, &str); 27] = [
+    const EXPECTED: [(&str, &str, &str); 32] = [
         ("page_title", "Consultant Playground", "顾问练习场"),
         ("boundary_notice", "Practice with this example only. You cannot enter or save your own business or customer data here. Real-data setup is unavailable in this preview.", "请仅使用此示例练习。你无法在此输入或保存自己的业务或客户数据。此预览版尚不支持真实数据设置。"),
         ("company_label", "Company", "公司"),
@@ -71,6 +76,11 @@ mod tests {
         ("action_reset", "Reset example", "重置示例"),
         ("language_en", "English", "英语"),
         ("language_zh", "Simplified Chinese", "简体中文"),
+        ("reporting_search_query", "reporting", "报告"),
+        ("guidance_correct_price", "Correct the offer price to match this example.", "修正服务价格，使其符合本示例。"),
+        ("guidance_promote_customer", "Mark the lead as a customer in this example.", "将本示例中的潜在客户标记为客户。"),
+        ("guidance_review_scoping_call", "Consider the recorded scoping call as a suggested next step.", "将已记录的需求范围沟通作为建议的下一步。"),
+        ("guidance_example_changes_complete", "The two changes in this example are complete. No client call has been scheduled or made.", "本示例的两项修改已完成。尚未安排或进行任何客户沟通。"),
     ];
 
     #[test]
