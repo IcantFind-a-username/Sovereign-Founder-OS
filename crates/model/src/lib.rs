@@ -30,6 +30,10 @@ use std::fmt;
 use serde::Serialize;
 use sovereign_contracts::DataClass;
 
+mod ollama;
+
+pub use ollama::{OllamaConfigError, OllamaProvider};
+
 /// Where a provider runs, for confidentiality routing. Local providers run on
 /// the founder's device; cloud providers are untrusted for confidentiality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

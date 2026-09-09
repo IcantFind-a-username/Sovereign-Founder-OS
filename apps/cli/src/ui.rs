@@ -122,6 +122,7 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
         (Method::Get, "/api/command-center") => json_response(&command_center_json(root)),
         (Method::Get, "/api/workspace") => json_response(&workspace_get(root)),
         (Method::Get, "/api/export") => export_response(root),
+        (Method::Get, "/api/model/status") => json_response(&crate::ui_mvp::model_status(root)),
         (Method::Post, "/api/gauntlet") => match read_json_body(request) {
             Ok(_) => json_response(&gauntlet_json()),
             Err(error) => bad_request(&error),

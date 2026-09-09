@@ -3,8 +3,9 @@ use super::store::AuditEntry;
 use super::util::{clean_email, clean_optional_text, clean_text, kernel, now};
 use super::*;
 
+use super::model_config::providers_for;
 use sovereign_contracts::{AutomationLevel, DataClass};
-use sovereign_model::{DeterministicProvider, Health as ModelHealth, ModelGateway, ModelRequest};
+use sovereign_model::{ModelGateway, ModelRequest};
 use uuid::Uuid;
 
 impl Store {
@@ -98,9 +99,10 @@ impl Store {
     /// keys, and the founder must copy it into a real field to keep it. Only
     /// the disclosure (which provider saw Amber data) is audited.
     ///
-    /// The provider is a deterministic local drafter, not an LLM. The gateway
-    /// gives it health-aware failover and a data-disclosure record; Red data
-    /// would never be routed to a non-local provider.
+    /// Providers come from the device's `model.json` (an Experimental Ollama
+    /// adapter over loopback) with deterministic stand-ins as fallback. The
+    /// gateway gives them health-aware failover and a data-disclosure record;
+    /// Red data would never be routed to a non-local provider.
     pub fn draft_assistant(
         &self,
         customer_id: Uuid,
@@ -114,16 +116,10 @@ impl Store {
         let customer = workspace.customer(customer_id)?.clone();
 
         let note = draft_outreach_note(&venture, &customer, lang.starts_with("zh"));
-        let gateway = ModelGateway::new(vec![
-            Box::new(DeterministicProvider::local_echo(
-                "local-drafter",
-                ModelHealth::Healthy,
-            )),
-            Box::new(DeterministicProvider::local_echo(
-                "local-drafter-backup",
-                ModelHealth::Healthy,
-            )),
-        ]);
+        // The device's configured providers: a real local model when the
+        // founder set one up in model.json, always backed by the
+        // deterministic stand-ins so a down daemon fails over, never fails.
+        let gateway = ModelGateway::new(providers_for(&self.root)?);
         let (response, disclosure) = gateway
             .complete(&ModelRequest {
                 task: "draft_outreach".into(),

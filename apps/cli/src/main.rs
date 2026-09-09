@@ -309,6 +309,29 @@ fn cmd_model_check() {
     }
 
     println!("\nModels are replaceable. Red data stays local. Output is a draft, never authority.");
+
+    // The providers this device actually routes to (model.json beside the
+    // vault), with live health — so "is my local model connected?" has a
+    // command-line answer that never claims more than it probed.
+    println!("\n== Configured providers on this device ==");
+    match workspace::provider_status(&data_dir()) {
+        Ok(providers) => {
+            for provider in providers {
+                println!(
+                    "  {:<28} {:<6} {:<8} {}",
+                    provider.id,
+                    provider.trust,
+                    provider.health,
+                    if provider.real_model {
+                        "real model (Experimental Ollama adapter)"
+                    } else {
+                        "deterministic stand-in"
+                    }
+                );
+            }
+        }
+        Err(error) => println!("  model.json could not be used: {error}"),
+    }
 }
 
 fn cmd_sandbox_check() -> Result<(), Box<dyn std::error::Error>> {

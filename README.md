@@ -192,9 +192,12 @@ hash-chain evidence. Its present boundary is **Experimental**:
   unauthenticated marker that someone says the file was sent manually.
 
 The current Model Gateway and workflow demo are also experimental foundations.
-Model providers are deterministic stand-ins rather than LLMs, and caller-owned
-classification/provider self-reported trust must be removed before any real
-public egress. Workflow recovery is another runner over the same durable
+Model providers are deterministic stand-ins by default. An Experimental
+per-device Ollama adapter can be enabled in `model.json` beside the vault:
+it routes to a separate local process over loopback that this product does
+not sandbox, confine, or audit, and it claims nothing beyond loopback
+routing. Cloud adapters do not exist; caller-owned classification/provider
+self-reported trust must be removed before any real public egress. Workflow recovery is another runner over the same durable
 directory, not replicated multi-machine failover. See
 [RFC 0004](rfcs/0004-data-sovereignty-boundaries.md) for the approved privacy
 implementation target.

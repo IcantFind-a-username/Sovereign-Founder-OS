@@ -13,6 +13,21 @@ use crate::workspace::{self, ProjectStatus, WorkspaceError};
 
 type Body = serde_json::Value;
 
+/// `GET /api/model/status`: the device's configured providers with live
+/// health, and where the founder edits them. Never a secret: model names
+/// and loopback addresses only.
+pub(crate) fn model_status(root: &Path) -> Body {
+    match workspace::provider_status(root) {
+        Ok(providers) => serde_json::json!({
+            "ok": true,
+            "providers": providers,
+            "real_model_available": providers.iter().any(|p| p.real_model && p.health == "healthy"),
+            "config_path": root.join(workspace::MODEL_CONFIG_FILE).display().to_string(),
+        }),
+        Err(error) => serde_json::json!({ "ok": false, "error": error.to_string() }),
+    }
+}
+
 /// Handle one `/api/workspace/...` POST that `ui.rs` does not know. Returns
 /// `None` for an unknown path so the caller can report "not found".
 pub(crate) fn workspace_post(path: &str, body: &Body, root: &Path) -> Option<Body> {

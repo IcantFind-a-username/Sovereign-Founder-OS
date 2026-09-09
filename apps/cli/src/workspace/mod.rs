@@ -30,6 +30,7 @@ mod compose;
 mod erp_ops;
 mod erp_types;
 mod kernel_exec;
+mod model_config;
 mod ops;
 mod reporting;
 mod send_workflow;
@@ -46,6 +47,7 @@ mod stage1_suite;
 mod tests;
 
 pub use erp_types::*;
+pub use model_config::{provider_status, MODEL_CONFIG_FILE};
 pub use types::*;
 pub use util::parse_amount_cents;
 pub use verify::verify_export;
