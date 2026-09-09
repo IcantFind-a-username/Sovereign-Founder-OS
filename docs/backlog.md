@@ -1055,7 +1055,7 @@ while the controller routes eligible design/review cards to the strong role.
   unqualified, the ops.rs comment is corrected, and
   `cargo test -p sovereign-cli` passes.
 
-- [ ] **P2 | `apps/cli/assets/` | Correct the three overstated UI claims (disclosure, vault, approval).**
+- [x] **P2 | `apps/cli/assets/` | Correct the three overstated UI claims (disclosure, vault, approval).** Landed 2026-09-09; `footer_limits` also dropped a stale "no AI yet" clause.
   Frontend honesty pass — update the en and zh blocks together (i18n.js
   holds both): (1) the disclosure wording "whether the data stayed on this
   machine" (i18n.js:107) and the `stayed_local` badge (app.js:337) must say
