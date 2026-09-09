@@ -75,7 +75,7 @@ Owner 最新指示优先：S0-06 仅约束自动调度，不阻塞主控监督�
 | S1-00 | architect；按增量冻结产品接口，实际状态见 backlog | [Playground 接口与门迁移](cards/S1-00.md) |
 | S1-G01 / G02、S1-01–11 | 已冻结增量及未冻结后续项见索引；完成与认领见 backlog | [后续 Playground 卡](cards/S1-after-design.md) |
 | S2-00 | architect；Frozen 设计任务，实际认领见 backlog | [可编辑完整业务流程设计](cards/S2-00.md)；输出仍须独立验收。 |
-| S2-00、S2-01A1/A2、S2-01B–07 | S2-00 设计候选；独立验收后实现卡准入 | [S2 合成业务契约](business-demo-contract.md)、[S2 索引](milestones.md#123-s2从教学图扩展到完整合成业务演示)；完成/认领只见 backlog。 |
+| S2-00、S2-01A1/A2、S2-01B–07 | A1/A2 首批设计已独立准入；后续候选另行验收 | [S2 合成业务契约](business-demo-contract.md)、[S2 索引](milestones.md#123-s2从教学图扩展到完整合成业务演示)；完成/认领只见 backlog。 |
 | S3、MVP-00/01/02 | Target；按证据冻结 | [里程碑索引](milestones.md)，真实模型/法务及最终统一业务/AI 界面验收仍必需。 |
 | S4–S6 | Target / Research，完整合成 MVP 之后 | [里程碑索引](milestones.md)，真实模型所必需的核心安全依赖按 S3-M 前置。 |
 

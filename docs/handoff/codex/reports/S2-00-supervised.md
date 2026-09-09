@@ -58,3 +58,38 @@ Final admission scope: backlog, README, S2-00 card and this controller report.
 New files were checked with `git ls-files --others --exclude-standard`.
 No product changes or new browser conclusions; accepted S1 evidence remains
 in its own stage report.
+
+
+## First-slice design acceptance and remaining work
+
+First design candidate `ef5440a71bd0e0451969fa8d4d3a81a8d1567ec0` received
+three P2 findings from independent `/root/blueprint_review` (actual Astra/max):
+code-enum spelling, tiny_http pre-handler response promises, and next-step
+branches. Evidence `.harness/s2-00/design-review.md` is preserved.
+Architect repaired the same attempt, cycle1, into
+`c89f7c908c154cdef3b929beec475ee46dc886e8`; raw
+`.harness/s2-00/design-repair1/` preserves bindings and passed document gate.
+No product code changed; original design history remains committed.
+
+The same independent reviewer explicitly accepted **S2-01A1 and S2-01A2 design
+admission in dependency order** at c89f7c9. Enum and HTTP corrections pass;
+startup/helper/dependency reuse and bounded first-launch write set are accepted.
+This is partial design admission under protocol §9.7, not full S2 implementation
+or complete design acceptance. Later-only next-step revision-cap handling
+remains pending; it does not affect company/service or case/discovery.
+The reviewer verified that §5 already permits a successor for stale/expired
+submitted proposals, resolving controller's possible-deadlock concern.
+
+Reviewed contract revision2 blob `1a8047774ddef8ea4fe7827fe93336d306486d4c`;
+reviewed A1 revision2 blob `e627fa838a73fe1ea3f535f2134965d98601af99`;
+A2 revision2 blob `41998f862e85804530f7e7b6c8dc68452327e3cf`.
+Controller advances A1/A2 to revision3 only to record partial-admission status
+and its evidence link; their behavior, interfaces, tests and write sets are
+unchanged. The global contract remains a design candidate outside these scopes.
+Next product work is S2-01A1, then S2-01A2 after A1 implementation acceptance.
+
+Final partial-review verdict retains one later P2 only: contract §9's
+revision10,000 replacement advice must include row13 complete_followup;
+S2-06 must add due_followup_at_revision_cap. No new framework/file is needed.
+S2-03's submitted shorthand can be qualified as current and unexpired.
+Preserve this pending design work while A1 implementation advances.
