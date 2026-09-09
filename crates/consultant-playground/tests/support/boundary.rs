@@ -7,7 +7,8 @@ use std::path::Path;
 
 use crate::rust_lexer::{RustLexer, RustToken};
 
-const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;";
+pub(crate) const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;";
+pub(crate) const EXPECTED_LIB_CATALOG_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;";
 
 pub(crate) const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -99,6 +100,7 @@ pub(crate) const ACTION_DOMAIN_ADDITIONS: &str =
     include_str!("fixtures/action-domain-additions.rs.txt");
 pub(crate) const READ_MODEL_DOMAIN_PRODUCTION: &str =
     include_str!("fixtures/read-model-domain.rs.txt");
+pub(crate) const CATALOG_PRODUCTION: &str = include_str!("fixtures/catalog-production.rs.txt");
 
 const DOMAIN_TEST_HEADER: &str = "#[cfg(test)] mod tests {";
 
@@ -110,6 +112,8 @@ pub(crate) enum SourceBoundaryKind {
     LibItemShape,
     DomainTestModuleShape,
     DomainProductionShape,
+    CatalogProductionShape,
+    CatalogTestModuleShape,
     UnexpectedSourceFile,
 }
 
@@ -140,6 +144,7 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
     match path.file_name().and_then(|name| name.to_str()) {
         Some("lib.rs") => validate_lib_shape(&tokens),
         Some("domain.rs") => validate_domain_shape(&tokens),
+        Some("catalog.rs") => validate_catalog_shape(&tokens),
         Some(name) => Err(SourceBoundaryError::new(
             SourceBoundaryKind::UnexpectedSourceFile,
             format!("unexpected Task 1 source file `{name}`"),
@@ -151,10 +156,48 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
     }
 }
 
+fn validate_catalog_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production = strip_exact_test_module(
+        tokens,
+        "catalog",
+        SourceBoundaryKind::CatalogTestModuleShape,
+    )?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(CATALOG_PRODUCTION).expect("catalog fixture must lex");
+    let text_positions: Vec<_> = expected.windows(3).enumerate().filter_map(|(index, tokens)| {
+        matches!(&tokens,
+            &[RustToken::Ident(field), RustToken::Punct(':'), RustToken::Literal(value)]
+                if (field == "en" || field == "zh") && value.starts_with('"') && value.ends_with('"')
+        ).then_some(index + 2)
+    }).collect();
+    assert_eq!(
+        text_positions.len(),
+        54,
+        "frozen catalog has 54 text positions"
+    );
+    if production.len() == expected.len()
+        && production.iter().enumerate().all(|(index, token)| {
+            if text_positions.contains(&index) {
+                matches!(token, RustToken::Literal(value) if value.starts_with('"') && value.ends_with('"'))
+            } else {
+                token == &expected[index]
+            }
+        })
+    {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::CatalogProductionShape,
+            token_mismatch("catalog.rs", &expected, production),
+        ))
+    }
+}
+
 fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
     reject_path_attributes(tokens)?;
     let expected = RustLexer::lex(EXPECTED_LIB_SHAPE).expect("expected lib shape must lex");
-    if tokens == expected {
+    let catalog = RustLexer::lex(EXPECTED_LIB_CATALOG_SHAPE).expect("catalog lib shape must lex");
+    if tokens == expected || tokens == catalog {
         return Ok(());
     }
     let module = RustLexer::lex("mod domain;").expect("expected module shape must lex");
@@ -170,7 +213,8 @@ fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
 }
 
 fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
-    let production = strip_exact_test_module(tokens)?;
+    let production =
+        strip_exact_test_module(tokens, "domain", SourceBoundaryKind::DomainTestModuleShape)?;
     reject_path_attributes(production)?;
     let expected =
         RustLexer::lex(EXPECTED_DOMAIN_PRODUCTION).expect("expected domain shape must lex");
@@ -188,7 +232,11 @@ fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError
     }
 }
 
-fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceBoundaryError> {
+fn strip_exact_test_module<'a>(
+    tokens: &'a [RustToken],
+    label: &str,
+    kind: SourceBoundaryKind,
+) -> Result<&'a [RustToken], SourceBoundaryError> {
     let header = RustLexer::lex(DOMAIN_TEST_HEADER).expect("expected test header must lex");
     let mut brace_depth = 0_usize;
     let mut start = None;
@@ -196,8 +244,8 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
         if brace_depth == 0 && tokens[index..].starts_with(&header) {
             if start.replace(index).is_some() {
                 return Err(SourceBoundaryError::new(
-                    SourceBoundaryKind::DomainTestModuleShape,
-                    "domain has more than one exact test module",
+                    kind,
+                    format!("{label} has more than one exact test module"),
                 ));
             }
             break;
@@ -206,10 +254,7 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
             RustToken::Punct('{') => brace_depth += 1,
             RustToken::Punct('}') => {
                 brace_depth = brace_depth.checked_sub(1).ok_or_else(|| {
-                    SourceBoundaryError::new(
-                        SourceBoundaryKind::DomainTestModuleShape,
-                        "unbalanced closing brace before test module",
-                    )
+                    SourceBoundaryError::new(kind, "unbalanced closing brace before test module")
                 })?;
             }
             _ => {}
@@ -217,8 +262,8 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
     }
     let start = start.ok_or_else(|| {
         SourceBoundaryError::new(
-            SourceBoundaryKind::DomainTestModuleShape,
-            "domain is missing exact `#[cfg(test)] mod tests { ... }` wrapper",
+            kind,
+            format!("{label} is missing exact `#[cfg(test)] mod tests {{ ... }}` wrapper"),
         )
     })?;
     let opening = start + header.len() - 1;
@@ -229,10 +274,7 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
             RustToken::Punct('{') => depth += 1,
             RustToken::Punct('}') => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    SourceBoundaryError::new(
-                        SourceBoundaryKind::DomainTestModuleShape,
-                        "unbalanced test-module closing brace",
-                    )
+                    SourceBoundaryError::new(kind, "unbalanced test-module closing brace")
                 })?;
                 if depth == 0 {
                     end = Some(opening + offset + 1);
@@ -244,7 +286,7 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
     }
     if end != Some(tokens.len()) {
         return Err(SourceBoundaryError::new(
-            SourceBoundaryKind::DomainTestModuleShape,
+            kind,
             "test module is unbalanced or is not the terminal top-level item",
         ));
     }

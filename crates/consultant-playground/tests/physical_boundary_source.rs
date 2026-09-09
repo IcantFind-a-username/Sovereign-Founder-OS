@@ -22,26 +22,86 @@ mod source_root;
 mod symlink_fixture;
 
 use boundary::{
-    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, EXPECTED_DOMAIN_PRODUCTION,
+    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, CATALOG_PRODUCTION,
+    EXPECTED_DOMAIN_PRODUCTION, EXPECTED_LIB_CATALOG_SHAPE, EXPECTED_LIB_SHAPE,
     READ_MODEL_DOMAIN_PRODUCTION,
 };
-use manifest::{crate_root, manifest_boundary};
+use manifest::{crate_root, manifest_boundary, ManifestFixture};
 use production_sources::production_sources;
+use rust_lexer::{RustLexer, RustToken};
 use source_root::SourceRootError;
 use std::collections::BTreeSet;
 
 #[test]
 fn task_one_production_source_closure_has_no_persistence_or_product_surface() {
-    let source_root = crate_root().join("src");
-    let expected = BTreeSet::from([source_root.join("domain.rs"), source_root.join("lib.rs")]);
-    let actual = production_sources(&source_root).expect("source root must be a real directory");
-    assert_eq!(actual, expected, "Task 1 source closure changed");
+    source_closure_boundary(&crate_root().join("src")).expect("production source closure");
+}
 
-    for path in actual {
-        let source = fs::read_to_string(&path).expect("production source must be readable");
-        source_boundary(&path, &source)
-            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+#[derive(Debug, Eq, PartialEq)]
+enum SourceClosureError {
+    Root(SourceRootError),
+    Inventory,
+    LibInventoryPair,
+    Source(SourceBoundaryKind),
+    Unreadable,
+}
+
+// The real inventory and adversarial fixtures use this same boundary. Traversal
+// and symlink handling remain owned by production_sources/source_root.
+fn source_closure_boundary(source_root: &Path) -> Result<(), SourceClosureError> {
+    let actual = production_sources(source_root).map_err(SourceClosureError::Root)?;
+    let catalog = actual.contains(&source_root.join("catalog.rs"));
+    let mut expected = BTreeSet::from([source_root.join("domain.rs"), source_root.join("lib.rs")]);
+    if catalog {
+        expected.insert(source_root.join("catalog.rs"));
     }
+    if actual != expected {
+        return Err(SourceClosureError::Inventory);
+    }
+    for path in actual {
+        let source = fs::read_to_string(&path).map_err(|_| SourceClosureError::Unreadable)?;
+        source_boundary(&path, &source).map_err(|error| SourceClosureError::Source(error.kind))?;
+        if path == source_root.join("lib.rs") {
+            let expected_lib = if catalog {
+                EXPECTED_LIB_CATALOG_SHAPE
+            } else {
+                EXPECTED_LIB_SHAPE
+            };
+            if RustLexer::lex(&source).expect("validated lib must lex")
+                != RustLexer::lex(expected_lib).expect("frozen lib must lex")
+            {
+                return Err(SourceClosureError::LibInventoryPair);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn catalog_source_fixture(catalog_file: bool, catalog_lib: bool) -> ManifestFixture {
+    let fixture = ManifestFixture::new("");
+    let source_root = fixture.root.join("src");
+    fs::write(
+        source_root.join("lib.rs"),
+        if catalog_lib {
+            EXPECTED_LIB_CATALOG_SHAPE
+        } else {
+            EXPECTED_LIB_SHAPE
+        },
+    )
+    .expect("fixture lib");
+    fs::write(
+        source_root.join("domain.rs"),
+        format!("{READ_MODEL_DOMAIN_PRODUCTION}\n#[cfg(test)] mod tests {{}}"),
+    )
+    .expect("fixture domain");
+    if catalog_file {
+        fs::write(
+            source_root.join("catalog.rs"),
+            format!("{CATALOG_PRODUCTION}\n#[cfg(test)] mod tests {{}}"),
+        )
+        .expect("fixture catalog");
+    }
+    fixture
 }
 
 #[cfg(any(unix, windows))]
@@ -210,6 +270,413 @@ fn action_gate_accepts_pinned_legacy_and_action_grammars() {
 
     assert!(source_boundary(Path::new("domain.rs"), &legacy).is_ok());
     assert!(source_boundary(Path::new("domain.rs"), &action).is_ok());
+}
+
+#[test]
+fn catalog_gate_accepts_static_text_variants_only() {
+    let source = format!("{CATALOG_PRODUCTION}\n#[cfg(test)] mod tests {{}}");
+    source_boundary(Path::new("catalog.rs"), &source).expect("complete static catalog");
+    let tokens = RustLexer::lex(CATALOG_PRODUCTION).expect("frozen fixture must lex");
+    let mut changed_all = source.clone();
+    let mut text_count = 0;
+    for window in tokens.windows(3) {
+        if let [RustToken::Ident(field), RustToken::Punct(':'), RustToken::Literal(value)] = window
+        {
+            if field == "en" || field == "zh" {
+                let target = format!("{field}: {value}");
+                let replacement =
+                    format!("{field}: \"文字 \\\"quoted\\\" {{ std::fs::write() }}\"");
+                assert!(source.contains(&target));
+                let changed = source.replacen(&target, &replacement, 1);
+                assert_ne!(changed, source);
+                source_boundary(Path::new("catalog.rs"), &changed).expect("ordinary text is data");
+                changed_all = changed_all.replacen(&target, &replacement, 1);
+                text_count += 1;
+            }
+        }
+    }
+    assert_eq!(text_count, 54);
+    assert_ne!(changed_all, source);
+    source_boundary(Path::new("catalog.rs"), &changed_all).expect("all 54 text values may change");
+}
+
+#[test]
+fn catalog_gate_rejects_structure_key_and_code_mutations() {
+    let source = format!("{CATALOG_PRODUCTION}\n#[cfg(test)] mod tests {{}}");
+    for (name, target, replacement) in [
+        ("key", "key: \"page_title\"", "key: \"other\""),
+        ("length", "[CatalogEntry; 27]", "[CatalogEntry; 28]"),
+        ("type", "en: &'static str", "en: String"),
+        ("field", "en: &'static str", "english: &'static str"),
+        ("missing field", "    zh: &'static str,", ""),
+        (
+            "extra field",
+            "    zh: &'static str,",
+            "    zh: &'static str, extra: bool,",
+        ),
+        (
+            "field order",
+            "    key: &'static str,\n    en: &'static str,",
+            "    en: &'static str,\n    key: &'static str,",
+        ),
+        ("public field", "en: &'static str", "pub en: &'static str"),
+        (
+            "public type",
+            "pub(crate) struct CatalogEntry",
+            "pub struct CatalogEntry",
+        ),
+        (
+            "public const",
+            "pub(crate) const CATALOG",
+            "pub const CATALOG",
+        ),
+        ("private const", "pub(crate) const CATALOG", "const CATALOG"),
+        ("derive", "serde::Serialize", "serde::Deserialize"),
+        (
+            "Deserialize",
+            "serde::Serialize",
+            "serde::Serialize, serde::Deserialize",
+        ),
+        ("missing Copy", "Clone, Copy, Debug", "Clone, Debug"),
+        (
+            "serde attribute",
+            "pub(crate) struct CatalogEntry",
+            "#[serde(rename_all = \"UPPERCASE\")] pub(crate) struct CatalogEntry",
+        ),
+        (
+            "function",
+            "pub(crate) const CATALOG",
+            "fn leak() {}\npub(crate) const CATALOG",
+        ),
+        (
+            "custom serializer",
+            "];",
+            "]; impl serde::Serialize for CatalogEntry {}",
+        ),
+        (
+            "constructor",
+            "];",
+            "]; impl CatalogEntry { fn new() -> Self { loop {} } }",
+        ),
+        (
+            "lookup",
+            "];",
+            "]; fn lookup(key: &str) -> Option<CatalogEntry> { None }",
+        ),
+        (
+            "IO",
+            "];",
+            "]; fn leak() { std::fs::write(\"leak\", \"data\").unwrap(); }",
+        ),
+        (
+            "environment",
+            "];",
+            "]; const LEAK: &str = env!(\"SECRET\");",
+        ),
+        (
+            "process",
+            "];",
+            "]; fn leak() { std::process::Command::new(\"sh\").spawn().unwrap(); }",
+        ),
+        ("unsafe", "];", "]; unsafe extern \"C\" { fn leak(); }"),
+        ("include", "];", "]; include!(\"outside.rs\");"),
+        ("trailing", "];", "]; fn leak() {}"),
+        (
+            "extra token",
+            "en: \"Consultant Playground\"",
+            "en: \"Consultant Playground\" true",
+        ),
+        (
+            "raw literal",
+            "en: \"Consultant Playground\"",
+            "en: r#\"changed\"#",
+        ),
+        (
+            "raw literal without hash",
+            "en: \"Consultant Playground\"",
+            "en: r\"changed\"",
+        ),
+        (
+            "byte literal",
+            "en: \"Consultant Playground\"",
+            "en: b\"changed\"",
+        ),
+        (
+            "raw byte literal",
+            "en: \"Consultant Playground\"",
+            "en: br#\"changed\"#",
+        ),
+        (
+            "c literal",
+            "en: \"Consultant Playground\"",
+            "en: c\"changed\"",
+        ),
+        (
+            "raw c literal",
+            "en: \"Consultant Playground\"",
+            "en: cr#\"changed\"#",
+        ),
+        ("identifier", "en: \"Consultant Playground\"", "en: OTHER"),
+        ("number", "en: \"Consultant Playground\"", "en: 42"),
+        ("character", "en: \"Consultant Playground\"", "en: 'x'"),
+        ("macro", "en: \"Consultant Playground\"", "en: env!(\"X\")"),
+        (
+            "include macro",
+            "en: \"Consultant Playground\"",
+            "en: include_str!(\"outside\")",
+        ),
+        (
+            "concat macro",
+            "en: \"Consultant Playground\"",
+            "en: concat!(\"a\", \"b\")",
+        ),
+        (
+            "expression",
+            "en: \"Consultant Playground\"",
+            "en: \"a\" + \"b\"",
+        ),
+        ("block", "en: \"Consultant Playground\"", "en: { \"text\" }"),
+        (
+            "adjacent strings",
+            "en: \"Consultant Playground\"",
+            "en: \"a\" \"b\"",
+        ),
+        ("zh expression", "zh: \"顾问练习场\"", "zh: TEXT"),
+    ] {
+        assert!(source.contains(target), "missing {name} target");
+        let changed = source.replacen(target, replacement, 1);
+        assert_ne!(source, changed, "mutation {name} must take effect");
+        assert_source_rejection(
+            name,
+            Path::new("catalog.rs"),
+            &changed,
+            SourceBoundaryKind::CatalogProductionShape,
+        );
+    }
+    let entries: Vec<_> = CATALOG_PRODUCTION
+        .lines()
+        .filter(|line| line.contains("CatalogEntry { key:"))
+        .collect();
+    assert_eq!(entries.len(), 27);
+    for entry in &entries {
+        let key = entry
+            .split_once("key: ")
+            .expect("fixed key field")
+            .1
+            .split_once(',')
+            .expect("key terminator")
+            .0;
+        let changed = source.replacen(&format!("key: {key}"), "key: \"changed\"", 1);
+        assert_ne!(changed, source);
+        assert_source_rejection(
+            key,
+            Path::new("catalog.rs"),
+            &changed,
+            SourceBoundaryKind::CatalogProductionShape,
+        );
+    }
+    for (name, changed) in [
+        ("missing entry", source.replacen(entries[0], "", 1)),
+        (
+            "duplicate entry",
+            source.replacen(entries[1], entries[0], 1),
+        ),
+        (
+            "extra entry",
+            source.replacen("];", &format!("{}\n];", entries[0]), 1),
+        ),
+        (
+            "entry order",
+            source.replacen(
+                &format!("{}\n{}", entries[0], entries[1]),
+                &format!("{}\n{}", entries[1], entries[0]),
+                1,
+            ),
+        ),
+    ] {
+        assert_ne!(changed, source, "{name}");
+        assert_source_rejection(
+            name,
+            Path::new("catalog.rs"),
+            &changed,
+            SourceBoundaryKind::CatalogProductionShape,
+        );
+    }
+    let path = format!(
+        "{CATALOG_PRODUCTION}\n#[path=\"../outside.rs\"] mod escaped;\n#[cfg(test)] mod tests {{}}"
+    );
+    assert_ne!(path, source);
+    assert_source_rejection(
+        "catalog path",
+        Path::new("catalog.rs"),
+        &path,
+        SourceBoundaryKind::PathAttribute,
+    );
+}
+
+#[test]
+fn catalog_gate_preserves_wrapper_and_source_closure() {
+    for (catalog_file, catalog_lib, expected) in [
+        (false, false, Ok(())),
+        (true, true, Ok(())),
+        (false, true, Err(SourceClosureError::LibInventoryPair)),
+        (true, false, Err(SourceClosureError::LibInventoryPair)),
+    ] {
+        let fixture = catalog_source_fixture(catalog_file, catalog_lib);
+        assert_eq!(
+            source_closure_boundary(&fixture.root.join("src")),
+            expected,
+            "catalog file={catalog_file}, lib declaration={catalog_lib}"
+        );
+    }
+    for catalog in [false, true] {
+        for unknown in ["unknown.rs", "nested/unknown.rs"] {
+            let fixture = catalog_source_fixture(catalog, catalog);
+            let source_root = fixture.root.join("src");
+            assert_eq!(source_closure_boundary(&source_root), Ok(()));
+            let path = source_root.join(unknown);
+            fs::create_dir_all(path.parent().expect("parent")).expect("fixture subdir");
+            fs::write(path, "").expect("unknown fixture source");
+            assert_eq!(
+                source_closure_boundary(&source_root),
+                Err(SourceClosureError::Inventory),
+                "{unknown}"
+            );
+        }
+        for missing in ["lib.rs", "domain.rs"] {
+            let fixture = catalog_source_fixture(catalog, catalog);
+            let source_root = fixture.root.join("src");
+            assert_eq!(source_closure_boundary(&source_root), Ok(()));
+            fs::remove_file(source_root.join(missing)).expect("remove required source");
+            assert_eq!(
+                source_closure_boundary(&source_root),
+                Err(SourceClosureError::Inventory),
+                "missing {missing}"
+            );
+        }
+    }
+    for (filename, source, expected) in [
+        ("catalog.rs", "", SourceBoundaryKind::CatalogTestModuleShape),
+        (
+            "lib.rs",
+            "#[path=\"../outside.rs\"] mod domain;",
+            SourceBoundaryKind::PathAttribute,
+        ),
+    ] {
+        let fixture = catalog_source_fixture(true, true);
+        let source_root = fixture.root.join("src");
+        assert_eq!(source_closure_boundary(&source_root), Ok(()));
+        fs::write(source_root.join(filename), source).expect("mutated fixture source");
+        assert_eq!(
+            source_closure_boundary(&source_root),
+            Err(SourceClosureError::Source(expected))
+        );
+    }
+    let fixture = ManifestFixture::new("");
+    assert_eq!(
+        source_closure_boundary(&fixture.root.join("missing")),
+        Err(SourceClosureError::Root(
+            SourceRootError::MetadataUnreadable
+        ))
+    );
+    assert_eq!(
+        source_closure_boundary(&fixture.manifest),
+        Err(SourceClosureError::Root(SourceRootError::RootNotDirectory))
+    );
+    let source = format!("{CATALOG_PRODUCTION}\n#[cfg(test)] mod tests {{}}");
+    for (name, changed) in [
+        (
+            "changed wrapper",
+            source.replacen("#[cfg(test)] mod tests", "#[cfg(any())] mod tests", 1),
+        ),
+        ("missing wrapper", CATALOG_PRODUCTION.to_string()),
+        (
+            "external wrapper",
+            source.replace("mod tests {}", "mod tests;"),
+        ),
+        ("wrapper not terminal", format!("{source} fn leak() {{}}")),
+        (
+            "duplicate wrapper",
+            format!("{source} #[cfg(test)] mod tests {{}}"),
+        ),
+        (
+            "unbalanced wrapper",
+            format!("{CATALOG_PRODUCTION}\n#[cfg(test)] mod tests {{"),
+        ),
+    ] {
+        assert_ne!(changed, source, "{name}");
+        assert_source_rejection(
+            name,
+            Path::new("catalog.rs"),
+            &changed,
+            SourceBoundaryKind::CatalogTestModuleShape,
+        );
+    }
+    assert_source_rejection(
+        "unknown source",
+        Path::new("other.rs"),
+        &source,
+        SourceBoundaryKind::UnexpectedSourceFile,
+    );
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn catalog_gate_rejects_source_symlink_escapes() {
+    let fixture = match symlink_fixture::SymlinkedSourceFixture::new() {
+        Ok(fixture) => fixture,
+        #[cfg(windows)]
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            eprintln!("directory symlinks are unavailable without Windows developer privilege");
+            return;
+        }
+        Err(error) => panic!("symlink fixture: {error}"),
+    };
+    assert_eq!(
+        source_closure_boundary(&fixture.source_link),
+        Err(SourceClosureError::Root(SourceRootError::RootSymlink))
+    );
+    let valid = catalog_source_fixture(true, true);
+    let source_root = valid.root.join("src");
+    assert_eq!(source_closure_boundary(&source_root), Ok(()));
+    // Reuse the existing directory symlink fixture inside an otherwise valid
+    // source inventory; the existing scanner must reject it before traversal.
+    let directory_link = source_root.join("linked");
+    fs::rename(&fixture.source_link, &directory_link).expect("move fixture symlink");
+    let error = std::panic::catch_unwind(|| source_closure_boundary(&source_root))
+        .expect_err("source symlink must panic in the existing scanner");
+    let message = error
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| error.downcast_ref::<&str>().copied())
+        .expect("scanner panic message");
+    assert!(
+        message.contains("production sources must not be symlinks"),
+        "{message}"
+    );
+    for filename in ["catalog.rs", "domain.rs", "lib.rs"] {
+        let valid = catalog_source_fixture(true, true);
+        let source_root = valid.root.join("src");
+        assert_eq!(source_closure_boundary(&source_root), Ok(()));
+        let file = source_root.join(filename);
+        let outside = valid.root.join("outside.rs");
+        fs::rename(&file, &outside).expect("move source outside root");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, &file).expect("source symlink");
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&outside, &file).expect("source symlink");
+        let error = std::panic::catch_unwind(|| source_closure_boundary(&source_root))
+            .expect_err("file symlink must panic in existing scanner");
+        let message = error
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| error.downcast_ref::<&str>().copied())
+            .expect("scanner panic message");
+        assert!(
+            message.contains("production sources must not be symlinks"),
+            "{filename}: {message}"
+        );
+    }
 }
 
 #[test]

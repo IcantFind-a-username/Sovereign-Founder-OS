@@ -259,11 +259,21 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution evidence](handoff/codex/reports/S1-02-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G03 — Admit the static bilingual catalog.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures).
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G03 — Admit the static bilingual catalog.** `lane:codex` DONE (Astra fallback accepted after two Luna failures).
   Definition and done criteria: [S1-G03](handoff/codex/cards/S1-G03.md).
   Base `e31795e2d9f9c27edfdc56495eb87bfc486ed126`; card blob
   `b2f529ef84ac195b95e4d2d7e2d45c815fb1809f`; exact three test files.
   S1-02 accepted in `9e938ef`.
+  Attempt 1 rejected: text slots accepted arbitrary tokens, new lib/source
+  closure pairing absent, mutation coverage incomplete and no preserved RED.
+  Attempt 2 repaired text-token/path checks but explicitly left source-closure
+  pairing and mismatch/symlink cases incomplete. No third Luna retry;
+  `/root/s1_g02_fallback` repairs the same three files before independent review.
+  Worker-reported attempt2/red.log was actually green on inspection; it is not
+  RED evidence. Fallback preserved it and recorded a real failing closure test.
+  Independent reviewer `/root/recovery_spec_card_review` accepted; full workspace
+  test/clippy and scoped gate passed (process44157 exit0).
+  [Execution evidence](handoff/codex/reports/S1-G03-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` `needs:fable`
@@ -271,7 +281,7 @@ while the controller routes eligible design/review cards to the strong role.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-04](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-04](handoff/codex/cards/S1-04.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` `needs:fable`
