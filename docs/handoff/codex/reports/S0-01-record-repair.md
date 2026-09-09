@@ -6,7 +6,7 @@ attempt or independent acceptance. Outcome: **blocked**, diagnostic
 
 ## Actual Git evidence
 
-The inspected checkout is `/Users/franz/Soverign Founder OS`, branch
+The inspected checkout is this repository's working tree, branch
 `docs/founder-os-execution-blueprint`, initially clean at
 `780975956f14ba24fcbe64e66a63010cde23684f`. Git uses SHA-1. Its actual linear
 history is:

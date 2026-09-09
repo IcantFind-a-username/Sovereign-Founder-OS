@@ -22,7 +22,7 @@ revision；不需要产品 RFC 变更，不改任何 Rust 安全接口。
 
 ## 已核对基线与历史
 
-实际 repo：`/Users/franz/Soverign Founder OS`；分支
+实际 repo：本仓库工作树；分支
 `docs/founder-os-execution-blueprint`；本报告写入前工作树干净，HEAD 为
 `38544604a78332e22b165ea5b79980396ea328f5`。Git object format 为历史报告所述
 SHA-1，以下均为本次 Git 读取到的完整提交。

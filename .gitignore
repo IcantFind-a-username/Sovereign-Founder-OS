@@ -36,3 +36,13 @@ notes/
 
 # Automation harness local logs
 .harness/
+
+# Locally installed agent tooling. The project's own skills
+# (.claude/skills/iterate, .claude/skills/plan-feature) are tracked on
+# purpose, so this ignores the installed ones by name rather than the whole
+# directory — a project skill must never be hidden by accident. Add a line
+# here when you install another.
+/.agents/
+# (a symlink into .agents/, so no trailing slash — that would not match)
+/.claude/skills/ui-ux-pro-max
+/skills-lock.json
