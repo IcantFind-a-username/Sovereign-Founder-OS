@@ -1561,6 +1561,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-privacy"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "sovereign-sandbox"
 version = "0.1.0"
 dependencies = [
