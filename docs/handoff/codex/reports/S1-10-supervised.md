@@ -1,6 +1,6 @@
 # S1-10 supervised execution
 
-Incomplete; two substantive Luna failures. Revision3 card blob
+Accepted after two substantive Luna failures and Astra fallback. Revision3 card blob
 `874f76dc1c1277a7f5cc31ee1f1414c9c04ba836`; attempt1 claim/base
 `5b7111ba85222f4a7f575f191df126aa7dc34e97`.
 
@@ -79,3 +79,36 @@ must receive independent acceptance before S1-11.
 Root fresh baseline gate69499 completed exit0 on the stopped attempt2 source;
 root-baseline-gate.log/full.log preserve actual output. This newly bound pass
 does not resolve sensitivity defects or alter earlier chronology.
+
+## Astra fallback — independently accepted
+
+Reviewer `/root/s1_10_review` accepted at HEAD
+`c3aa18df99a185f2b934bbb330c0bf7e9d06d820`. Product commit
+`1d4da2423ba386a722f02fd190857aea6a2e7a10`: four files,+462/-0.
+Final CLI test blob `432f9e56ffa4568a2f6d4987737b4a8084041d62`, fixture
+`5fd560e3a830200640af03069806c5ab02ccd654`; manifest/lock/helper unchanged
+from reviewed attempt2. Only remaining test assertions and artifact location
+changed during fallback. Specific bytes, key absence, nested empty-directory
+representation and recorded0640→0600 permissions now prove sensitivity;
+additional umask077 run passed.
+
+Final release evidence under `.harness/s1-10/fallback/`:
+run-a-1788924262465031000 (PID58093), run-b-1788924263048365000 (PID58101),
+macOS arm64, sameport50525,44ordered exchanges each. Reviewer verified raw
+request/response equality and saved SHA256 list, complete expected states,
+seven error nonmutation checks, corrected/promoted final state and restart,
+before/after inventories, unequal roots, exactstdout/emptystderr/canaryabsence.
+BinarySHA256 remains
+`0c259b55cb637f8a02a69e00ee51aa9c0937c6676b5826295aad0968ace2222f`.
+
+Candidate/baseline copies and hashes, raw exchange/output/inventory files,
+installed-dirs-observation.log, release-isolation.log, sensitivity-umask077.log
+and all gate logs are preserved there. TEST_CHANGED_LOG directed full output
+to fallback/full-gate.log; gate-summary.log records ALL GREEN at finalsource.
+Session95718 completedexit0. Release23passes=18inheriteddomain/catalog+
+3helper+2newnamed; requiredchecks postdate finaledits. Independent diffcheck
+passed. No production/helper changes; both prior failures preserved. Access
+time excluded; process evidence is complemented by source-level absence of
+read capability, not proof of that property by itself. All owned processes
+cleaned; rootpreview95545/:7788 untouched. Next S1-11 reviewer-only checkpoint,
+then S2-00; fullMVP remains unfinished.
