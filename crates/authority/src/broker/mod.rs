@@ -61,6 +61,11 @@ pub fn run_owner_effect_fixture_broker(
         Ok(established) => established,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
     };
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::reach(
+        crate::fault_injection::Barrier::AfterAddressBeforeSupervisorHello,
+    );
+
     let mut supervisor = match listener::accept_by_deadline(&established) {
         Ok(stream) => stream,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
@@ -73,6 +78,11 @@ pub fn run_owner_effect_fixture_broker(
     {
         return Err(emit(diagnostics, diagnostic));
     }
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::reach(
+        crate::fault_injection::Barrier::AfterAuthenticatedHelloBeforeLock,
+    );
+
     // Only now: a broker that has not proved its parent must not claim the
     // store, and a broker that cannot prove it is alone must not either.
     let _lock = match process_lock::acquire(root.path()) {
@@ -87,6 +97,9 @@ pub fn run_owner_effect_fixture_broker(
             return Err(emit(diagnostics, protocol::Diagnostic::LockUnavailable))
         }
     };
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::reach(crate::fault_injection::Barrier::AfterLockBeforeRedbOpen);
+
     // Only with the lock in hand. `OwnedStore::open` takes a `&HeldLock` and
     // has no other constructor, so this ordering cannot be skipped by a later
     // caller who did not read the comment.
@@ -102,6 +115,9 @@ pub fn run_owner_effect_fixture_broker(
             return Err(emit(diagnostics, protocol::Diagnostic::StoreUnavailable))
         }
     };
+    #[cfg(feature = "fault-injection")]
+    crate::fault_injection::reach(crate::fault_injection::Barrier::AfterRedbOpenBeforeBrokerReady);
+
     Err(BrokerExit::NotImplemented)
 }
 

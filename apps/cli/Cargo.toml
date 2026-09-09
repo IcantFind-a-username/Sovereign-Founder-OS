@@ -17,6 +17,8 @@ default = []
 # someone naming it here. Cargo features are additive, so this edge is the
 # thing scripts/check-fault-injection-excluded.sh's sibling check watches.
 owner-effect-fixture = ["sovereign-authority/owner-effect-fixture"]
+# Only for the kill matrix: barriers live in authority behind its own flag.
+fault-injection = ["sovereign-authority/fault-injection"]
 
 [dependencies]
 sovereign-artifact = { workspace = true }
@@ -50,3 +52,7 @@ wat = "1"
 [dev-dependencies]
 tempfile = "3"
 httparse = { version = "=1.10.1", default-features = false }
+
+[[test]]
+name = "broker_kill_matrix"
+required-features = ["owner-effect-fixture", "fault-injection"]
