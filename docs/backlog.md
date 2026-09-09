@@ -286,19 +286,32 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution evidence](handoff/codex/reports/S1-03-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G04 — Admit fixed search and guidance.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures).
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G04 — Admit fixed search and guidance.** `lane:codex` DONE (controller fallback independently accepted after two Luna failures).
   Definition and done criteria: [S1-G04](handoff/codex/cards/S1-G04.md).
   Base `3feb5c0ffeea2539c069703791f37449a637f007`; card blob
   `7c5454b46e1849bdbd43756ce9c1d63e269ea11d`; exact four test files.
   S1-03 accepted in `551fbf5`; fresh worker context.
+  Attempt 1 rejected: accepted teaching additions without the fixed domain,
+  omitted required Serialize derives and used mutations targeting unrelated
+  tokens instead of the intended behavior. Attempt 2 repaired production shape
+  but omitted claimed additions-only rejection and left some off-target mutations.
+  Controller completed those narrow tests; no third Luna attempt, independent
+  strong reviewer accepted. All changes remain in the four-file scope.
+  Full workspace/scoped gates passed; original RED probes invalid, original
+  test-first unproven. Isolated complete-fixture test failed on old gate and
+  passed on final gate. [Execution evidence](handoff/codex/reports/S1-G04-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`
   Definition and done criteria: [S1-04](handoff/codex/cards/S1-04.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G05 — Freeze and admit the pure HTTP boundary.** `lane:codex` Frozen architecture task; depends on S1-04 acceptance.
+  Definition and done criteria: [S1-G05](handoff/codex/cards/S1-G05.md).
+  Strong implementation plus independent strong review; product S1-05 remains Luna.
+
 - [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-05](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-05](handoff/codex/cards/S1-05.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` `needs:fable`

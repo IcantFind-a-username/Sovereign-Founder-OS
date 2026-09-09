@@ -100,7 +100,11 @@ pub(crate) const ACTION_DOMAIN_ADDITIONS: &str =
     include_str!("fixtures/action-domain-additions.rs.txt");
 pub(crate) const READ_MODEL_DOMAIN_PRODUCTION: &str =
     include_str!("fixtures/read-model-domain.rs.txt");
+pub(crate) const TEACHING_DOMAIN_PRODUCTION: &str =
+    include_str!("fixtures/teaching-domain-additions.rs.txt");
 pub(crate) const CATALOG_PRODUCTION: &str = include_str!("fixtures/catalog-production.rs.txt");
+pub(crate) const CATALOG_GUIDANCE_PRODUCTION: &str =
+    include_str!("fixtures/catalog-guidance-production.rs.txt");
 
 const DOMAIN_TEST_HEADER: &str = "#[cfg(test)] mod tests {";
 
@@ -163,7 +167,19 @@ fn validate_catalog_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryErro
         SourceBoundaryKind::CatalogTestModuleShape,
     )?;
     reject_path_attributes(production)?;
-    let expected = RustLexer::lex(CATALOG_PRODUCTION).expect("catalog fixture must lex");
+    let old = RustLexer::lex(CATALOG_PRODUCTION).expect("catalog fixture must lex");
+    let new = RustLexer::lex(CATALOG_GUIDANCE_PRODUCTION).expect("catalog fixture must lex");
+    if production.len() == old.len() {
+        return validate_catalog_tokens(production, &old, 54);
+    }
+    validate_catalog_tokens(production, &new, 64)
+}
+
+fn validate_catalog_tokens(
+    production: &[RustToken],
+    expected: &[RustToken],
+    text_count: usize,
+) -> Result<(), SourceBoundaryError> {
     let text_positions: Vec<_> = expected.windows(3).enumerate().filter_map(|(index, tokens)| {
         matches!(&tokens,
             &[RustToken::Ident(field), RustToken::Punct(':'), RustToken::Literal(value)]
@@ -172,8 +188,8 @@ fn validate_catalog_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryErro
     }).collect();
     assert_eq!(
         text_positions.len(),
-        54,
-        "frozen catalog has 54 text positions"
+        text_count,
+        "frozen catalog text positions"
     );
     if production.len() == expected.len()
         && production.iter().enumerate().all(|(index, token)| {
@@ -188,7 +204,7 @@ fn validate_catalog_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryErro
     } else {
         Err(SourceBoundaryError::new(
             SourceBoundaryKind::CatalogProductionShape,
-            token_mismatch("catalog.rs", &expected, production),
+            token_mismatch("catalog.rs", expected, production),
         ))
     }
 }
@@ -222,7 +238,17 @@ fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError
     extended.extend(RustLexer::lex(ACTION_DOMAIN_ADDITIONS).expect("action additions must lex"));
     let read_model = RustLexer::lex(READ_MODEL_DOMAIN_PRODUCTION)
         .expect("complete read model production fixture must lex");
-    if production == expected || production == extended || production == read_model {
+    let mut teaching = RustLexer::lex(READ_MODEL_DOMAIN_PRODUCTION)
+        .expect("complete read model production fixture must lex");
+    teaching.extend(
+        RustLexer::lex(TEACHING_DOMAIN_PRODUCTION)
+            .expect("complete teaching production fixture must lex"),
+    );
+    if production == expected
+        || production == extended
+        || production == read_model
+        || production == teaching
+    {
         Ok(())
     } else {
         Err(SourceBoundaryError::new(
