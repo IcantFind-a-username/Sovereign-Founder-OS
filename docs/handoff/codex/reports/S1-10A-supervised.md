@@ -1,6 +1,6 @@
 # S1-10A supervised execution
 
-Incomplete; two substantive Luna failures. Frozen revision1 card blob
+Accepted after two substantive Luna failures and Astra fallback. Frozen revision1 card blob
 `5a2ea0c3b71bb65db12a5535c49a3a588cead2c9`; first claim/base
 `47c4542b73c523a3964d889611a60e6150faee89`.
 
@@ -66,3 +66,34 @@ Root baseline gate session51453 completed exit0 on unchanged helper37f4ff9;
 raw summary/full output are root-baseline-gate.log and
 root-baseline-gate-full.log under attempt2. This newly observed pass does not
 resolve the independent synchronization finding or restore missing old logs.
+
+## Astra fallback and independent acceptance
+
+Stopped candidate `bf7b594e9bdd55305e04c34ea873ca1509127279`, reviewed against
+HEAD `76ae0ced6cea5914bd25a9f628940bb81369bed9`. Product commit
+`73cd9b2f98cce2af0954b05091e19c7e22e2cfb7` changes only the shared helper,
++484/-55,630lines. Relative to attempt2, fallback changes only its terminal
+regression module; the previously reviewed parser/capture/lifecycle prefix
+and original HTTP helpers are unchanged.
+
+Astra `/root/s1_10a_review` independently **accepted** all four repaired
+findings. Tests use bounded write acknowledgment and overflowing-reader
+completion before stop. They verify exact stdout including pinned libtest
+preamble, exact stderr, both65536/65537 limits, split/Interrupted reads,
+post-start read errors, reader panics, sticky repeated cleanup, reaped child,
+joined handles and unaffected pipe bytes. The frozen CLI import shape and
+startup boundaries were inspected. OS-level wait errors were not injected;
+this limit remains explicit.
+
+Evidence: `.harness/s1-10a/fallback/handoff.txt`, saved candidate/hash/patch,
+transport-final.log (32passed: two named behavioral tests plus one fixture
+among inherited cases), test_changed.log/full.log (ALL GREEN at exact hash).
+Other final checks passed. No inherited timing failure occurred this run.
+A labeled truncation mutation produced one real behavioral RED and was restored;
+this is test sensitivity, not reconstructed historical TDD. Earlier failed
+attempts remain intact. All owned sessions and children stopped; preview95545
+at7788 untouched. New helpers are test-only captured_child acknowledgment and
+assert_reaped_and_joined, reusing std IO/TCP and existing capture lifecycle.
+
+Next S1-10 consumes this accepted helper read-only. This does not yet prove
+CLI root isolation or complete the fullMVP Goal.
