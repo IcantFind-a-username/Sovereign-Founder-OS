@@ -1406,6 +1406,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sovereign-contracts",
+ "sovereign-fault-testing",
  "sovereign-identity",
  "tempfile",
  "thiserror 2.0.18",
@@ -1504,6 +1505,7 @@ dependencies = [
  "hex",
  "serde",
  "sha2",
+ "sovereign-fault-testing",
  "tempfile",
  "thiserror 2.0.18",
 ]
@@ -1612,6 +1614,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "sovereign-fault-testing",
  "tempfile",
  "thiserror 2.0.18",
 ]
