@@ -14,6 +14,7 @@
 
 pub mod bootstrap;
 pub mod connections;
+pub mod corpus;
 pub mod listener;
 pub mod process_lock;
 pub mod protocol;

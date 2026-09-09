@@ -162,6 +162,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
     -p sovereign-authority -p sovereign-owner -p sovereign-cli --all-targets \
     --features owner-effect-fixture --locked -- -D warnings
   run_step "owner-effect-profile-builds" ./scripts/check-owner-effect-profile-builds.sh
+  # A real address reaching the fixture would put it in an unencrypted redb
+  # file. Cheap to scan for, and the way it happens is someone pasting one in
+  # while debugging and not taking it out.
+  run_step "owner-effect-canaries" ./scripts/check-owner-effect-canaries.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
