@@ -325,7 +325,7 @@ while the controller routes eligible design/review cards to the strong role.
   final workspace test/clippy/fmt and scoped gate passed.
   [Evidence](handoff/codex/reports/S1-G05-supervised.md).
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` IN PROGRESS (Astra fallback pending; two Luna substantive failures).
+- [x] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` Accepted (Astra fallback after two Luna substantive failures).
   Definition and done criteria: [S1-05](handoff/codex/cards/S1-05.md).
   Source base `c978e9be1d609fb367510f72a8ea4f73db614164`; card revision1 blob
   `c78a9e9af185b947d7b377549acc4f2f0ade278a`. Exact write set src/http.rs
@@ -348,6 +348,9 @@ while the controller routes eligible design/review cards to the strong role.
   Luna attempts terminated at two failures. Astra fallback owns only inline
   HTTP tests (same src/http.rs +lib write set), then independent review.
   No production or gate redesign; preserve all baseline/attempt logs.
+  Fallback f623a6b accepted independently; seven coverage gaps closed, scoped
+  full workspace/Clippy/fmt/tsc passed.
+  [Execution and acceptance](handoff/codex/reports/S1-05-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G06 — Admit closed embedded assets.** `lane:codex` Frozen architecture task; depends on S1-05 acceptance.

@@ -4,3 +4,6 @@ mod domain;
 // Keep the catalog declaration paired with the domain declaration.
 #[cfg_attr(not(test), allow(dead_code))]
 mod catalog;
+// The pure handler follows domain and catalog.
+#[cfg_attr(not(test), allow(dead_code))]
+mod http;
