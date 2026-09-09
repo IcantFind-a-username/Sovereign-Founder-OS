@@ -405,10 +405,11 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence and retained failure history](handoff/codex/reports/S1-07-supervised.md).
   Next S1-09; no CLI/browser/full-MVP acceptance implied.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` IN PROGRESS (Luna medium attempt1, zero failures)
+- [ ] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` IN PROGRESS (revision2; Luna attempt2 next, one substantive failure)
   Definition and done criteria: [S1-08](handoff/codex/cards/S1-08.md) — depends on S1-09 real CLI acceptance.
-  Base `5e3a7fbf6658554462980b4eab4370102cad239c`, revision1 card blob
-  `c50171cc49e63d3d3a74f53498450af515e109bf`; six UI/test repair paths only.
+  Attempt1 rejected: missing browser evidence, preserved in
+  [report](handoff/codex/reports/S1-08-supervised.md). Revision2 permits CUA
+  visual supplement after actual ego screenshot failures; same six repair paths.
   founder_worker Luna medium + independent Astra review, normal bounded attempts.
   Logs .harness/s1-08/; existing ego-browser task space16 Founder OS MVP.
   Root preview process46719 at127.0.0.1:7788 is live, initial browser render observed.
