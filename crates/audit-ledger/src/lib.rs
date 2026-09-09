@@ -425,3 +425,6 @@ mod tests {
         assert_eq!(reloaded.events.len(), 1);
     }
 }
+
+#[cfg(feature = "owner-effect-fixture")]
+pub mod effect_v1;

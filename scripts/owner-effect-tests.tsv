@@ -129,3 +129,13 @@ task	package	target	profile	test_name
 6	sovereign-owner	exact_approval	owner-effect-fixture	a_restart_invalidates_an_approval_whose_digest_still_verifies
 6	sovereign-owner	exact_approval	owner-effect-fixture	one_store_does_not_honour_anothers_approval
 6	sovereign-owner	exact_approval	owner-effect-fixture	the_approval_is_opaque_and_never_prints_itself
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	a_record_carries_only_the_allowlisted_fields
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	the_record_omits_everything_that_describes_the_effect
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	a_low_entropy_dictionary_gives_no_projection_oracle
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	every_record_is_tagged_as_a_fixture_signer
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	the_chain_verifies_and_each_record_links_to_the_last
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	the_same_outcome_for_one_intent_appends_once
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	a_different_outcome_for_one_intent_conflicts
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	an_indeterminate_outcome_is_never_relabelled
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	tampering_with_any_field_changes_the_hash
+12	sovereign-audit-ledger	effect_v1	owner-effect-fixture	evidence_never_advances_an_effect

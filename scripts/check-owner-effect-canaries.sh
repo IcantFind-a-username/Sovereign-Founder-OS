@@ -32,7 +32,9 @@ SCANNED="crates/authority/src/broker
 crates/authority/tests
 crates/owner/src
 crates/owner/tests
-apps/cli/tests"
+apps/cli/tests
+crates/audit-ledger/src
+crates/audit-ledger/tests"
 
 completed=0
 on_exit() {
