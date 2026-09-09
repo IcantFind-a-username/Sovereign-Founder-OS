@@ -1480,6 +1480,15 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   matters — the write returns rather than blocking forever, and not before
   the budget could elapse — instead of a band that measures machine load.
 
+- [x] **P2 | `crates/consultant-playground/tests/support/transport.rs` | Child-server startup timed out under load.**
+  `ChildServer::start_command` waited 3 seconds for a spawned child to report
+  its port. Cargo runs these suites in parallel and each test spawns and
+  links its own child, so a concurrent release build timed five of eight
+  `business_demo_http` tests out at once (2026-09-10) while they pass in
+  1.7s idle. Nothing asserts that startup is fast, so the budget is now 30
+  seconds: it still fails a child that never reports, without measuring how
+  busy the machine is. Same family as the write-timeout flake above.
+
 - [ ] **P3 | `apps/cli/src/ui.rs` | Split `ui.rs` (1087 lines) along its concerns before it hits the limit.**
   Move the gauntlet and admission views out; `ui_mvp.rs` already holds the
   MVP routes.

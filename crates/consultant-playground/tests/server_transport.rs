@@ -547,11 +547,32 @@ fn transport_helper_rejects_malformed_response_headers() {
 
 #[test]
 fn transport_child_startup_failures_are_bounded() {
-    for mode in ["bad-port", "no-line", "oversized"] {
+    // A child that reports something unusable is an error the reader sees at
+    // once; waiting out a timeout for it would be a defect, so these must
+    // fail well inside the startup budget rather than merely within it.
+    for mode in ["bad-port", "oversized"] {
         let started = Instant::now();
         assert!(ChildServer::start_mode(mode).is_err(), "{mode}");
-        assert!(started.elapsed() < Duration::from_secs(5), "{mode}");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "{mode} should fail on the invalid line, not on the timeout"
+        );
     }
+
+    // A child that reports nothing must still end in an error rather than a
+    // hung suite. Two things can end it: the child exiting, which closes the
+    // pipe and is the better signal, or the startup budget. The fixture
+    // child exits on its own after fifteen seconds, so in practice the
+    // parent notices the death first — which is why the bound here is stated
+    // against the budget and nothing asserts a lower one. Asserting an exact
+    // duration would only pin the fixture's sleep.
+    let started = Instant::now();
+    assert!(ChildServer::start_mode("no-line").is_err());
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < ChildServer::STARTUP_BUDGET + Duration::from_secs(10),
+        "a silent child must not hang the suite: {elapsed:?}"
+    );
 }
 
 #[test]

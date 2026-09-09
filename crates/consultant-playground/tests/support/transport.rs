@@ -134,6 +134,17 @@ impl ChildServer {
         Self::start_command(command)
     }
 
+    /// How long to wait for a spawned child to report the port it bound.
+    ///
+    /// Generous on purpose. Nothing here asserts that a server starts
+    /// quickly; the budget exists only so a child that reports *nothing*
+    /// fails instead of hanging the suite forever. Three seconds measured
+    /// the machine rather than the code — cargo runs these suites in
+    /// parallel and each test spawns and links its own child, so a busy host
+    /// timed several out at once (2026-09-10). A child that reports
+    /// something invalid still fails immediately, without waiting for this.
+    pub const STARTUP_BUDGET: Duration = Duration::from_secs(30);
+
     pub fn start_command(mut command: Command) -> io::Result<Self> {
         command.stdout(Stdio::piped()).stderr(Stdio::piped());
         let child = command.spawn()?;
@@ -162,7 +173,7 @@ impl ChildServer {
         guard.stdout_reader = Some(thread::spawn(move || capture_pipe(stdout, Some(sender))));
         guard.stderr_reader = Some(thread::spawn(move || capture_pipe(stderr, None)));
         let startup = receiver
-            .recv_timeout(Duration::from_secs(3))
+            .recv_timeout(Self::STARTUP_BUDGET)
             .map_err(|error| io::Error::new(io::ErrorKind::TimedOut, error))?;
         let port = match startup {
             Ok(port) => port,
