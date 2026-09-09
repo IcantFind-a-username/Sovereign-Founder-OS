@@ -341,3 +341,43 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
+
+  /* ═══════════ Founder MVP additions ═══════════ */
+  .banner {
+    margin: 14px 0 6px; padding: 10px 14px; border-radius: var(--r-md);
+    background: var(--warn-soft); color: var(--warn); font-size: 13px; line-height: 1.45;
+    border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
+  }
+  .model-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 8px; font-size: 13px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: var(--r-md);
+    padding: 14px 16px; box-shadow: var(--shadow-1); display: flex; flex-direction: column; gap: 8px;
+  }
+  .card p { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .role-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12.5px; }
+  .role-facts dt { color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; font-size: 11px; padding-top: 2px; }
+  .role-facts dd { margin: 0; color: var(--ink-2); }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+  .task-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--panel-edge); font-size: 13.5px; }
+  .task-row:first-child { border-top: 0; }
+  .task-row .done { text-decoration: line-through; color: var(--ink-3); }
+  .tasks { margin-top: 8px; }
+  .tasks .toolbar input { flex: 1; min-width: 160px; }
+  ul.criteria { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; }
+  ul.criteria li { margin: 2px 0; }
+  .change { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
+  .finding { padding: 10px 0; border-top: 1px solid var(--panel-edge); }
+  .finding:first-of-type { border-top: 0; }
+  .finding p { margin: 6px 0; font-size: 13.5px; }
+  .finding a { color: var(--accent); }
+  .finding.attention { border-left: 3px solid var(--critical); padding-left: 10px; }
+  .finding.needs_review { border-left: 3px solid var(--warn); padding-left: 10px; }
+  .finding.pass { border-left: 3px solid var(--good); padding-left: 10px; }
+  .check label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .form-row > div { flex: 1; min-width: 160px; }
+  h3 { font-size: 15px; margin: 18px 0 8px; }
+  #cd-team button { margin-right: 6px; }
+  #cp-invoice, #rc-invoice, #tm-subject, #tm-employee { max-width: 380px; }

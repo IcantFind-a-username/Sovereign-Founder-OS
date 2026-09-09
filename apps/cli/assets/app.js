@@ -1,23 +1,29 @@
 "use strict";
-// Checked by `tsc --checkJs` in CI (see tsconfig.json) — types via JSDoc only,
-// zero build step, nothing here changes what ships.
+// Shell, Today (Command Center), Security Center, and backup verification.
+// The Company/Customers/Documents views live in crm.js, the Team view and
+// proposals inbox in team.js, Compliance in compliance.js; this file wires
+// them together. Checked by `tsc --checkJs` (see tsconfig.json) — types via
+// JSDoc only, zero build step, nothing here changes what ships.
 
 /**
- * @typedef {{id: string, name: string, email: string, notes: string, created_at: number}} Customer
+ * @typedef {{id: string, name: string, email: string, notes: string, created_at: number, stage: string, discovery_notes: string, jurisdiction: string, personal_data_consent: boolean, updated_at: number}} Customer
  * @typedef {{relative_path: string, content_sha256: string, bytes: number}} OutboxWrite
  * @typedef {{evidence_digest: string, approver_key_id: string, guest_exit_code: number, outbox: OutboxWrite|null}} Evidence
  * @typedef {{id: string, document_id: string, status: string, action: string, policy_reason: string, requested_at: number, evidence: Evidence|null}} Approval
- * @typedef {{id: string, customer_id: string, kind: string, title: string, body: string, status: string}} Doc
- * @typedef {{name: string, service: string}} Venture
- * @typedef {{version: number, venture: Venture|null, customers: Customer[], documents: Doc[], approvals: Approval[], disclosures: object[]}} Workspace
+ * @typedef {{id: string, customer_id: string, kind: string, title: string, body: string, amount_cents: number|null, status: string, revision: number, due_at: number|null, project_id: string|null, accepted_at: number|null}} Doc
+ * @typedef {{name: string, service: string, jurisdiction: string, currency: string, uen: string, gst_registered: boolean, incorporated_at: number|null, fiscal_year_end_month: number, revenue_estimate_cents: number|null}} Venture
+ * @typedef {{version: number, venture: Venture|null, customers: Customer[], documents: Doc[], approvals: Approval[], disclosures: object[], projects: Project[], tasks: Task[], follow_ups: FollowUp[], payments: object[], employees: Employee[], decisions: Decision[], compliance_reports: any[]}} Workspace
  */
 
 let lang = localStorage.getItem("sovereign-ui-lang")
   || (navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en");
 let view = localStorage.getItem("sovereign-ui-view") || "command";
+const VIEWS = ["command", "company", "customers", "documents", "team", "compliance", "security"];
+if (!VIEWS.includes(view)) view = "command";
 let lastState = null;
 let lastGauntlet = null;
 let lastCommand = null;
+let modelStatus = null;
 /** @type {Workspace|null} */
 let ws = null;
 
@@ -128,162 +134,41 @@ function confirmAction(kind, subject) {
   });
 }
 
-/* ─────────────── Workspace ─────────────── */
+/* ─────────────── Shared workspace state ─────────────── */
 
 async function loadWorkspace() {
   const data = await (await fetch("/api/workspace")).json();
-  if (data.ok) { ws = data.workspace; renderWorkspace(); }
+  if (data.ok) { ws = data.workspace; renderAll(); }
 }
 
-function renderWorkspace() {
+function renderAll() {
   if (!ws) return;
-  if (ws.venture) {
-    if (document.activeElement !== $("v-name")) $("v-name").value = ws.venture.name;
-    if (document.activeElement !== $("v-service")) $("v-service").value = ws.venture.service;
-  }
+  renderCompany();
+  renderCustomers();
+  renderDocuments();
+  renderTeam();
+  renderProposalsInbox();
+  renderCompliance();
+}
 
-  const customers = $("customers");
-  if (!ws.customers.length) {
-    customers.replaceChildren(el("div", "empty", t("ws_no_customers")));
+async function loadModelStatus() {
+  try {
+    modelStatus = await (await fetch("/api/model/status")).json();
+  } catch (error) { modelStatus = null; }
+  renderModelStatus();
+}
+
+function renderModelStatus() {
+  const line = $("model-status");
+  const hint = $("model-hint");
+  const real = modelStatus && modelStatus.ok && modelStatus.providers.find(p => p.real_model);
+  if (real) {
+    line.replaceChildren(badge(real.health === "healthy" ? "good" : "warn", t("model_status_real")(real)));
+    hint.textContent = "";
   } else {
-    customers.replaceChildren(table(
-      [t("th_customer"), t("th_email"), t("th_notes"), t("th_added")],
-      ws.customers.map(c => [c.name, c.email || "—", c.notes, fmtTime(c.created_at)])));
+    line.replaceChildren(badge("neutral", t("model_status_none")));
+    hint.textContent = t("model_status_hint") + (modelStatus && modelStatus.config_path ? " (" + modelStatus.config_path + ")" : "");
   }
-
-  const select = $("d-customer");
-  const selected = select.value;
-  select.replaceChildren(...ws.customers.map(c => {
-    const option = /** @type {HTMLOptionElement} */ (el("option", null, c.name));
-    option.value = c.id;
-    return option;
-  }));
-  if (selected && ws.customers.some(c => c.id === selected)) select.value = selected;
-
-  const documents = $("documents");
-  if (!ws.documents.length) {
-    documents.replaceChildren(el("div", "empty", t("ws_no_documents")));
-  } else {
-    documents.replaceChildren(...[...ws.documents].reverse().map(d => {
-      const wrap = el("div", "doc");
-      const head = el("div", "doc-head");
-      head.appendChild(el("span", "badge neutral", t(d.kind === "offer" ? "kind_offer" : "kind_invoice")));
-      head.appendChild(el("span", "title", d.title));
-      const statusKind = { draft: "neutral", pending_approval: "warn", approved_pending_delivery: "good", rejected: "bad", revoked: "neutral", delivered: "good" }[d.status] || "neutral";
-      head.appendChild(badge(statusKind, t("status_" + d.status)));
-      if (d.status === "draft") {
-        const submit = el("button", "ghost small", t("ws_submit_send"));
-        submit.addEventListener("click", () => withBusy(submit, async () => {
-          const result = await api("/api/workspace/request-send", { document_id: d.id });
-          if (result.ok) { ws = result.workspace; renderWorkspace(); }
-          else toast("bad", result.error);
-        }));
-        head.appendChild(submit);
-      }
-      if (d.status === "approved_pending_delivery") {
-        const delivered = el("button", "ghost small", t("ws_mark_delivered"));
-        delivered.addEventListener("click", () => withBusy(delivered, async () => {
-          if (!await confirmAction("deliver", d.title)) return;
-          const result = await api("/api/workspace/confirm-delivery", { document_id: d.id });
-          if (result.ok) { ws = result.workspace; renderWorkspace(); loadState(); toast("good", t("toast_delivered")(d.title)); }
-          else toast("bad", result.error);
-        }));
-        head.appendChild(delivered);
-        const revoke = el("button", "ghost small", t("ws_revoke"));
-        revoke.addEventListener("click", () => withBusy(revoke, async () => {
-          if (!await confirmAction("revoke", d.title)) return;
-          const result = await api("/api/workspace/revoke", { document_id: d.id });
-          if (result.ok) { ws = result.workspace; renderWorkspace(); loadState(); toast("good", t("toast_revoked")(d.title)); }
-          else toast("bad", result.error);
-        }));
-        head.appendChild(revoke);
-      }
-      wrap.appendChild(head);
-      const approvalWithEvidence = ws.approvals.find(a => a.document_id === d.id && a.evidence);
-      if (approvalWithEvidence) {
-        wrap.appendChild(el("div", "mono", t("ws_evidence")(approvalWithEvidence.evidence)));
-        if (approvalWithEvidence.evidence.outbox) {
-          wrap.appendChild(el("div", "mono", t("ws_outbox")(approvalWithEvidence.evidence.outbox)));
-        }
-      }
-      const details = el("details");
-      details.appendChild(el("summary", null, t("ws_view_content")));
-      details.appendChild(el("pre", null, d.body));
-      wrap.appendChild(details);
-      return wrap;
-    }));
-  }
-
-  const approvals = $("approvals");
-  const pending = ws.approvals.filter(a => a.status === "pending");
-  if (!pending.length) {
-    approvals.replaceChildren(el("div", "empty", t("ws_no_approvals")));
-  } else {
-    approvals.replaceChildren(...pending.map(a => {
-      const doc = ws.documents.find(d => d.id === a.document_id);
-      const row = el("div", "approval");
-      const info = el("div");
-      info.appendChild(el("div", null, t("ws_approval_for") + (doc ? doc.title : a.document_id)));
-      info.appendChild(el("div", "why", a.policy_reason));
-      row.appendChild(info);
-      const actions = el("div", "actions");
-      const approve = el("button", "approve", "✓ " + t("ws_approve"));
-      const reject = el("button", "reject", "✗ " + t("ws_reject"));
-      const decide = async (yes) => {
-        const title = doc ? doc.title : a.document_id;
-        if (!await confirmAction(yes ? "approve" : "reject", title)) return;
-        const result = await api("/api/workspace/decide", { approval_id: a.id, approve: yes });
-        if (result.ok) {
-          ws = result.workspace; renderWorkspace(); loadState();
-          toast("good", t(yes ? "toast_approved" : "toast_rejected")(title));
-        } else {
-          toast("bad", result.error);
-        }
-      };
-      approve.addEventListener("click", () => withBusy(approve, () => decide(true)));
-      reject.addEventListener("click", () => withBusy(reject, () => decide(false)));
-      actions.appendChild(approve); actions.appendChild(reject);
-      row.appendChild(actions);
-      return row;
-    }));
-  }
-}
-
-async function saveVenture() {
-  const result = await api("/api/workspace/venture", { name: $("v-name").value, service: $("v-service").value });
-  $("v-status").textContent = result.ok ? t("saved") : "";
-  if (result.ok) { ws = result.workspace; renderWorkspace(); loadState(); }
-  else toast("bad", result.error);
-}
-
-async function addCustomer() {
-  const result = await api("/api/workspace/customer", { name: $("c-name").value, email: $("c-email").value, notes: $("c-notes").value });
-  if (result.ok) { $("c-name").value = ""; $("c-email").value = ""; $("c-notes").value = ""; ws = result.workspace; renderWorkspace(); loadState(); }
-  else toast("bad", result.error);
-}
-
-async function draftAssist() {
-  const customer_id = $("d-customer").value;
-  if (!customer_id) { $("d-status").textContent = t("ws_no_customers"); return; }
-  $("d-status").textContent = "…";
-  const result = await api("/api/workspace/assist", { customer_id });
-  if (!result.ok) { $("d-status").textContent = ""; toast("bad", result.error); return; }
-  $("d-status").textContent = "";
-  const s = result.suggestion;
-  $("assist-box").hidden = false;
-  $("assist-label").textContent = t("ws_assist_label");
-  $("assist-text").value = s.text;
-  $("assist-meta").textContent = t("ws_assist_meta")(s);
-  loadState();
-}
-
-async function createDocument(kind) {
-  const body = { customer_id: $("d-customer").value };
-  if (kind === "invoice") body.amount = $("d-amount").value;
-  const result = await api("/api/workspace/" + kind, body);
-  $("d-status").textContent = result.ok ? t("saved") : "";
-  if (result.ok) { ws = result.workspace; renderWorkspace(); loadState(); }
-  else toast("bad", result.error);
 }
 
 /* ─────────────── Security Center ─────────────── */
@@ -318,7 +203,6 @@ function renderState() {
       row.appendChild(el("div", "detail", f.resource + " — " + f.detail));
       wrap.appendChild(row);
     });
-    wrap.classList.remove("empty");
     integrity.replaceChildren(wrap);
     integrity.classList.remove("empty");
   }
@@ -470,7 +354,7 @@ function renderVerifyReport(r) {
   box.replaceChildren(...children);
 }
 
-/* ─────────────── Command Center ─────────────── */
+/* ─────────────── Today / Command Center ─────────────── */
 
 async function loadCommandCenter() {
   try {
@@ -494,9 +378,14 @@ function renderCommandCenter() {
   }
 
   $("cc-customers").textContent = s.counts.customers;
+  $("cc-leads").textContent = s.counts.leads;
+  $("cc-projects").textContent = s.counts.projects_active;
+  $("cc-projects-meta").textContent = t("cc_projects_meta")(s.counts);
+  $("cc-followups").textContent = s.counts.follow_ups_overdue;
+  $("cc-receivable").textContent = (s.counts.receivable_cents / 100).toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   $("cc-documents").textContent = s.counts.documents;
   $("cc-documents-meta").textContent = t("cc_documents_meta")(s.counts);
-  $("cc-pending").textContent = s.pending_decisions.length;
+  $("cc-pending").textContent = s.pending_decisions.length + s.counts.proposals_pending;
   $("cc-effects").textContent = s.evidence.outbox_effects;
   $("cc-effects-meta").textContent = t("cc_effects_meta")(s.evidence);
 
@@ -526,7 +415,7 @@ function renderCommandGuidance(items) {
     const bar = el("div", "toolbar");
     const risk = g.kind_class === "risk";
     bar.appendChild(badge(risk ? "warn" : "neutral", risk ? t("cc_risk_word") : t("cc_step_word")));
-    bar.appendChild(el("span", null, t("cc_guidance")(g)));
+    bar.appendChild(el("span", null, t("cc_guidance_extra")(g) || t("cc_guidance")(g)));
     row.appendChild(bar);
     return row;
   }));
@@ -559,14 +448,7 @@ function renderCommandDecisions(decisions) {
 async function commandDecide(approvalId, approve, title) {
   if (!await confirmAction(approve ? "approve" : "reject", title || "")) return;
   const result = await api("/api/workspace/decide", { approval_id: approvalId, approve });
-  if (result.ok) {
-    ws = result.workspace; renderWorkspace();
-    toast("good", t(approve ? "toast_approved" : "toast_rejected")(title || ""));
-  } else {
-    toast("bad", result.error);
-  }
-  await loadCommandCenter();
-  await loadState();
+  await applyResult(result, t(approve ? "toast_approved" : "toast_rejected")(title || ""));
 }
 
 /* ─────────────── Shell ─────────────── */
@@ -579,10 +461,16 @@ function applyLanguage() {
     const value = t(node.dataset.i18n);
     if (typeof value === "string") node.textContent = value;
   });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((/** @type {HTMLInputElement} */ node) => {
+    const value = t(node.dataset.i18nPlaceholder);
+    if (typeof value === "string") node.placeholder = value;
+  });
   renderState();
   renderGauntlet();
-  renderWorkspace();
+  renderAll();
   renderCommandCenter();
+  renderWorkSuggestions();
+  renderModelStatus();
 }
 
 function setLanguage(next) {
@@ -594,13 +482,12 @@ function setLanguage(next) {
 function setView(next) {
   view = next;
   localStorage.setItem("sovereign-ui-view", next);
-  $("view-command").hidden = next !== "command";
-  $("view-workspace").hidden = next !== "workspace";
-  $("view-security").hidden = next !== "security";
-  $("tab-command").classList.toggle("active", next === "command");
-  $("tab-workspace").classList.toggle("active", next === "workspace");
-  $("tab-security").classList.toggle("active", next === "security");
-  if (next === "command") loadCommandCenter();
+  VIEWS.forEach(name => {
+    $("view-" + name).hidden = next !== name;
+    $("tab-" + name).classList.toggle("active", next === name);
+  });
+  if (next === "command") { loadCommandCenter(); loadWorkSuggestions(); }
+  if (next === "security") loadState();
 }
 
 $("theme-toggle").addEventListener("click", () => {
@@ -610,27 +497,17 @@ $("theme-toggle").addEventListener("click", () => {
 });
 $("lang-en").addEventListener("click", () => setLanguage("en"));
 $("lang-zh").addEventListener("click", () => setLanguage("zh"));
-$("tab-command").addEventListener("click", () => setView("command"));
-$("tab-workspace").addEventListener("click", () => setView("workspace"));
-$("tab-security").addEventListener("click", () => setView("security"));
-$("v-save").addEventListener("click", () => withBusy($("v-save"), saveVenture));
-$("c-add").addEventListener("click", () => withBusy($("c-add"), addCustomer));
-$("d-assist").addEventListener("click", () => withBusy($("d-assist"), draftAssist));
-$("assist-copy").addEventListener("click", () => {
-  const text = $("assist-text").value;
-  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
-  else { $("assist-text").select(); document.execCommand("copy"); }
-  $("assist-copy").textContent = t("ws_assist_copied");
-  setTimeout(() => { $("assist-copy").textContent = t("ws_assist_copy"); }, 1500);
-});
+VIEWS.forEach(name => $("tab-" + name).addEventListener("click", () => setView(name)));
 $("verify-btn").addEventListener("click", () => withBusy($("verify-btn"), verifyBackup));
-$("d-offer").addEventListener("click", () => withBusy($("d-offer"), () => createDocument("offer")));
-$("d-invoice").addEventListener("click", () => withBusy($("d-invoice"), () => createDocument("invoice")));
 $("run").addEventListener("click", runGauntlet);
 $("refresh").addEventListener("click", loadState);
 
+initCrm();
+initTeam();
+initCompliance();
 applyLanguage();
 setView(view);
 loadState();
-loadWorkspace();
+loadWorkspace().then(() => { loadRoles(); loadPacks(); loadWorkSuggestions(); });
 loadCommandCenter();
+loadModelStatus();

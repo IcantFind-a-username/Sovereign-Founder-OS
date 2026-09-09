@@ -49,7 +49,12 @@ const UI_HTML: &str = include_str!("../assets/index.html");
 const UI_CSS: &str = include_str!("../assets/styles.css");
 const UI_I18N_JS: &str = include_str!("../assets/i18n.js");
 const UI_APP_JS: &str = include_str!("../assets/app.js");
+const UI_I18N_MVP_JS: &str = include_str!("../assets/i18n-mvp.js");
+const UI_CRM_JS: &str = include_str!("../assets/crm.js");
+const UI_TEAM_JS: &str = include_str!("../assets/team.js");
+const UI_COMPLIANCE_JS: &str = include_str!("../assets/compliance.js");
 const UI_FAVICON: &str = include_str!("../assets/favicon.svg");
+const JS_TYPE: &str = "application/javascript; charset=utf-8";
 
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
 
@@ -117,6 +122,10 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
         (Method::Get, "/assets/app.js") => {
             asset_response(UI_APP_JS, "application/javascript; charset=utf-8")
         }
+        (Method::Get, "/assets/i18n-mvp.js") => asset_response(UI_I18N_MVP_JS, JS_TYPE),
+        (Method::Get, "/assets/crm.js") => asset_response(UI_CRM_JS, JS_TYPE),
+        (Method::Get, "/assets/team.js") => asset_response(UI_TEAM_JS, JS_TYPE),
+        (Method::Get, "/assets/compliance.js") => asset_response(UI_COMPLIANCE_JS, JS_TYPE),
         (Method::Get, "/favicon.svg") => asset_response(UI_FAVICON, "image/svg+xml"),
         (Method::Get, "/api/state") => json_response(&state_json(root)),
         (Method::Get, "/api/command-center") => json_response(&command_center_json(root)),

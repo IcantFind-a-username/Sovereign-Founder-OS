@@ -4,11 +4,22 @@
     "checkJs": true,
     "noEmit": true,
     "target": "es2022",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": [
+      "es2022",
+      "dom",
+      "dom.iterable"
+    ],
     "types": [],
     "strict": false,
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["i18n.js", "app.js"]
+  "include": [
+    "i18n.js",
+    "i18n-mvp.js",
+    "crm.js",
+    "team.js",
+    "compliance.js",
+    "app.js"
+  ]
 }
