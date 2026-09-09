@@ -75,7 +75,8 @@ Owner 最新指示优先：S0-06 仅约束自动调度，不阻塞主控监督�
 | S1-00 | architect；按增量冻结产品接口，实际状态见 backlog | [Playground 接口与门迁移](cards/S1-00.md) |
 | S1-G01 / G02、S1-01–11 | 已冻结增量及未冻结后续项见索引；完成与认领见 backlog | [后续 Playground 卡](cards/S1-after-design.md) |
 | S2-00 | architect；Frozen 设计任务，实际认领见 backlog | [可编辑完整业务流程设计](cards/S2-00.md)；输出仍须独立验收。 |
-| S2–S3、MVP-00/01/02 | Target；按证据冻结 | [里程碑索引](milestones.md)，最终必须完成统一业务/AI 界面验收。 |
+| S2-00、S2-01A1/A2、S2-01B–07 | S2-00 设计候选；独立验收后实现卡准入 | [S2 合成业务契约](business-demo-contract.md)、[S2 索引](milestones.md#123-s2从教学图扩展到完整合成业务演示)；完成/认领只见 backlog。 |
+| S3、MVP-00/01/02 | Target；按证据冻结 | [里程碑索引](milestones.md)，真实模型/法务及最终统一业务/AI 界面验收仍必需。 |
 | S4–S6 | Target / Research，完整合成 MVP 之后 | [里程碑索引](milestones.md)，真实模型所必需的核心安全依赖按 S3-M 前置。 |
 
 Frozen 表示这张卡自身的任务契约可用；依赖、claim、环境与实际运行状态仍从 backlog/执行证据读取。S1-00 是可以交给架构角色的设计工作，不是可以让 Luna 自行确定安全边界的功能卡。
