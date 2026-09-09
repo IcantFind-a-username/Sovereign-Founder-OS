@@ -90,6 +90,12 @@ enum Commands {
     /// serialized module to stdout.
     #[command(name = "__compile-worker", hide = true)]
     CompileWorker,
+    /// Internal, fixture only: the RFC 0006 owner-effect broker. Absent from
+    /// a default build — the variant, its name, and its dispatch arm all
+    /// compile only under `owner-effect-fixture`.
+    #[cfg(feature = "owner-effect-fixture")]
+    #[command(name = "__owner-effect-broker", hide = true)]
+    OwnerEffectBroker,
 }
 
 /// The hidden subcommand name the runtime spawns for out-of-process
@@ -106,6 +112,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     match cli.command {
         Commands::Init => cmd_init()?,
+        #[cfg(feature = "owner-effect-fixture")]
+        Commands::OwnerEffectBroker => {
+            // Print the sentence, not the type name: `Box<dyn Error>` from
+            // `main` renders with Debug, so `?` here would surface
+            // "BrokerNotImplemented" and tell a reader nothing.
+            if let Err(error) = sovereign_authority::broker::run_owner_effect_fixture_broker() {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
         Commands::Demo { fast } => demo::run(fast, data_dir())?,
         Commands::SandboxCheck => cmd_sandbox_check()?,
         Commands::Status => cmd_status()?,

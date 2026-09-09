@@ -15,6 +15,9 @@ repository.workspace = true
 # release artifact rather than trusting this comment.
 default = []
 fault-injection = []
+# RFC 0006's synthetic broker. Non-default for the same reason: a default
+# build must contain no broker mode and no entry point.
+owner-effect-fixture = []
 
 [dependencies]
 hex = { workspace = true }
