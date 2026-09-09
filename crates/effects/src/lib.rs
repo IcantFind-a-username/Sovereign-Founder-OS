@@ -417,4 +417,58 @@ mod tests {
         let written = std::fs::read(dir.path().join("outbox").join("doc.txt")).unwrap();
         assert_eq!(written, b"second");
     }
+
+    /// The outbox is where an approved effect becomes a real file, and until
+    /// now no test made that write fail. An unavailable outbox must surface
+    /// the error and leave nothing at all behind — neither a partial `.eml`
+    /// nor the dot-prefixed temp it writes through.
+    #[test]
+    fn write_message_fails_closed_when_the_outbox_is_unavailable() {
+        let dir = tempdir().unwrap();
+        let outbox = dir.path().join("outbox");
+        let broker = OutboxBroker::open(&outbox).unwrap();
+
+        let blocked = sovereign_fault_testing::BlockedPath::block(&outbox).unwrap();
+        assert!(
+            broker
+                .write_message("msg-1", EffectDataClass::Amber, b"never written")
+                .is_err(),
+            "writing into an unavailable outbox must fail, not report success"
+        );
+        drop(blocked);
+
+        let names: Vec<_> = std::fs::read_dir(&outbox)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            names.is_empty(),
+            "a failed write must leave no file and no temp: {names:?}"
+        );
+    }
+
+    /// A revoke that cannot remove the file must say so. Reporting success
+    /// while the message is still sitting in the outbox would let the product
+    /// tell a founder that a send was withdrawn when it was not.
+    #[test]
+    fn revoke_reports_failure_when_the_outbox_is_unavailable() {
+        let dir = tempdir().unwrap();
+        let outbox = dir.path().join("outbox");
+        let broker = OutboxBroker::open(&outbox).unwrap();
+        let receipt = broker
+            .write_message("msg-1", EffectDataClass::Amber, b"delivered")
+            .unwrap();
+
+        let blocked = sovereign_fault_testing::BlockedPath::block(&outbox).unwrap();
+        assert!(
+            broker.revoke(&receipt.relative_path).is_err(),
+            "a revoke that removed nothing must not report success"
+        );
+        drop(blocked);
+
+        assert!(
+            outbox.join(&receipt.relative_path).is_file(),
+            "the message is still there, which is exactly why revoke had to fail"
+        );
+    }
 }

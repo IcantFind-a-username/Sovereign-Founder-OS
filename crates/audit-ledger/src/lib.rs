@@ -318,4 +318,110 @@ mod tests {
         let loaded = AuditLedger::load(&path, device.public_key_b64()).unwrap();
         assert_eq!(loaded.events().len(), 1);
     }
+
+    fn one_event_ledger(device: &DeviceIdentity) -> AuditLedger {
+        let mut ledger = AuditLedger::new();
+        ledger
+            .append(
+                AppendInput {
+                    venture_id: "ven_1".into(),
+                    actor_id: "agent".into(),
+                    action: "execute".into(),
+                    resource: "email:draft".into(),
+                    capability_id: None,
+                    payload: serde_json::json!({}),
+                    policy_decision_hash: None,
+                },
+                device,
+            )
+            .unwrap();
+        ledger
+    }
+
+    /// The durable half of an append is `save`, and nothing made it fail
+    /// before this: the chain's tamper-evidence was proven only against
+    /// writes that succeeded. A ledger directory that has gone away must
+    /// surface the error, leave no partial chain, and leave the chain that
+    /// was already on disk intact and verifiable.
+    #[test]
+    fn append_fails_closed_when_the_ledger_directory_is_unavailable() {
+        let dir = tempdir().unwrap();
+        let ledger_dir = dir.path().join("audit");
+        std::fs::create_dir(&ledger_dir).unwrap();
+        let path = ledger_dir.join("ledger.json");
+        let device = DeviceIdentity::generate();
+
+        let mut ledger = one_event_ledger(&device);
+        ledger.save(&path).unwrap();
+        let before = std::fs::read(&path).unwrap();
+
+        // Extend in memory. The in-memory append always succeeds; `save` is
+        // the step that can fail, and the point is that a failed save leaves
+        // the durable chain exactly as it was.
+        ledger
+            .append(
+                AppendInput {
+                    venture_id: "ven_1".into(),
+                    actor_id: "agent".into(),
+                    action: "execute".into(),
+                    resource: "email:send".into(),
+                    capability_id: None,
+                    payload: serde_json::json!({}),
+                    policy_decision_hash: None,
+                },
+                &device,
+            )
+            .unwrap();
+
+        let blocked = sovereign_fault_testing::BlockedPath::block(&ledger_dir).unwrap();
+        assert!(
+            ledger.save(&path).is_err(),
+            "saving into an unavailable directory must fail, not report success"
+        );
+        drop(blocked);
+
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            before,
+            "the chain already on disk must be untouched"
+        );
+        assert!(
+            !ledger_dir.join("ledger.tmp").exists(),
+            "temp file left behind"
+        );
+        let reloaded =
+            AuditLedger::load(&path, device.public_key_b64()).expect("the saved chain reloads");
+        reloaded.verify_chain().expect("and still verifies");
+        assert_eq!(
+            reloaded.events.len(),
+            1,
+            "the event whose save failed must not be on disk"
+        );
+    }
+
+    /// A crash can leave a temp file from a save that never completed. It is
+    /// not part of the chain and must never be trusted or block the next
+    /// save; the write replaces it.
+    #[test]
+    fn a_stale_temp_file_is_ignored_and_replaced_on_the_next_append() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("ledger.json");
+        let device = DeviceIdentity::generate();
+
+        let stale = dir.path().join("ledger.tmp");
+        std::fs::write(&stale, b"[not json at all").unwrap();
+
+        let ledger = one_event_ledger(&device);
+        ledger
+            .save(&path)
+            .expect("a stale temp must not block the save");
+
+        assert!(
+            !stale.exists(),
+            "the stale temp must be gone, not merely ignored"
+        );
+        let reloaded = AuditLedger::load(&path, device.public_key_b64()).unwrap();
+        reloaded.verify_chain().unwrap();
+        assert_eq!(reloaded.events.len(), 1);
+    }
 }

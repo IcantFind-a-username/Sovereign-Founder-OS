@@ -76,6 +76,8 @@ impl Vault {
                 entries: Vec::new(),
             }
         };
+        #[cfg(unix)]
+        restrict_existing(&root, &manifest.entries);
         Ok(Self {
             root,
             key,
@@ -128,7 +130,7 @@ fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     let temp_path = path.with_extension("tmp");
     let result = (|| {
-        let mut file = std::fs::File::create(&temp_path)?;
+        let mut file = create_owner_only(&temp_path)?;
         file.write_all(bytes)?;
         file.sync_all()?;
         drop(file);
@@ -190,6 +192,49 @@ fn generate_key() -> [u8; 32] {
     let mut key = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut key);
     key
+}
+
+/// Create a file only this user can read. `File::create` takes the ambient
+/// umask, which on a default account is 0644 — for `vault.key` that is the
+/// master key readable by every local account. The device signing key in
+/// `crates/identity` has always been 0600; this brings the vault's own files
+/// to the same footing.
+///
+/// The temp file is created with the mode, and `rename` carries it to the
+/// destination, so the target is never briefly world-readable.
+fn create_owner_only(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
+/// Tighten what a vault created before this existed. Modes are all that
+/// change; the on-disk format is untouched.
+///
+/// This narrows who can read the files from here on. It cannot undo an
+/// earlier exposure: a key that was 0644 on a shared machine must be treated
+/// as having been readable, and rotating it is a separate decision.
+#[cfg(unix)]
+fn restrict_existing(root: &std::path::Path, entries: &[String]) {
+    use std::os::unix::fs::PermissionsExt;
+    let set = |path: std::path::PathBuf, mode: u32| {
+        if path.exists() {
+            // Best effort: a vault on a filesystem without Unix modes still
+            // opens. Failing here would deny access to readable data.
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode));
+        }
+    };
+    set(root.to_path_buf(), 0o700);
+    set(root.join("vault.key"), 0o600);
+    set(root.join("manifest.json"), 0o600);
+    for entry in entries {
+        set(root.join(format!("{entry}.enc")), 0o600);
+    }
 }
 
 fn save_key(path: &std::path::Path, key: &[u8; 32]) -> Result<(), VaultError> {
@@ -405,5 +450,131 @@ mod tests {
             Err(VaultError::InvalidEntryName(_))
         ));
         assert!(!dir.path().join("outside.enc").exists());
+    }
+
+    /// The master key must not be readable by other local accounts, and
+    /// neither must the ciphertext or the manifest. `File::create` and
+    /// `create_dir_all` take the ambient umask, which on a default account
+    /// left `vault.key` at 0644 inside a 0755 directory.
+    ///
+    /// This does not make the vault safe against someone who can read the
+    /// disk as this user — the key still sits beside its ciphertext by
+    /// design at this stage, and RFC 0005 is what changes that. It removes
+    /// the weaker exposure: every other account on the machine.
+    #[cfg(unix)]
+    #[test]
+    fn every_vault_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("vault");
+        let mut vault = Vault::init(&root).unwrap();
+        vault.put("secret", b"plaintext").unwrap();
+
+        let mode = |path: std::path::PathBuf| {
+            std::fs::metadata(&path)
+                .unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+                .permissions()
+                .mode()
+                & 0o777
+        };
+        assert_eq!(mode(root.clone()), 0o700, "vault root");
+        assert_eq!(mode(root.join("vault.key")), 0o600, "master key");
+        assert_eq!(mode(root.join("manifest.json")), 0o600, "manifest");
+        assert_eq!(mode(root.join("secret.enc")), 0o600, "entry");
+    }
+
+    /// A vault created by an older build keeps its 0644 key until something
+    /// tightens it. Opening it is that something.
+    #[cfg(unix)]
+    #[test]
+    fn opening_an_older_vault_tightens_what_it_already_holds() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("vault");
+        let mut vault = Vault::init(&root).unwrap();
+        vault.put("secret", b"plaintext").unwrap();
+        drop(vault);
+
+        // Exactly what a default umask produced before this change.
+        let loosen = |path: std::path::PathBuf, mode: u32| {
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap()
+        };
+        loosen(root.join("vault.key"), 0o644);
+        loosen(root.join("manifest.json"), 0o644);
+        loosen(root.join("secret.enc"), 0o644);
+        loosen(root.clone(), 0o755);
+
+        let reopened = Vault::init(&root).unwrap();
+        assert_eq!(reopened.get("secret").unwrap(), b"plaintext");
+
+        let mode = |path: std::path::PathBuf| {
+            std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+        };
+        assert_eq!(mode(root.clone()), 0o700, "vault root");
+        assert_eq!(mode(root.join("vault.key")), 0o600, "master key");
+        assert_eq!(mode(root.join("manifest.json")), 0o600, "manifest");
+        assert_eq!(mode(root.join("secret.enc")), 0o600, "entry");
+    }
+
+    /// A vault whose root has gone away must fail the write, leave no debris,
+    /// and still hold everything it held before. Until now no test made a
+    /// vault write fail at all, so "writes replace atomically" was only ever
+    /// checked on writes that succeeded.
+    #[test]
+    fn put_fails_closed_when_the_vault_root_is_unavailable() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("vault");
+        let mut vault = Vault::init(&root).unwrap();
+        vault.put("first", b"stored before the fault").unwrap();
+
+        let blocked = sovereign_fault_testing::BlockedPath::block(&root).unwrap();
+        assert!(
+            vault.put("second", b"never written").is_err(),
+            "a put into an unavailable root must fail, not report success"
+        );
+        drop(blocked);
+
+        let names: Vec<_> = std::fs::read_dir(&root)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            !names.iter().any(|name| name.ends_with(".tmp")),
+            "a failed write left debris behind: {names:?}"
+        );
+        assert!(!root.join("second.enc").exists());
+
+        let reopened = Vault::init(&root).unwrap();
+        assert_eq!(reopened.get("first").unwrap(), b"stored before the fault");
+        assert_eq!(reopened.list(), ["first"]);
+    }
+
+    /// `put` publishes the entry and then the manifest, so a crash between
+    /// them leaves a readable blob the manifest does not list. That tear must
+    /// not lose data: the entry still decrypts, `list` tells the truth about
+    /// what the manifest knows, and the next write reconciles the two.
+    #[test]
+    fn a_torn_entry_absent_from_the_manifest_stays_readable_and_heals_on_next_put() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("vault");
+        let mut vault = Vault::init(&root).unwrap();
+        vault.put("a", b"first entry").unwrap();
+        drop(vault);
+
+        // Exactly the state a crash between the two renames leaves: b.enc is
+        // published, the manifest still lists only a.
+        std::fs::copy(root.join("a.enc"), root.join("b.enc")).unwrap();
+
+        let mut reopened = Vault::init(&root).unwrap();
+        assert_eq!(reopened.list(), ["a"], "list reports the manifest");
+        assert_eq!(
+            reopened.get("b").unwrap(),
+            b"first entry",
+            "the torn entry must still decrypt"
+        );
+
+        reopened.put("b", b"second entry").unwrap();
+        assert_eq!(reopened.list(), ["a", "b"], "the next put reconciles them");
+        assert_eq!(reopened.get("b").unwrap(), b"second entry");
     }
 }
