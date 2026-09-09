@@ -19,7 +19,12 @@ Developer Preview maturity.
   `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
   `publish = false`, no product path yet).
 - `apps/cli` — `sovereign-cli` binary + zero-dependency web frontend under
-  `apps/cli/assets/` (JSDoc-typed JS, checked with `tsc --checkJs`).
+  `apps/cli/assets/` (JSDoc-typed JS, checked with `tsc --checkJs`). The
+  founder MVP lives in `apps/cli/src/workspace/` (`erp_*` business graph,
+  `crew_*` AI employees, `compliance*` rule pack and checks,
+  `model_config.rs`), its routes in `apps/cli/src/ui_mvp.rs`, its pages in
+  `assets/{crm,team,compliance,i18n-mvp}.js`; design record under
+  `docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md`.
 - `tests/adversarial` — cross-crate security-invariant suite
   (`sovereign-adversarial-tests`).
 - `rfcs/` — accepted designs; with current code, the source of truth over
@@ -32,7 +37,7 @@ Green on macOS 26.5 arm64 as well, as of 2026-08-15.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
-cargo test --workspace --locked  # full suite (~293 tests as of 2026-09-09)
+cargo test --workspace --locked  # full suite (~463 tests as of 2026-09-10)
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 ./scripts/check-file-size.sh     # god-file limit: 1200 rs / 800 frontend
@@ -135,6 +140,10 @@ secret scanning. Toolchain is pinned: 1.97.0.
     `primary_resource() == None` for a rejection-path test, declare the
     manifest operation's `resource_bindings` as `[]` (an empty array is
     valid) and pass no grants — `prepare_grants` then never sets it.
+13. `sovereign ui` has no `--root` flag yet: to test the app without touching
+    the owner's real data, build it and run the binary with `HOME` pointed at
+    a scratch directory (`dirs::data_local_dir()` follows `HOME` on macOS),
+    e.g. `HOME=/tmp/x ./target/debug/sovereign ui --no-open --port 7791`.
 12. To split an inline `#[cfg(test)] mod tests { … }` out of a growing `.rs`
     file, move the body verbatim into a sibling file and declare
     `#[cfg(test)] mod tests;` — Rust module privacy follows the module tree,

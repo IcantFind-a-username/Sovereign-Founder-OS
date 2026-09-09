@@ -1416,6 +1416,66 @@ while the controller routes eligible design/review cards to the strong role.
   runs a state-writing command with it set and asserts nothing was created
   under `dirs::data_local_dir()/sovereign-founder-os`.
 
+## MVP product line
+
+Founder MVP — Consultant Core v1, built by the orchestrator session on
+2026-09-10 (design record:
+`docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md`).
+Entries here follow the queue rules above; `lane:codex` does not apply.
+
+- [x] **P1 | `apps/cli/src/workspace/` | Business graph: stages, discovery, editing, projects, tasks, follow-ups, payments, receivables, timeline (workspace v2).** Landed 2026-09-10 (`erp_types.rs`, `erp_ops.rs`, `erp_tests.rs`).
+- [x] **P1 | `crates/model/`, `apps/cli/src/workspace/` | Experimental loopback Ollama provider and per-device `model.json`.** Landed 2026-09-10.
+- [x] **P1 | `apps/cli/src/workspace/` | Six hireable AI employees that propose; founder decisions apply the exact change.** Landed 2026-09-10 (`crew_*`).
+- [x] **P1 | `apps/cli/src/workspace/` | Singapore demo rule pack, keyword retrieval, deterministic compliance checks, reports.** Landed 2026-09-10 (`compliance*`).
+- [x] **P1 | `apps/cli/assets/`, `apps/cli/src/ui_mvp.rs` | Seven-tab bilingual MVP pages.** Landed 2026-09-10; verified by hand in the in-app browser.
+
+- [ ] **P1 | `docs/`, `apps/cli/` | Live verification with a real Ollama model and the five-consultant usability protocol.**
+  Run every role against a real local model (`ollama serve`, a pulled model,
+  `model.json` enabled) and record which proposals validated, which fell back
+  to the template, and why; then run the five-consultant usability protocol
+  from the superseded playground plan (Task 8) on the MVP. Done when: a
+  report under `docs/handoff/reports/` records model, prompts' pass/fail per
+  role, and the usability observations, with follow-up entries queued for
+  every failure.
+- [ ] **P2 | `apps/cli/src/` | HTTP-layer tests for the MVP routes.**
+  Extend the loopback HTTP boundary (HO-002) to cover `/api/workspace/profile`,
+  `customer/update`, `document/update`, `project`, `task`, `follow-up`,
+  `payment`, `employee/*`, `decision`, `compliance/*`: same Host/Content-Type/
+  size rules, JSON error envelopes, and that a malformed `RunSubject` or
+  profile is a 200 `{ok:false}` with a message, never a panic. Done when
+  `cargo test -p sovereign-cli` covers each route once.
+- [ ] **P2 | `apps/cli/src/workspace/` | Export/verify-export learns the new entities.**
+  `verify_export` counts only customers/documents/approvals; extend the
+  report (and the UI) to projects, tasks, follow-ups, payments, employees,
+  decisions, and compliance reports, and document what stays excluded. Done
+  when `verify_export_accepts_genuine_bundle_and_rejects_tampering` covers a
+  bundle with every entity.
+- [ ] **P2 | `apps/cli/src/workspace/reporting.rs` | Integrity self-audit covers the MVP events.**
+  Reconcile approved decisions (`decision.approved` must exist for every
+  approved decision), payments (`payment.record`), and compliance reports
+  (`compliance.checked`) against the chain, in both directions. Done when
+  `integrity_check` fails closed on a vault edited to add an approved
+  decision without its event.
+- [ ] **P2 | `apps/cli/src/workspace/compliance_pack.rs` | Professional review pass over the Singapore pack.**
+  Each rule's summary and check must be confirmed against its cited source
+  by a person; rules that cannot be confirmed are demoted to `demo_rule` or
+  removed. Done when `review_status` records who reviewed which rule and the
+  UI stops calling the pack unreviewed. `needs:fable`
+- [ ] **P2 | `apps/cli/src/workspace/` | Coverage for EU and US: explicit "not covered" facts and a second pack skeleton.**
+  Add pack data for one more jurisdiction with the same source discipline,
+  or record explicitly why not. Done when a customer in that jurisdiction
+  yields covered findings rather than the cross-border "needs review".
+- [ ] **P2 | `crates/model/`, `rfcs/` | Cloud model adapter behind RFC 0004.**
+  Blocked on RFC 0004's boundary (owner consent per request, disclosure
+  records, credential broker). Do not add TLS or a cloud adapter before that
+  design lands. `needs:fable`
+- [ ] **P3 | `apps/cli/src/` | `--root` flag so `sovereign ui` can run against a throwaway data directory.**
+  Manual and browser testing currently overrides `HOME` to isolate data; a
+  flag is honest and simpler. Keep the CLI pin tests (`cli_tests.rs`) green.
+- [ ] **P3 | `apps/cli/src/ui.rs` | Split `ui.rs` (1087 lines) along its concerns before it hits the limit.**
+  Move the gauntlet and admission views out; `ui_mvp.rs` already holds the
+  MVP routes.
+
 ## Run log
 
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.

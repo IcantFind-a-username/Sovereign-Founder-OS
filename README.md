@@ -162,16 +162,35 @@ release is evidenced in this repository yet. The current product is a narrow,
 local founder workflow backed by substantial security primitives—not the full
 Founder OS and not a production security boundary.
 
-The loopback web app (`sovereign ui`, English/中文) currently provides:
+The loopback web app (`sovereign ui`, English/中文) is the **Founder MVP —
+Consultant Core v1** (Experimental; see the
+[design record](docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md)):
 
-- a business-state read-only **Command Center** with business counts, pending
-  decisions, deterministic guidance, and evidence summaries. Current first/open
-  GET paths may initialize the co-located device/Vault key files, so this is not
+- **Today** — business tiles, the AI team's pending proposals shown as the
+  exact change that approval applies, one-click work suggestions,
+  deterministic guidance, send approvals, and kernel evidence. First/open GET
+  paths may initialize the co-located device/Vault key files, so this is not
   yet an authenticated, side-effect-free read boundary;
-- a **Workspace** for one company profile, append-only customers, fixed local
-  Offer/Invoice templates, a deterministic drafting stand-in, approval or
-  rejection, local RFC 5322 `.eml` composition, revocation of that local file,
-  an unauthenticated local manual-delivery marker, and plaintext JSON export;
+- **Company** — profile with founder-entered registration facts (jurisdiction,
+  currency, UEN, GST, incorporation date, fiscal year end, revenue estimate),
+  plus plaintext export and offline verification;
+- **Customers** — leads and customers with stage, location, and consent; per
+  customer: discovery notes, projects with dated tasks, follow-ups, documents
+  with recorded acceptance, and the signed event timeline;
+- **Documents** — editable drafts with revisions, the signed send approval and
+  local RFC 5322 `.eml` composition, revocation, the manual-delivery marker,
+  and receivables with founder-recorded payments;
+- **Team** — six hireable AI employees (requirements analyst, proposal writer,
+  delivery planner, invoice clerk, quality checker, compliance checker), each
+  with a card stating what it reads, delivers, and cannot decide. Employees
+  only propose; a founder decision applies exactly the recorded change under
+  policy with signed evidence. A real local model (Ollama, loopback only) may
+  produce proposals when its output validates; otherwise a deterministic
+  template does, and the decision says which;
+- **Compliance** — a Singapore demo rule pack (unreviewed, every rule cites
+  its official source) checked against the recorded facts, with findings
+  that are pass / action / review / unknown and never "compliant"; rule
+  search with citations;
 - a **Security Center** for identity/vault metadata, audit verification,
   disclosure and admission records, state reconciliation, and an in-memory
   adversarial gauntlet.
@@ -224,15 +243,18 @@ Important current limitations:
 - the vault encrypts entries, but its master key is stored beside the data;
 - export is plaintext workspace/audit JSON, not an encrypted backup or restore
   package, and integrity reconciliation does not bind every workspace field;
-- customer/document editing, real models, network effects, clean-machine
-  restore, and broader business modules remain targets; the sandbox can run a
-  component under one zero-import WIT world (Experimental, pure compute only),
-  but the general Component/WIT plugin boundary with host interfaces remains a
-  target; Secure Mesh remains Research.
+- AI employees are bounded proposers (six roles, no tools, no autonomy) and
+  the compliance pack is an unreviewed Singapore demo; cloud models, network
+  effects, clean-machine restore, other jurisdictions, and broader business
+  modules remain targets; the sandbox can run a component under one
+  zero-import WIT world (Experimental, pure compute only), but the general
+  Component/WIT plugin boundary with host interfaces remains a target; Secure
+  Mesh remains Research.
 
-The Rust workspace contains thirteen Runtime crates covering contracts,
-identity, artifacts, policy, capabilities, authority, execution, effects,
-vault, audit, sandboxing, models, and workflows. The detailed maturity and
+The Rust workspace contains fifteen crates covering contracts, identity,
+artifacts, policy, capabilities, authority, execution, effects, vault, audit,
+sandboxing, models, workflows, the consultant playground, and the vault-v2
+engine skeleton. The detailed maturity and
 release gates live in [ROADMAP.md](ROADMAP.md); sandbox protocol boundaries are
 in [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 

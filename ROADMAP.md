@@ -33,18 +33,23 @@ used only for a named exit criterion with evidence.
 ## Current verified state
 
 The repository is a **Developer Preview / pre-release** with no tagged release.
-A fresh `cargo test --workspace --locked -- --list` enumerates 186 Rust tests.
+A fresh `cargo test --workspace --locked -- --list` enumerates 463 Rust tests.
 Formatting, lint, file-size, locked dependency, TypeScript, and release-build
 gates are configured in the repository.
 
 ### Founder product today
 
-The loopback-only local web app has three real surfaces:
+The loopback-only local web app is the Founder MVP — Consultant Core v1
+(Experimental; [design record](docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md)).
+It runs the v0.3 consultant loop on the existing kernel ahead of the v0.1/v0.2
+security gates, labelled accordingly; it claims none of those gates.
 
 | Surface | Current capability | Important limit |
 | --- | --- | --- |
-| **Command Center** | Business-state read-only counts, pending decisions, deterministic next actions/risks, evidence rollups | It does not mutate business objects, but a first/open GET may initialize the current co-located device/Vault key files; it is not yet an authenticated, side-effect-free read. No real company-stage, finance, project, or analytics model |
-| **Workspace** | One company profile; append customers; fixed non-editable Offer/Invoice drafts; deterministic unsaved outreach suggestion; approve/reject; local `.eml`; revoke; unauthenticated manual-delivery marker; plaintext export | No real LLM, editing, CRM, projects, contracts, expenses, restore, or network send |
+| **Today** | Business tiles (leads, projects, tasks, overdue follow-ups, receivables), the AI team's pending proposals with the exact change approval applies, work suggestions, deterministic guidance, send approvals, evidence rollups | A first/open GET may initialize the co-located device/Vault key files; not an authenticated, side-effect-free read |
+| **Company / Customers / Documents** | Editable profile with registration facts; leads and customers with stage, discovery notes, projects and dated tasks, follow-ups, recorded acceptance, signed timeline; editable drafts with revisions; signed send approval to a local `.eml`; receivables with founder-recorded payments; plaintext export | No network send, no restore, no encrypted backup; payments are founder attestations |
+| **Team** | Six hireable AI employees that only propose; approval applies exactly the recorded change under policy with signed evidence; optional loopback Ollama model with validated output, deterministic templates otherwise | No tools, no autonomy, no cloud model; the Ollama process is routed to, not confined |
+| **Compliance** | Singapore demo rule pack with a cited source per rule, deterministic checks over recorded facts, keyword rule search, reports bound to a facts digest | Unreviewed demo pack, Singapore only, never a "compliant" verdict; not legal or tax advice |
 | **Security Center** | Identity/vault/audit/plugin/disclosure facts, state reconciliation, live attack gauntlet | Reconciliation checks selected event presence, not every workspace value |
 
 Another machine can verify an export's format, device-key binding, and signed

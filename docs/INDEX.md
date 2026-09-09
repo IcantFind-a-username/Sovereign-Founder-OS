@@ -22,6 +22,7 @@ This page helps contributors find the current source of truth without reading th
 | --- | --- |
 | Make a first contribution | [CONTRIBUTING.md](../CONTRIBUTING.md) and current open issues |
 | Work a relayed task card as an AI worker session | [Handoff protocol](handoff/README.md), then [`docs/backlog.md`](backlog.md) and [`CLAUDE.md`](../CLAUDE.md) |
+| Understand the founder MVP that ships in `sovereign ui` | [Founder MVP design record](superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md) |
 | Understand product direction | [README.md](../README.md) and [MANIFESTO.md](../MANIFESTO.md) |
 | Change runtime architecture | [ARCHITECTURE.md](../ARCHITECTURE.md) and the relevant [RFC](../rfcs/) |
 | Review security | [THREAT_MODEL.md](../THREAT_MODEL.md), [SECURITY.md](../SECURITY.md), [RFC 0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md), [RFC 0004](../rfcs/0004-data-sovereignty-boundaries.md), [RFC 0005](../rfcs/0005-dual-root-vault-and-recovery.md), and the [open-source cross-validation note](security/open-source-security-cross-validation.md) |
