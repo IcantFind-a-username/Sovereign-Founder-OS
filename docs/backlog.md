@@ -787,7 +787,7 @@ while the controller routes eligible design/review cards to the strong role.
   when: both self-tests pass, the TSV seeds at least the RFC-gate row, and
   `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [ ] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: origin preflight harness and mechanism-matrix doc.**
+- [x] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: origin preflight harness and mechanism-matrix doc.** Landed 2026-09-10. Verified green on macOS 26.5/arm64 with Chrome 152; **not yet run on Linux**, so the Linux half of the acceptance is open — the harness handles the root-sandbox case but no Linux run is recorded. The preflight also settled a design question RFC 0006 did not: an IP address cannot be a WebAuthn RP ID, so the browser must reach the fixture as `http://localhost:7787` while the socket still binds 127.0.0.1.
   Blocked on nothing but pairs with the runners entry above. Deliver
   `scripts/owner-auth-origin-preflight.sh` plus a zero-dependency
   `scripts/owner-auth-origin-preflight.mjs` that binds only `127.0.0.1:7787`,
