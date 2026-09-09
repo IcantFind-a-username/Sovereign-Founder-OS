@@ -1,6 +1,6 @@
 # S1-10A supervised execution
 
-Incomplete; one substantive Luna failure. Frozen revision1 card blob
+Incomplete; two substantive Luna failures. Frozen revision1 card blob
 `5a2ea0c3b71bb65db12a5535c49a3a588cead2c9`; first claim/base
 `47c4542b73c523a3964d889611a60e6150faee89`.
 
@@ -36,3 +36,33 @@ was terminated by worker; root confirmed it absent. Root preview untouched.
 Attempt2 retains this candidate and failure count, same card/write set, bounded
 30minutes/3targeted repair cycles. No third Luna attempt after another
 substantive failure; then Astra fallback. FullMVP remains active.
+
+## Attempt2 — changes requested; Astra escalation
+
+Stopped Luna `/root/s1_10a_attempt2`, base
+`432ced48a5635e3d2f90d7bc2725db74a907d45a`; helper blob
+`37f4ff9c3090d23b2c708eb8b375de487892d844`, +340/-55. Same card and ownership.
+Astra `/root/s1_10a_review` verified chunk-safe completed-line parsing, sticky
+cleanup failure/kill after status-check error, and narrow method allowances.
+It still rejected deterministic fixture synchronization: success publishes
+startup before stderr; stdout overflow publishes startup before oversized
+write. Immediate stop can terminate either write. Cleanup evidence remains
+limited to error assertions, without concrete reader-join/reaping checks.
+
+The worker supplied no attempt2 raw directory at terminal handoff. Root then
+created `.harness/s1-10a/attempt2/` to preserve candidate-transport.rs and patch,
+plus a copy named root-observed-shared-gate.log. Shared log contains33 transport
+passes but is not sufficient to bind all worker claims to this candidate.
+No historical behavioral RED is reconstructed. Worker-reported full gate and
+inherited restart timing failure/rerun remain unverified pending original
+execution evidence. Root process inventory found no remaining fixture/gate.
+
+Two substantive failures reached: no third Luna attempt. Astra fallback must
+finish the unchanged single-file contract, preserve earlier evidence, and
+receive independent review. Root runs a fresh baseline gate separately before
+handoff; it cannot prove missing historical chronology or absent race behavior.
+
+Root baseline gate session51453 completed exit0 on unchanged helper37f4ff9;
+raw summary/full output are root-baseline-gate.log and
+root-baseline-gate-full.log under attempt2. This newly observed pass does not
+resolve the independent synchronization finding or restore missing old logs.

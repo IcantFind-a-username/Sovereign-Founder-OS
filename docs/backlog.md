@@ -419,7 +419,7 @@ while the controller routes eligible design/review cards to the strong role.
   [Evidence and RED chronology limitation](handoff/codex/reports/S1-09-supervised.md).
   Next S1-08; no browser/fullMVP acceptance implied.
 
-- [ ] **P1 | `crates/consultant-playground/tests/support/transport.rs` | S1-10A — Extend shared test process capture.** `lane:codex` CLAIMED; Luna attempt2 next, one substantive failure.
+- [ ] **P1 | `crates/consultant-playground/tests/support/transport.rs` | S1-10A — Extend shared test process capture.** `lane:codex` CLAIMED; two substantive Luna failures, Astra fallback next.
   Definition and done criteria: [S1-10A](handoff/codex/cards/S1-10A.md).
   One helper file, two capture regressions; preserve existing S1-07 transport checks.
   Source base672cd236a064d9095fdff2eb5c93be1ef81000ee; revision1 card blob
