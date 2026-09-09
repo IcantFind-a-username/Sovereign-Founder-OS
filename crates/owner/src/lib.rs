@@ -29,6 +29,9 @@
 pub mod config;
 
 #[cfg(feature = "owner-effect-fixture")]
+pub mod session;
+
+#[cfg(feature = "owner-effect-fixture")]
 mod bootstrap;
 
 #[cfg(feature = "owner-effect-fixture")]
