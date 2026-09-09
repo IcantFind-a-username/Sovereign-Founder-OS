@@ -1,0 +1,28 @@
+{
+  "kind": "owner-authorised-continuation",
+  "taskId": "S0-01-RECOVERY-SPEC",
+  "revision": 3,
+  "baseCommit": "558ed6c460e319809300bdae24bdba028a94eb22",
+  "ownerInstruction": "怎么影响小怎么去修，然后快点开发",
+  "historicalElapsedMs": null,
+  "historicalRecordsValid": false,
+  "dispatch": {
+    "agent": "/root/recovery_spec_architect_r2_retry",
+    "tool": "collaboration.followup_task",
+    "role": "founder_architect",
+    "model": "gpt-6-astra",
+    "effort": "high",
+    "observedBeforeCallUtc": "2026-09-08T23:36:12Z",
+    "worktree": ".worktrees/recovery-spec-r3",
+    "baseCommit": "558ed6c460e319809300bdae24bdba028a94eb22",
+    "segment": 1
+  },
+  "segmentBudgetMs": 1800000,
+  "status": "running",
+  "freezeReview": {
+    "reviewer": "/root/recovery_spec_card_review",
+    "outcome": "accepted",
+    "baseCommit": "558ed6c460e319809300bdae24bdba028a94eb22",
+    "scope": "r3 freeze only; no valid historical v2 replay claimed"
+  }
+}

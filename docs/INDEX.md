@@ -27,6 +27,8 @@ This page helps contributors find the current source of truth without reading th
 | Review security | [THREAT_MODEL.md](../THREAT_MODEL.md), [SECURITY.md](../SECURITY.md), [RFC 0002](../rfcs/0002-wasm-sandbox-and-plugin-capabilities.md), [RFC 0004](../rfcs/0004-data-sovereignty-boundaries.md), [RFC 0005](../rfcs/0005-dual-root-vault-and-recovery.md), and the [open-source cross-validation note](security/open-source-security-cross-validation.md) |
 | Study privacy, recovery, or resilience targets | [Privacy model](design/privacy-model.md), [approved data-sovereignty design](superpowers/specs/2026-08-13-data-sovereignty-boundaries-v1-design.md), [RFC 0004](../rfcs/0004-data-sovereignty-boundaries.md), [RFC 0005](../rfcs/0005-dual-root-vault-and-recovery.md), and [Distributed systems](design/distributed-systems.md) |
 | Discuss product UI | [GUI design draft](product/gui-design.zh-CN.md) (Chinese) |
+| Run bounded Luna development | [Luna scaffold: single execution entry](handoff/codex/README.md) (Chinese; frozen documentation, implementation pending; canonical source map, cards, interfaces, review and escalation) |
+| Study the business demo and component choices | [Founder OS product and research blueprint](product/founder-os-execution-blueprint.zh-CN.md) (Chinese; product vision, verified baseline, source-linked research) |
 | Understand the category positioning | [Why Not Another Agent?](positioning/why-not-another-agent.md) |
 | Trace how the idea evolved | [Historical Chinese design archive](archive/zh/README.md) |
 

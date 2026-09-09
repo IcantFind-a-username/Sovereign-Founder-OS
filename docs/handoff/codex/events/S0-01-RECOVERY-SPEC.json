@@ -1,0 +1,38 @@
+[
+  {
+    "schemaVersion": 2,
+    "seq": 1,
+    "taskId": "S0-01-RECOVERY-SPEC",
+    "revision": 1,
+    "kind": "claim",
+    "attempt": 0,
+    "actor": {"role": "controller", "thread": "01a08283-09fb-7bb0-b01b-04494080cde8", "model": "gpt-6-astra", "effort": "high"},
+    "baseCommit": "5a84fc4022dda2c7c843ca60a3351c92c78d6e00",
+    "candidateCommit": null,
+    "reportPath": null,
+    "reviewPath": null,
+    "checkRunPath": null,
+    "reason": null,
+    "resumeFrom": null,
+    "spentMs": 0,
+    "children": []
+  }
+  ,{
+    "schemaVersion": 2,
+    "seq": 2,
+    "taskId": "S0-01-RECOVERY-SPEC",
+    "revision": 2,
+    "kind": "revise",
+    "attempt": 0,
+    "actor": {"role": "architect", "thread": "/root/recovery_spec_architect_impl", "model": "gpt-6-astra", "effort": "high"},
+    "baseCommit": "c73c296792a286d83abba7676f0faf2d19dc66f5",
+    "candidateCommit": null,
+    "reportPath": null,
+    "reviewPath": null,
+    "checkRunPath": null,
+    "reason": "Cspec inputBlobs omitted required RFC evidence",
+    "resumeFrom": null,
+    "spentMs": 0,
+    "children": []
+  }
+]

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Playground</title>
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="shell">
+    <h1 id="page-title"></h1>
+    <p id="boundary-notice" class="notice"></p>
+    <div class="languages">
+      <button type="button" id="language-en" aria-pressed="true" hidden disabled></button>
+      <button type="button" id="language-zh" aria-pressed="false" hidden disabled></button>
+    </div>
+  </header>
+  <main id="main" class="shell" aria-busy="true">
+    <div id="loading" class="static-message" role="status">
+      <span>Loading the example…</span>
+      <span lang="zh-CN">正在加载示例…</span>
+    </div>
+    <div id="failure" class="static-message" role="alert" tabindex="-1" hidden>
+      <span>The example is unavailable. Reload this page before continuing.</span>
+      <span lang="zh-CN">示例暂时不可用。请重新加载此页后再继续。</span>
+    </div>
+    <div id="business" hidden>
+      <div class="cards">
+        <section class="card" aria-labelledby="company-heading">
+          <h2 id="company-heading"></h2>
+          <dl>
+            <div><dt id="company-name-label"></dt><dd id="company-name"></dd></div>
+          </dl>
+        </section>
+        <section class="card" aria-labelledby="offer-heading">
+          <h2 id="offer-heading"></h2>
+          <dl>
+            <div><dt id="offer-name-label"></dt><dd id="offer-name"></dd></div>
+            <div><dt id="price-label"></dt><dd id="price"></dd></div>
+          </dl>
+        </section>
+        <section class="card" aria-labelledby="relationship-heading">
+          <h2 id="relationship-heading"></h2>
+          <dl>
+            <div><dt id="organization-label"></dt><dd id="organization"></dd></div>
+            <div><dt id="contact-name-label"></dt><dd id="contact-name"></dd></div>
+            <div><dt id="contact-email-label"></dt><dd id="contact-email"></dd></div>
+            <div><dt id="stage-label"></dt><dd id="stage"></dd></div>
+          </dl>
+        </section>
+        <section class="card" aria-labelledby="discovery-heading">
+          <h2 id="discovery-heading"></h2>
+          <dl>
+            <div><dt id="problem-label"></dt><dd id="problem"></dd></div>
+            <div><dt id="budget-label"></dt><dd id="budget"></dd></div>
+            <div><dt id="constraint-label"></dt><dd id="constraint"></dd></div>
+            <div><dt id="discovery-next-step-label"></dt><dd id="discovery-next-step"></dd></div>
+          </dl>
+        </section>
+      </div>
+      <section id="guidance" class="guidance" aria-live="polite" aria-atomic="true" aria-labelledby="next-step-heading">
+        <h2 id="next-step-heading"></h2>
+        <div id="guidance-items"></div>
+      </section>
+      <div id="actions" class="actions">
+        <button type="button" data-action="CorrectOfferPrice" hidden disabled></button>
+        <button type="button" data-action="PromoteAcmeToCustomer" hidden disabled></button>
+        <button type="button" data-action="ShowReportingSearch" aria-controls="search-results" aria-expanded="false" hidden disabled></button>
+        <button type="button" data-action="Reset" hidden disabled></button>
+      </div>
+      <section id="search-results" aria-labelledby="search-heading" hidden>
+        <h2 id="search-heading"></h2>
+        <ul id="hits"></ul>
+      </section>
+    </div>
+  </main>
+  <noscript>
+    <p class="static-message shell">
+      <span>Enable JavaScript to use this example.</span>
+      <span lang="zh-CN">请启用JavaScript以使用此示例。</span>
+    </p>
+  </noscript>
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

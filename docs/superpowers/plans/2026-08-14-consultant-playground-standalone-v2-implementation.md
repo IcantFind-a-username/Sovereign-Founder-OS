@@ -39,9 +39,12 @@ sovereign playground --port 7788 -> leaf run(7788)
 The leaf has no dependency on Workspace, Vault, `dirs`, authority,
 capability, policy, model, effects, audit, workflow, or the CLI. It has no
 filesystem, environment, process, clock, randomness, outbound-network, import,
-export, or generic backend API. `tiny_http` is used only for one inbound server
-bound to literal `127.0.0.1`. It has no product authority and cannot read or
-mutate product state.
+export, or generic backend API. The accepted [transport amendment](../../handoff/codex/playground-server-contract.md)
+replaces the original tiny_http assumption with bounded std TCP plus httparse,
+bound to literal `127.0.0.1`. Only transport liveness may use Instant/Duration
+deadlines; fixed startup URL output is allowed. No clock enters business state.
+Exact limits, framing and dependency rules live in that contract. The leaf has
+no product authority and cannot read or mutate product state.
 
 The command does not open a browser. It accepts only built-in Clap parsing of
 `--port <u16>` with default `7788`; it accepts no root, path, Workspace,

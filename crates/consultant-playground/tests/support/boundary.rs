@@ -1,4 +1,4 @@
-//! Exact-token-shape validation for `src/lib.rs` and `src/domain.rs`: the
+//! Exact-token-shape validation for the accepted playground source stages: the
 //! production source closure must match a pinned grammar so a rename,
 //! injected side effect, or path escape fails loudly instead of silently
 //! widening Task 1's boundary.
@@ -7,9 +7,29 @@ use std::path::Path;
 
 use crate::rust_lexer::{RustLexer, RustToken};
 
-const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;";
+pub(crate) const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;";
+pub(crate) const EXPECTED_LIB_CATALOG_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;";
 
-const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
+pub(crate) const EXPECTED_LIB_HTTP_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;";
+pub(crate) const EXPECTED_LIB_ASSETS_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;\n// Compile-time assets follow the pure handler.\n#[cfg_attr(not(test), allow(dead_code))]\nmod assets;\n";
+pub(crate) const EXPECTED_LIB_SERVER_SHAPE: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
+mod domain;
+#[cfg_attr(not(test), allow(dead_code))]
+mod catalog;
+#[cfg_attr(not(test), allow(dead_code))]
+mod http;
+#[cfg_attr(not(test), allow(dead_code))]
+mod assets;
+mod server;
+pub fn run(port: u16) -> std::io::Result<()> {
+    server::run(port)
+}
+"#;
+pub(crate) const SERVER_PRODUCTION: &str = include_str!("fixtures/server-production.rs.txt");
+pub(crate) const ASSETS_PRODUCTION: &str = include_str!("fixtures/assets-production.rs.txt");
+pub(crate) const HTTP_PRODUCTION: &str = include_str!("fixtures/http-production.rs.txt");
+
+pub(crate) const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SemanticKey {
     ReportingClaritySprint,
@@ -95,6 +115,16 @@ impl PlaygroundSession {
 }
 "####;
 
+pub(crate) const ACTION_DOMAIN_ADDITIONS: &str =
+    include_str!("fixtures/action-domain-additions.rs.txt");
+pub(crate) const READ_MODEL_DOMAIN_PRODUCTION: &str =
+    include_str!("fixtures/read-model-domain.rs.txt");
+pub(crate) const TEACHING_DOMAIN_PRODUCTION: &str =
+    include_str!("fixtures/teaching-domain-additions.rs.txt");
+pub(crate) const CATALOG_PRODUCTION: &str = include_str!("fixtures/catalog-production.rs.txt");
+pub(crate) const CATALOG_GUIDANCE_PRODUCTION: &str =
+    include_str!("fixtures/catalog-guidance-production.rs.txt");
+
 const DOMAIN_TEST_HEADER: &str = "#[cfg(test)] mod tests {";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -105,6 +135,14 @@ pub(crate) enum SourceBoundaryKind {
     LibItemShape,
     DomainTestModuleShape,
     DomainProductionShape,
+    CatalogProductionShape,
+    CatalogTestModuleShape,
+    HttpProductionShape,
+    HttpTestModuleShape,
+    AssetsProductionShape,
+    AssetsTestModuleShape,
+    ServerProductionShape,
+    ServerTestModuleShape,
     UnexpectedSourceFile,
 }
 
@@ -135,6 +173,10 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
     match path.file_name().and_then(|name| name.to_str()) {
         Some("lib.rs") => validate_lib_shape(&tokens),
         Some("domain.rs") => validate_domain_shape(&tokens),
+        Some("catalog.rs") => validate_catalog_shape(&tokens),
+        Some("http.rs") => validate_http_shape(&tokens),
+        Some("assets.rs") => validate_assets_shape(&tokens),
+        Some("server.rs") => validate_server_shape(&tokens),
         Some(name) => Err(SourceBoundaryError::new(
             SourceBoundaryKind::UnexpectedSourceFile,
             format!("unexpected Task 1 source file `{name}`"),
@@ -146,10 +188,113 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
     }
 }
 
+fn validate_server_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production =
+        strip_exact_test_module(tokens, "server", SourceBoundaryKind::ServerTestModuleShape)?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(SERVER_PRODUCTION).expect("complete server fixture must lex");
+    if production == expected {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::ServerProductionShape,
+            token_mismatch("server.rs production", &expected, production),
+        ))
+    }
+}
+
+fn validate_assets_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production =
+        strip_exact_test_module(tokens, "assets", SourceBoundaryKind::AssetsTestModuleShape)?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(ASSETS_PRODUCTION).expect("complete asset fixture must lex");
+    if production == expected {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::AssetsProductionShape,
+            token_mismatch("assets.rs production", &expected, production),
+        ))
+    }
+}
+
+fn validate_http_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production =
+        strip_exact_test_module(tokens, "http", SourceBoundaryKind::HttpTestModuleShape)?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(HTTP_PRODUCTION).expect("complete HTTP fixture must lex");
+    if production == expected {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::HttpProductionShape,
+            token_mismatch("http.rs production", &expected, production),
+        ))
+    }
+}
+
+fn validate_catalog_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production = strip_exact_test_module(
+        tokens,
+        "catalog",
+        SourceBoundaryKind::CatalogTestModuleShape,
+    )?;
+    reject_path_attributes(production)?;
+    let old = RustLexer::lex(CATALOG_PRODUCTION).expect("catalog fixture must lex");
+    let new = RustLexer::lex(CATALOG_GUIDANCE_PRODUCTION).expect("catalog fixture must lex");
+    if production.len() == old.len() {
+        return validate_catalog_tokens(production, &old, 54);
+    }
+    validate_catalog_tokens(production, &new, 64)
+}
+
+fn validate_catalog_tokens(
+    production: &[RustToken],
+    expected: &[RustToken],
+    text_count: usize,
+) -> Result<(), SourceBoundaryError> {
+    let text_positions: Vec<_> = expected.windows(3).enumerate().filter_map(|(index, tokens)| {
+        matches!(&tokens,
+            &[RustToken::Ident(field), RustToken::Punct(':'), RustToken::Literal(value)]
+                if (field == "en" || field == "zh") && value.starts_with('"') && value.ends_with('"')
+        ).then_some(index + 2)
+    }).collect();
+    assert_eq!(
+        text_positions.len(),
+        text_count,
+        "frozen catalog text positions"
+    );
+    if production.len() == expected.len()
+        && production.iter().enumerate().all(|(index, token)| {
+            if text_positions.contains(&index) {
+                matches!(token, RustToken::Literal(value) if value.starts_with('"') && value.ends_with('"'))
+            } else {
+                token == &expected[index]
+            }
+        })
+    {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::CatalogProductionShape,
+            token_mismatch("catalog.rs", expected, production),
+        ))
+    }
+}
+
 fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
     reject_path_attributes(tokens)?;
     let expected = RustLexer::lex(EXPECTED_LIB_SHAPE).expect("expected lib shape must lex");
-    if tokens == expected {
+    let catalog = RustLexer::lex(EXPECTED_LIB_CATALOG_SHAPE).expect("catalog lib shape must lex");
+    let http = RustLexer::lex(EXPECTED_LIB_HTTP_SHAPE).expect("HTTP lib shape must lex");
+    let assets = RustLexer::lex(EXPECTED_LIB_ASSETS_SHAPE).expect("asset lib shape must lex");
+    let server = RustLexer::lex(EXPECTED_LIB_SERVER_SHAPE).expect("server lib shape must lex");
+    if tokens == expected
+        || tokens == catalog
+        || tokens == http
+        || tokens == assets
+        || tokens == server
+    {
         return Ok(());
     }
     let module = RustLexer::lex("mod domain;").expect("expected module shape must lex");
@@ -165,11 +310,26 @@ fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
 }
 
 fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
-    let production = strip_exact_test_module(tokens)?;
+    let production =
+        strip_exact_test_module(tokens, "domain", SourceBoundaryKind::DomainTestModuleShape)?;
     reject_path_attributes(production)?;
     let expected =
         RustLexer::lex(EXPECTED_DOMAIN_PRODUCTION).expect("expected domain shape must lex");
-    if production == expected {
+    let mut extended = expected.clone();
+    extended.extend(RustLexer::lex(ACTION_DOMAIN_ADDITIONS).expect("action additions must lex"));
+    let read_model = RustLexer::lex(READ_MODEL_DOMAIN_PRODUCTION)
+        .expect("complete read model production fixture must lex");
+    let mut teaching = RustLexer::lex(READ_MODEL_DOMAIN_PRODUCTION)
+        .expect("complete read model production fixture must lex");
+    teaching.extend(
+        RustLexer::lex(TEACHING_DOMAIN_PRODUCTION)
+            .expect("complete teaching production fixture must lex"),
+    );
+    if production == expected
+        || production == extended
+        || production == read_model
+        || production == teaching
+    {
         Ok(())
     } else {
         Err(SourceBoundaryError::new(
@@ -179,7 +339,11 @@ fn validate_domain_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError
     }
 }
 
-fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceBoundaryError> {
+fn strip_exact_test_module<'a>(
+    tokens: &'a [RustToken],
+    label: &str,
+    kind: SourceBoundaryKind,
+) -> Result<&'a [RustToken], SourceBoundaryError> {
     let header = RustLexer::lex(DOMAIN_TEST_HEADER).expect("expected test header must lex");
     let mut brace_depth = 0_usize;
     let mut start = None;
@@ -187,8 +351,8 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
         if brace_depth == 0 && tokens[index..].starts_with(&header) {
             if start.replace(index).is_some() {
                 return Err(SourceBoundaryError::new(
-                    SourceBoundaryKind::DomainTestModuleShape,
-                    "domain has more than one exact test module",
+                    kind,
+                    format!("{label} has more than one exact test module"),
                 ));
             }
             break;
@@ -197,10 +361,7 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
             RustToken::Punct('{') => brace_depth += 1,
             RustToken::Punct('}') => {
                 brace_depth = brace_depth.checked_sub(1).ok_or_else(|| {
-                    SourceBoundaryError::new(
-                        SourceBoundaryKind::DomainTestModuleShape,
-                        "unbalanced closing brace before test module",
-                    )
+                    SourceBoundaryError::new(kind, "unbalanced closing brace before test module")
                 })?;
             }
             _ => {}
@@ -208,8 +369,8 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
     }
     let start = start.ok_or_else(|| {
         SourceBoundaryError::new(
-            SourceBoundaryKind::DomainTestModuleShape,
-            "domain is missing exact `#[cfg(test)] mod tests { ... }` wrapper",
+            kind,
+            format!("{label} is missing exact `#[cfg(test)] mod tests {{ ... }}` wrapper"),
         )
     })?;
     let opening = start + header.len() - 1;
@@ -220,10 +381,7 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
             RustToken::Punct('{') => depth += 1,
             RustToken::Punct('}') => {
                 depth = depth.checked_sub(1).ok_or_else(|| {
-                    SourceBoundaryError::new(
-                        SourceBoundaryKind::DomainTestModuleShape,
-                        "unbalanced test-module closing brace",
-                    )
+                    SourceBoundaryError::new(kind, "unbalanced test-module closing brace")
                 })?;
                 if depth == 0 {
                     end = Some(opening + offset + 1);
@@ -235,7 +393,7 @@ fn strip_exact_test_module(tokens: &[RustToken]) -> Result<&[RustToken], SourceB
     }
     if end != Some(tokens.len()) {
         return Err(SourceBoundaryError::new(
-            SourceBoundaryKind::DomainTestModuleShape,
+            kind,
             "test module is unbalanced or is not the terminal top-level item",
         ));
     }

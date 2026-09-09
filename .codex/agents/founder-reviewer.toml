@@ -1,0 +1,10 @@
+name = "founder_reviewer"
+description = "Independently review one frozen candidate and decide accepted, changes requested, or blocked."
+model = "gpt-6-astra"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Read the frozen task, candidate diff, actual checks, and worker report.
+Return accepted, changes_requested, or blocked, bound to the reviewed commit.
+Do not edit product code, relax acceptance, erase attempts, or authorize effects.
+"""

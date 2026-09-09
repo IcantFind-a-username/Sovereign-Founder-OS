@@ -1,0 +1,74 @@
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+struct ReportingHit {
+    section_key: &'static str,
+    fact_key: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+struct ReportingSearch {
+    query_key: &'static str,
+    hits: [ReportingHit; 2],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+struct Guidance {
+    next_step_key: &'static str,
+    suggested_action: Option<&'static str>,
+    detail_key: Option<&'static str>,
+    completion_key: Option<&'static str>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize)]
+pub(crate) struct PlaygroundTeachingReadModel {
+    profile: &'static str,
+    real_data_enabled: bool,
+    persistence: &'static str,
+    search: ReportingSearch,
+    guidance: Guidance,
+}
+
+impl PlaygroundSession {
+    pub(crate) fn teaching_read_model(&self) -> PlaygroundTeachingReadModel {
+        let guidance = if self.graph.offer.price_usd_cents != 350_000 {
+            Guidance {
+                next_step_key: "guidance_correct_price",
+                suggested_action: Some("CorrectOfferPrice"),
+                detail_key: None,
+                completion_key: None,
+            }
+        } else if self.graph.relationship.stage == RelationshipStage::Lead {
+            Guidance {
+                next_step_key: "guidance_promote_customer",
+                suggested_action: Some("PromoteAcmeToCustomer"),
+                detail_key: None,
+                completion_key: None,
+            }
+        } else {
+            Guidance {
+                next_step_key: "guidance_review_scoping_call",
+                suggested_action: None,
+                detail_key: Some("thirty_minute_scoping_call"),
+                completion_key: Some("guidance_example_changes_complete"),
+            }
+        };
+        PlaygroundTeachingReadModel {
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            search: ReportingSearch {
+                query_key: "reporting_search_query",
+                hits: [
+                    ReportingHit {
+                        section_key: "offer_label",
+                        fact_key: "reporting_clarity_sprint",
+                    },
+                    ReportingHit {
+                        section_key: "discovery_label",
+                        fact_key: "weekly_reporting_takes_six_hours",
+                    },
+                ],
+            },
+            guidance,
+        }
+    }
+}

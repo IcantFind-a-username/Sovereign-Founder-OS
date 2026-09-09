@@ -16,6 +16,16 @@ repo audit; every entry below points at verified, real state of the code.
 - **Stuck = diagnose and release.** If a round can't go green, write the
   diagnosis as an indented note under the item, remove the IN PROGRESS mark,
   and end the session. The note is the next session's starting point.
+- **Codex lane routing.** Entries labelled `lane:codex` belong exclusively to
+  [the Codex scaffold](handoff/codex/README.md). Legacy nightly and human-relayed
+  workers MUST skip them. Codex controllers use the linked card as the sole
+  detailed scope/acceptance definition; controllers update queue records,
+  while workers write only their card's allowed files and report. An existing
+  `needs:fable` tag still blocks small-model implementation until an architect
+  releases that exact card. The Codex controller may route it to the prescribed
+  strong-model design/review role under the scaffold protocol; this is not
+  permission for Luna to decide its interfaces. A lane label is a protocol rule, not a proven
+  process-isolation mechanism; check for active conflicting work before claim.
 - **Entry format:** priority (P1 urgent / P2 soon / P3 opportunistic) +
   directory-level scope + done criteria that a test (or an exact command)
   can verify.
@@ -34,6 +44,444 @@ repo audit; every entry below points at verified, real state of the code.
   and judgment, not on keystrokes a small model can gate-check.
 
 ## Queue
+
+- [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Strengthen the full-chain Goal and context recovery instructions.**
+  Extend the canonical MVP Goal with founder-runnable end-to-end acceptance,
+  active context reduction, persistent recovery summaries, and continuation
+  after compaction without resetting progress or failure history. Keep one
+  canonical Goal and reuse existing report/event records. Documentation only;
+  prepare the Luna launch text without starting implementation or automation.
+  Done when the Goal, protocol and entry agree, links and `git diff --check`
+  pass, and `./scripts/test_changed.sh` is green.
+  Independent read-only review accepted `de0fa88`; one ambiguous attempt
+  recovery sentence was corrected before acceptance. Local links/fences and
+  continuity checks pass; scoped gate ran gate-self-test/file-size/fmt, with
+  no Cargo test scope. Canonical Goal remains in models-and-goals §13.1,
+  recovery rules in protocol §9.5.1; no Goal or implementation was started.
+
+- [x] **P1 | `docs/handoff/codex/`, `docs/product/`, `docs/backlog.md` | Finalize the scaffold for a Luna-medium kickoff.**
+  Audit the canonical contracts and frozen first-stage cards, resolve bootstrap
+  and controller handoff gaps, and provide one runnable-instructions entry for
+  the requested integrated MVP. Keep runtime implementation, real provider
+  access and automation activation distinct from documentation readiness.
+  Done when the first task, handoff, recovery and design-release paths are
+  unambiguous, local links and card consistency checks pass, and
+  `git diff --check` plus `./scripts/test_changed.sh` are green.
+  Accepted documentation candidate: `e45be34`; evidence and next action:
+  [Luna kickoff readiness](handoff/codex/reviews/2026-09-09-luna-kickoff.md).
+  This completes documentation preparation, not S0 implementation.
+
+- [x] **P2 | `docs/handoff/codex/provider-setup.md`, `docs/backlog.md` | Record the founder's credential-storage handoff.**
+  Record the founder-reported local storage state separately from machine
+  verification and API connectivity. Do not read credentials or invoke the
+  provider. Done when the status is explicit and `git diff --check` plus
+  `./scripts/test_changed.sh` pass.
+
+- [x] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Consolidate the Singapore pilot and model-credential handoff.**
+  Record the founder's Singapore-first decision and reconcile the discussion
+  of employee skills, Claude access, credential custody, desktop delivery,
+  legal RAG, and the integrated MVP with the existing canonical scaffold.
+  Document a concrete local secret-entry route and distinguish storing a key
+  from a working broker. Schedule the bounded synthetic-model connection
+  before S3 requires it; retain S4/S5 gates for real data and external actions.
+  Documentation only; no secret reading, live API call, implementation, or
+  automation activation. Done when links and cross-document scope agree,
+  `git diff --check` and `./scripts/test_changed.sh` pass.
+
+- [x] **P1 | `docs/product/`, `docs/handoff/codex/`, `docs/backlog.md` | Scope legal assistance, jurisdiction rules, and pilot markets.**
+  Extend the canonical blueprint with the requested Singapore, EU, and US
+  jurisdiction direction; distinguish legal research, reviewed deterministic
+  rules, and uncovered or conflicting requirements. Compare pilot markets,
+  including mainland China, using current primary sources and explicit
+  product assumptions. Add bounded synthetic legal-review acceptance to the
+  MVP Goal and an architect-owned design queue entry. Include the requested
+  legal RAG knowledge base, source/version and retrieval boundaries, and
+  citation and non-answer acceptance. No production legal
+  rules, legal guarantees, real-data access, or implementation is authorized
+  by this documentation item. Done when local links, `git diff --check`, and
+  `./scripts/test_changed.sh` pass and all implementation remains design-gated.
+
+- [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Set the recommended Goal to an integrated end-to-end MVP.**
+  Replace the default stage-limited Goal with one bounded outcome spanning
+  S0 through S3 and their integrated consultant UI. Define synthetic business
+  data, real model participation, complete business flow, observable acceptance
+  and continuation across stage reviews. Keep the canonical Goal in
+  `docs/handoff/codex/models-and-goals.md`; no implementation or Goal activation
+  belongs to this documentation item. Done when the entry links to that Goal,
+  old early-stop prompts are retired, repository links resolve,
+  `git diff --check` and `./scripts/test_changed.sh` pass.
+
+- [x] **P1 | `docs/product/`, `docs/handoff/`, `docs/INDEX.md`, `docs/backlog.md` | Consolidate the Founder OS execution blueprint and bounded Luna task queue.**
+  Record the product vision, verified implementation baseline, researched
+  component choices, business-demo milestones, and the requested Luna-medium
+  worker / strong-model review / two-failure escalation protocol in one Chinese
+  document set with one canonical entry and frozen first-stage task cards.
+  Separate current mechanisms from proposed automation, preserve the
+  standalone synthetic Playground boundary, and add dependency-ordered tasks
+  with explicit readiness and acceptance criteria. Documentation only; no
+  product implementation or unattended development is activated by this item.
+  Done when: the canonical scaffold is linked from `docs/INDEX.md`, its repository links
+  resolve, the task queue distinguishes executable work from design gates,
+  `git diff --check` and `./scripts/test_changed.sh` pass.
+
+Codex execution uses the [single scaffold entry](handoff/codex/README.md).
+The entries below are queue records only: scope details, dependencies and
+acceptance are maintained in each linked card, not copied here. Frozen cards
+still require their dependencies, a clean base and a controller claim.
+Legacy human/nightly lanes must skip every `lane:codex` item. Unfrozen design
+and strong-model items retain `needs:fable`; Luna workers must skip those,
+while the controller routes eligible design/review cards to the strong role.
+
+- [x] **P1 | `docs/handoff/codex/` | S0-00 — Freeze the canonical scaffold document set.** `lane:codex`
+  Delivered as part of the current scaffold documentation item; no separate
+  planning round is required after that item is accepted.
+  Definition and done criteria: [S0-00](handoff/codex/README.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex` IN PROGRESS (2026-09-09)
+  Definition and done criteria: [S0-01](handoff/codex/cards/S0-01.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+  Attempt 1 smoke report: [S0-01 attempt 1](handoff/codex/reports/S0-01-attempt-1.md).
+  TOML parsing and explicit Luna/Astra read-only smoke returned; client loading,
+  enforced reviewer isolation, nested dispatch, and slot lifecycle remain unverified.
+  The record-repair audit is independently accepted as blocked:
+  [S0-01 record repair](handoff/codex/reports/S0-01-record-repair.md).
+  `S0_01_HISTORY_NOT_REPLAYABLE` means the old mixed B/C/W history cannot be
+  relabeled; a strong architect must approve a history-preserving recovery
+  decision before a clean attempt or S0-02 dispatch.
+  The recovery design and its independent review are accepted; the separate
+  architect design card is now frozen for v2 execution:
+  [S0-01 recovery design](handoff/codex/reports/S0-01-recovery-design.md),
+  [S0-01 recovery spec card](handoff/codex/cards/S0-01-RECOVERY-SPEC.md).
+  RECOVERY-SPEC has a recorded claim, but execution admission is not valid.
+  Architect preflight work occurred without a recorded start; no v3 candidate
+  is accepted. Absence of a start event is not evidence of zero work:
+  [contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r1/contract.json),
+  [events](handoff/codex/events/S0-01-RECOVERY-SPEC.json).
+  The first Cspec omitted five required RFC blobs. The later r2 does not repair
+  execution admission and must not be dispatched as a valid frozen contract:
+  [r2 contract](handoff/codex/tasks/S0-01-RECOVERY-SPEC/r2/contract.json).
+  Recovery checkpoint at `fce0763`: `SPEC_RECORD_BINDING_MISMATCH`.
+  r2 base is `e9372ad`, whereas its revise event binds `c73c296`; r2 was changed
+  in place by `fce0763`. Its backlog input blob is `785370bd`, but the bound
+  base contains `4a3cf69b`. The source card remains revision 1. These findings
+  are controller record defects, not Luna implementation failures. The latest
+  architect confirmed no file edits/candidate/report and paused. App thread
+  `01a08356-f1df-7a01-9bed-b9564ab7299a` is now idle with its stop turn completed;
+  its worktree is clean at `5a84fc4`, with no candidate or running check.
+  Next: one bounded architect correction decision, preserving actual history
+  and work already performed; do not manufacture start times, actors or a new
+  zero-work attempt, and do not recursively create recovery-design cards.
+  Owner authorised minimal-impact correction: “怎么影响小怎么去修，然后快点开发”.
+  The exception covers only one forward continuation of RECOVERY-SPEC.
+  r1/r2 contracts, events and Git history remain defective historical evidence;
+  no successful v2 replay or zero historical work is claimed. The corrected
+  card uses revision 3, a new independently checked freeze and isolated base.
+  New work has a separately measured 30-minute budget; old elapsed time remains
+  unknown. Stop on another binding mismatch. Keep W/R separation and independent
+  review; do not reset S0-01/Luna failures or extend product authority.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
+  Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-03 — Bind Git candidates to real check evidence.** `lane:codex`
+  Definition and done criteria: [S0-03](handoff/codex/cards/S0-03.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-04 — Enforce one controller and bounded recovery.** `lane:codex`
+  Definition and done criteria: [S0-04](handoff/codex/cards/S0-04.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-05A — Expose one controller CLI entry.** `lane:codex`
+  Definition and done criteria: [S0-05A](handoff/codex/cards/S0-05A.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `scripts/codex-control/` | S0-05 — Rehearse escalation recovery and real handoff.** `lane:codex`
+  Definition and done criteria: [S0-05](handoff/codex/cards/S0-05.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `docs/handoff/codex/` | S0-06 — Accept the scaffold and nominate the next product card.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S0-06](handoff/codex/cards/S0-06.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` IN PROGRESS (first action slice accepted; later interfaces deferred)
+  Definition and done criteria: [S1-00](handoff/codex/cards/S1-00.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G01 — Migrate the existing source boundary for the next closed stage.** `lane:codex` DONE (Luna two candidates; Astra completion and independent review accepted)
+  Definition and done criteria: [S1-G01](handoff/codex/cards/S1-G01.md).
+  Frozen source base `32c54a4c2ed5cbb691c4e1c0633d9ed7520545d1`; card blob
+  `cb4b2a98cb4d2ac2c3b1aa3e12c1213b3e505db5`. Exact three-file write set and
+  commands are in the card; controller reviews before S1-01 dispatch.
+  Attempt 1 review: changes requested. Escape tests exercised the legacy domain
+  instead of the extended action fixture; fifth-action mutation replaced an
+  existing variant. Attempt 2 corrects these cases in the same three-file scope.
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/` | S1-01 — Implement four closed actions.** `lane:codex` DONE (Luna medium; attempt 1 accepted, no failures)
+  Definition and done criteria: [S1-01](handoff/codex/cards/S1-01.md).
+  Base `5d909ddc90a46adfa4d9e5ee4d966c05301a5438`; card blob
+  `8e282e8a9206998485f0da36be48132c17427cce`. Only domain.rs is writable.
+  Controller accepted exact action grammar and all 16 transitions. Full workspace
+  test/clippy, fmt and scoped gate passed; logs `.harness/s1-01/`.
+  This is pure domain behavior; no search results, HTTP or browser UI yet.
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G02 — Migrate the exact DTO source and dependency boundary.** `lane:codex` DONE (Astra fallback accepted after two substantive Luna failures)
+  Definition and done criteria: [S1-G02](handoff/codex/cards/S1-G02.md).
+  Base `d42c50eb3303cd3c494b62321125af44a43ff4e6`; card blob
+  `b3c4cf31f00d0dc786440e861c19639b378c304f`; exact six-file test-only scope.
+  Attempt 1 changes requested: incomplete static grammar/visibility fixture, missing
+  required metadata fields accepted, and incomplete mutation coverage. Attempt 2
+  repaired required null fields and partial tests but still omitted the complete
+  static grammar/visibility fixture. Two substantive failures; no third Luna
+  attempt. Astra fallback repaired the six files; independent strong reviewer
+  `/root/recovery_spec_card_review` accepted the final candidate. Full workspace
+  test/clippy and scoped gate passed; logs `.harness/s1-g02/integration/`.
+  Evidence: [supervised report](handoff/codex/reports/S1-G02-supervised.md).
+  Logs: `.harness/s1-g02/attempt2*`.
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/` | S1-02 — Add one-way read models.** `lane:codex` DONE (independently accepted after two Luna failures)
+  Definition and done criteria: [S1-02](handoff/codex/cards/S1-02.md).
+  Base `b4935f00dfb06704454bf3b305a2c79ad1402073`; card blob
+  `76a00e5b165289e763150674818c75a33bd6cf8d`; domain.rs, leaf Cargo.toml,
+  Cargo.lock only. G02 accepted in `5e740b1`.
+  Attempt 1 production matched, but tests omitted most DTO values, search
+  read invariance and snapshot detachment across real session actions.
+  Attempt 2 repaired value/search assertions but reset every case only after
+  normalizing to the corrected/customer state. Controller fallback changed
+  that test to reset each original reachable state; independent strong reviewer
+  accepted final domain blob `bac8ff1597079d18ec7c7fd9a425fdd844c4d994`.
+  Workspace test/clippy, frontend tsc and scoped checks passed. Original test-first
+  evidence was not preserved; later isolated mutation failed/restoration passed.
+  [Execution evidence](handoff/codex/reports/S1-02-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G03 — Admit the static bilingual catalog.** `lane:codex` DONE (Astra fallback accepted after two Luna failures).
+  Definition and done criteria: [S1-G03](handoff/codex/cards/S1-G03.md).
+  Base `e31795e2d9f9c27edfdc56495eb87bfc486ed126`; card blob
+  `b2f529ef84ac195b95e4d2d7e2d45c815fb1809f`; exact three test files.
+  S1-02 accepted in `9e938ef`.
+  Attempt 1 rejected: text slots accepted arbitrary tokens, new lib/source
+  closure pairing absent, mutation coverage incomplete and no preserved RED.
+  Attempt 2 repaired text-token/path checks but explicitly left source-closure
+  pairing and mismatch/symlink cases incomplete. No third Luna retry;
+  `/root/s1_g02_fallback` repairs the same three files before independent review.
+  Worker-reported attempt2/red.log was actually green on inspection; it is not
+  RED evidence. Fallback preserved it and recorded a real failing closure test.
+  Independent reviewer `/root/recovery_spec_card_review` accepted; full workspace
+  test/clippy and scoped gate passed (process44157 exit0).
+  [Execution evidence](handoff/codex/reports/S1-G03-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` DONE (attempt 1 accepted, no substantive failures)
+  Definition and done criteria: [S1-03](handoff/codex/cards/S1-03.md).
+  Base `1122087691b3adde60c1db178f0af3d44daee8c5`; card blob
+  `7799e89b394ece03b75f9e9058036e3da754dd11`. New catalog.rs plus lib.rs only.
+  G03 accepted in `4274b13`; fresh worker `/root/s1_03_luna` implemented this card.
+  Controller independently accepted exact 27-row content, JSON shape and tests;
+  full workspace test/clippy and scoped gate passed (process43427 exit0).
+  [Execution evidence](handoff/codex/reports/S1-03-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G04 — Admit fixed search and guidance.** `lane:codex` DONE (controller fallback independently accepted after two Luna failures).
+  Definition and done criteria: [S1-G04](handoff/codex/cards/S1-G04.md).
+  Base `3feb5c0ffeea2539c069703791f37449a637f007`; card blob
+  `7c5454b46e1849bdbd43756ce9c1d63e269ea11d`; exact four test files.
+  S1-03 accepted in `551fbf5`; fresh worker context.
+  Attempt 1 rejected: accepted teaching additions without the fixed domain,
+  omitted required Serialize derives and used mutations targeting unrelated
+  tokens instead of the intended behavior. Attempt 2 repaired production shape
+  but omitted claimed additions-only rejection and left some off-target mutations.
+  Controller completed those narrow tests; no third Luna attempt, independent
+  strong reviewer accepted. All changes remain in the four-file scope.
+  Full workspace/scoped gates passed; original RED probes invalid, original
+  test-first unproven. Isolated complete-fixture test failed on old gate and
+  passed on final gate. [Execution evidence](handoff/codex/reports/S1-G04-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` DONE (attempt 1 accepted, no substantive failures)
+  Definition and done criteria: [S1-04](handoff/codex/cards/S1-04.md).
+  Base `7deb0eeed8273ac02d6a2cc0a84710470b0cbfc3`; card blob
+  `55c5aa6873b92c9219448f9d5ab8dc19f3467e08`; domain.rs + catalog.rs only.
+  G04 accepted in `59c0d7e`; fresh worker `/root/s1_04_luna`.
+  Controller repaired approved fixture rustfmt mismatch and strengthened two
+  assertions; independent strong reviewer accepted. Full workspace/scoped gate
+  passed (process56333). [Evidence and RED limitation](handoff/codex/reports/S1-04-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G05 — Freeze and admit the pure HTTP boundary.** `lane:codex` Accepted (Astra architecture; candidate 2, one review rejection).
+  Definition and done criteria: [S1-G05](handoff/codex/cards/S1-G05.md).
+  Strong implementation plus independent strong review; product S1-05 remains Luna.
+  Base `858329440fc482b6282bd27234c9df8337721bcd`; card blob
+  `c0f480b579066d2fd177c96720262fea08349e9b`; exact four test files.
+  S1-04 accepted in `8583294`.
+  Candidate 1 rejected: serde struct sequence decoding admitted top-level
+  one-element action arrays. Architecture repair adds an object-prefix guard
+  before direct serde parsing, preserving duplicate-field rejection; actual
+  pre/post behavior and guard mutations passed. Independent review accepted;
+  final workspace test/clippy/fmt and scoped gate passed.
+  [Evidence](handoff/codex/reports/S1-G05-supervised.md).
+
+- [x] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` Accepted (Astra fallback after two Luna substantive failures).
+  Definition and done criteria: [S1-05](handoff/codex/cards/S1-05.md).
+  Source base `c978e9be1d609fb367510f72a8ea4f73db614164`; card revision1 blob
+  `c78a9e9af185b947d7b377549acc4f2f0ade278a`. Exact write set src/http.rs
+  (new, inline tests) and src/lib.rs only. S1-G05 accepted in c978e9b.
+  Worker founder_worker (Luna medium), independent founder_reviewer (Astra high).
+  Preserve actual RED/GREEN under .harness/s1-05/; report to controller only.
+  Budget: up to three focused repair cycles per candidate; stop at two rejected
+  substantive attempts. Runtime token/time accounting unavailable; do not invent.
+  Attempt1 rejected by independent reviewer: production matched accepted fixture,
+  but all seven test groups lacked required coverage (full snapshots/isolation,
+  route/method/headers, port80/8123/Origin, strict bodies/arrays, precedence,
+  poison/lock release, all11 exact errors). Candidate http blob
+  `e54c88408591648c8444a69ec0f193b4b93c113d`; lib8aa01359.
+  Checks green; red.log was EXIT0 baseline, not RED. Preserve this limitation.
+  Attempt2 only repairs inline tests within the same two-file ownership;
+  production grammar unchanged.
+  Attempt2 rejected: most seven-group coverage gaps remained (only metadata,
+  search comparison and80/8123 GET added). http blob
+  `5302c3daf6cccd3bae9441f18c7868c37f861e59`; lib unchanged; actual checks green.
+  Luna attempts terminated at two failures. Astra fallback owns only inline
+  HTTP tests (same src/http.rs +lib write set), then independent review.
+  No production or gate redesign; preserve all baseline/attempt logs.
+  Fallback f623a6b accepted independently; seven coverage gaps closed, scoped
+  full workspace/Clippy/fmt/tsc passed.
+  [Execution and acceptance](handoff/codex/reports/S1-05-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G06 — Admit closed embedded assets.** `lane:codex` Accepted (Astra architecture; candidate1, no failures).
+  Definition and done criteria: [S1-G06](handoff/codex/cards/S1-G06.md).
+  Base `fecab4c824c90e986a81be802f1fefd402905b9e`; card revision1 blob
+  `96b29a3fcdfd988035137f17b554bb994b725819`; exact five test files per card.
+  S1-05 accepted in fecab4c. Fresh founder_architect implements, independent
+  strong reviewer accepts; logs .harness/s1-g06/. Preserve extraction baseline
+  and true new-stage RED/GREEN; runtime token/time budget unavailable.
+  Independent review accepted; final full scoped gate passed.
+  [Evidence](handoff/codex/reports/S1-G06-supervised.md).
+  Strong implementation and independent strong review precede the Luna UI card.
+
+- [x] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` Accepted (Astra fallback after two Luna substantive failures).
+  Definition and done criteria: [S1-06](handoff/codex/cards/S1-06.md).
+  Base `da47f15d167e4f41cdf2aa48182fbc6f0575ab98`; revision1 card blob
+  `0b801adb59f596ccb7089b3c501e144e29d80f2a`; exact ten files per card.
+  S1-G06 accepted in da47f15. Node22.23.1 available. Worker founder_worker
+  (Luna medium), independent strong review; logs .harness/s1-06/.
+  Up to3 focused repair cycles per candidate, second substantive rejection
+  escalates to Astra; token/time accounting unavailable, preserve attempts.
+  Attempt1 stopped incomplete, independently rejected: tsc5errors; nonexistent
+  company_name_label, incomplete success/failure state, three-level DTO validation,
+  missing request/error test matrices, initial language controls and Rust bytes
+  equality, unreadable compressed JS. app9f15acb1/UI6d874bae/tests004c7036.
+  Root reran Node3tests EXIT0 and tsc EXIT2, logs attempt1-node/tsc.log;
+  no preimplementation RED log exists. Attempt2 retains same ten-file scope.
+  Attempt2 independently rejected: first-render missing key persists, validation
+  regressed to shallow checks, busy state incomplete, Node tests unchanged.
+  tsc now green but widened locale type; no functional acceptance.
+  Astra fallback takes same ten files; no third Luna attempt.
+  Independent review accepted repaired10filecandidate; Node140/140, explicit
+  newfrontend tsc, Rust and full scoped checks passed. Browser still pending.
+  [Full failure/repair record](handoff/codex/reports/S1-06-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G07 — Admit bounded loopback transport.** `lane:codex` Accepted (Astra architecture; candidate1, no failures).
+  Definition and done criteria: [S1-G07](handoff/codex/cards/S1-G07.md).
+  Base `18844cb203faf606ab611b71012704459cc845c2`; revision1 card blob
+  `2423eef503e17aa242ba9657ebb7a1bbfe479eb0`; five exact test files per card.
+  S1-06 accepted in18844cb; fresh founder_architect plus independent reviewer.
+  Logs .harness/s1-g07/, preserve trueRED/GREEN/fixturecompile, no product
+  writes. Runtime token/time accounting unavailable.
+  Independent code review accepted; four matrices and full scoped gate passed.
+  [Evidence](handoff/codex/reports/S1-G07-supervised.md).
+
+- [x] **P1 | `crates/consultant-playground/` | S1-07 — Add exact loopback server routes.** `lane:codex` accepted after two Luna failures and Astra fallback.
+  Definition and done criteria: [S1-07](handoff/codex/cards/S1-07.md).
+  Product commit `b7caaadfa52371096292ab45dcba54604d1e8222`; six files +1251/-0.
+  Seven real socket cases, helper/private tests, read/write sensitivity and
+  full scoped workspace gates passed; independent Astra review accepted.
+  [Evidence and retained failure history](handoff/codex/reports/S1-07-supervised.md).
+  Next S1-09; no CLI/browser/full-MVP acceptance implied.
+
+- [x] **P1 | `crates/consultant-playground/` | S1-08 — Wire browser actions against the implemented server.** `lane:codex` accepted.
+  Astra fallback after two retained Luna failures; no source edits.
+  Independent review accepted HEAD672cd23 and the bound 45-artifact manifest:
+  all six browser groups, four viewport/locale pairs, actual network/fault/
+  keyboard/visual observations. [Evidence](handoff/codex/reports/S1-08-supervised.md).
+  Root preview at127.0.0.1:7788 retained. Next S1-10A; full MVP remains unfinished.
+
+- [x] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` accepted.
+  Product commit `6e0976c630f091f46aa51f64c11044b5f2a2fc6d`; four files +106/-0.
+  Three CLI groups/31tests, fullscoped, original Uihelp and actualrelease HTTP
+  smoke passed; independent Astra accepted after root test-module placement fix.
+  [Evidence and RED chronology limitation](handoff/codex/reports/S1-09-supervised.md).
+  Next S1-08; no browser/fullMVP acceptance implied.
+
+- [x] **P1 | `crates/consultant-playground/tests/support/transport.rs` | S1-10A — Extend shared test process capture.** `lane:codex` accepted.
+  Product73cd9b2f98cce2af0954b05091e19c7e22e2cfb7; helperbf7b594e9bdd55305e04c34ea873ca1509127279.
+  Astra fallback after two retained Luna failures; independent review accepted.
+  32transport tests/full gate green; exact capture and cleanup evidence in
+  [report](handoff/codex/reports/S1-10A-supervised.md). Next S1-10.
+
+- [x] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` accepted.
+  Product1d4da2423ba386a722f02fd190857aea6a2e7a10; fourfiles+462/-0.
+  Astra fallback after two retained Luna failures; independent review accepted
+  complete44exchange realrelease proof and specific snapshot sensitivity.
+  [Evidence](handoff/codex/reports/S1-10-supervised.md). Next S1-11.
+
+- [x] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` accepted; Astra reviewer-only.
+  Definition and done criteria: [S1-11](handoff/codex/cards/S1-11.md).
+  Revision2 blob4903767318fc35a3c79d7b2d9419df394c3c59db; sourcebase1d4da24;
+  Independently accepted36efdf28a3dad44499228a3345cf0288d4b77527; all writers stopped.
+  [Stage verdict](handoff/codex/reports/S1-11-review.md): actual browser/reload,
+  12legacyroute pairs, releaseisolation and gates passed. Raw .harness/s1-11/.
+  Next S2-00 design; fixed S1 does not complete fullMVP.
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `docs/handoff/codex/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` claimed; Astra architect.
+  Definition and done criteria: [S2-00](handoff/codex/cards/S2-00.md).
+  Revision1 blob9a14ba3d45295db32fa16bf1bc66ea16232176f1;
+  base ac4e09d759c5f1beebd8e3837d06ddd50d98fb59; design attempt1, no implementation failures.
+  [Admission and ownership](handoff/codex/reports/S2-00-supervised.md).
+  A1/A2 design independently admitted at c89f7c9; later design remains pending.
+  Architect stopped after repair1; continue visible A1 implementation first.
+
+- [ ] **P1 | `apps/cli/` | S2-01A1 — Run editable company and service forms.** `lane:codex` claimed; Astra fallback after two Luna failures.
+  [Frozen card](handoff/codex/cards/S2-01A1.md), revision3; design admitted at c89f7c9.
+  Original source base c89f7c908c154cdef3b929beec475ee46dc886e8; two substantive failures.
+  Both raw candidates preserved; no third Luna retry; fallback repairs frozen A1.
+  [Claim and exact ownership](handoff/codex/reports/S2-01A1-supervised.md).
+
+- [ ] **P1 | `apps/cli/` | S2-01A2 — Add editable lead and discovery.** `lane:codex` ready design, awaiting A1 implementation acceptance.
+  [Frozen card](handoff/codex/cards/S2-01A2.md), revision3; not yet claimed.
+
+- [ ] **P2 | `rfcs/, docs/handoff/codex/` | S3-00 — Freeze synthetic employee execution contracts.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S3-00](handoff/codex/milestones.md).
+  Design only; release implementation cards after the linked stage is frozen.
+
+- [ ] **P2 | `rfcs/, docs/handoff/codex/`, `docs/product/` | S3-M00 — Freeze the real model connection and its credential/authority prerequisites.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S3 model connection](handoff/codex/milestones.md#model-connection).
+  Resolve real-egress/Exact Effect and actual owner/authority dependencies
+  before releasing bounded Keychain, dispatch and connection-acceptance cards.
+  Reuse existing core tasks; synthetic input does not waive real-effect gates.
+
+- [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S3-L00 — Freeze legal RAG, jurisdiction facts, assistance outputs, and synthetic rule enforcement.** `lane:codex` `needs:fable`
+  Definition and done criteria: [S3 legal extension](handoff/codex/milestones.md#legal-extension).
+  Wait for its design dependencies, then freeze exact S3-L implementation and
+  acceptance cards. No real legal rule or professional approval is implied.
+
+- [ ] **P2 | `docs/handoff/codex/`, `docs/product/` | MVP-00 — Freeze unified business and employee integration.** `lane:codex` `needs:fable`
+  Definition and prerequisites: [MVP integration](handoff/codex/milestones.md#mvp-integration).
+  After S2-07 and S3-06, release exact implementation cards and the final
+  reviewer-only MVP-02 acceptance card. Map every complete-Goal requirement
+  to integrated behavior and evidence; separate demos do not complete it.
+
+- [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S4-L00 — Review the first real legal-rule pack and pilot scope.** `lane:codex` `needs:fable`
+  Definition and prerequisites: [S4 legal admission](handoff/codex/milestones.md).
+  Requires actual jurisdiction-specific professional review for production
+  legal rules; model-generated or synthetic approval is insufficient.
 
 - [x] **P1 | `crates/consultant-playground/tests/` | Split `physical_boundary.rs` before it breaks the file-size gate.**
   The file is at 1192 lines against the hard 1200 limit in

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 2,
+  "taskId": "S0-01",
+  "revision": 2,
+  "parentTaskId": null,
+  "sourceCardPath": "docs/handoff/codex/cards/S0-01.md",
+  "sourceCardBlob": "f6231acf98cb611b0798ee1aff49e8ca1daf5fa4",
+  "inputBlobs": [
+    {
+      "path": "docs/handoff/codex/README.md",
+      "blob": "0a3619c323189fd93f0049c291d40e037c7b6f2f"
+    },
+    {
+      "path": "docs/handoff/codex/protocol.md",
+      "blob": "1a4eb6780bc7b36f621b1ecf1f70d372acdfff4a"
+    },
+    {
+      "path": "docs/handoff/codex/contracts.md",
+      "blob": "cd8c34ee497676aa7dc6749ab16646eeb88031e1"
+    },
+    {
+      "path": "docs/handoff/codex/models-and-goals.md",
+      "blob": "09888cc8e0b1f0a672d3f57c60a617a15dbb4489"
+    },
+    {
+      "path": "CLAUDE.md",
+      "blob": "d15b2a5d109f4d2e7090a13ae4ce5eea1e49f8d7"
+    },
+    {
+      "path": "docs/backlog.md",
+      "blob": "e0c7fbb42c883211920517c90f514b7d206e3e2f"
+    }
+  ],
+  "baseCommit": "34e307beda8a9498d410b78d3e617d493009a573",
+  "dependencies": [],
+  "allowedWritePaths": [
+    ".codex/config.toml",
+    ".codex/agents/founder-worker.toml",
+    ".codex/agents/founder-reviewer.toml",
+    ".codex/agents/founder-fallback.toml",
+    ".codex/agents/founder-architect.toml"
+  ],
+  "reportPath": "docs/handoff/codex/reports/S0-01-attempt-1.md",
+  "workerRole": "worker",
+  "reviewerRole": "reviewer",
+  "expectedActors": {
+    "controller": { "model": "gpt-6-astra", "effort": "high" },
+    "worker": { "model": "gpt-5.6-luna", "effort": "medium" },
+    "reviewer": { "model": "gpt-6-astra", "effort": "high" },
+    "architect": { "model": "gpt-6-astra", "effort": "high" },
+    "fallback": { "model": "gpt-6-astra", "effort": "high" }
+  },
+  "maxLunaFailures": 2,
+  "attemptBudgetMs": 1800000,
+  "checks": [
+    {
+      "id": "diff-check",
+      "argv": ["git", "diff", "--check"],
+      "kind": "command",
+      "completion": "exit",
+      "minimumExecuted": null,
+      "timeoutMs": 60000
+    },
+    {
+      "id": "scoped-gate",
+      "argv": ["./scripts/test_changed.sh"],
+      "kind": "command",
+      "completion": "scoped-gate",
+      "minimumExecuted": null,
+      "timeoutMs": 1800000
+    }
+  ]
+}

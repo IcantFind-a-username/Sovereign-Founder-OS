@@ -1,0 +1,25 @@
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PlaygroundAction {
+    CorrectOfferPrice,
+    PromoteAcmeToCustomer,
+    ShowReportingSearch,
+    Reset,
+}
+
+impl PlaygroundSession {
+    fn apply(&mut self, action: PlaygroundAction) {
+        match action {
+            PlaygroundAction::CorrectOfferPrice => {
+                self.graph.offer.price_usd_cents = 350_000;
+            }
+            PlaygroundAction::PromoteAcmeToCustomer => {
+                self.graph.relationship.stage = RelationshipStage::Customer;
+            }
+            PlaygroundAction::ShowReportingSearch => {}
+            PlaygroundAction::Reset => {
+                *self = Self::new();
+            }
+        }
+    }
+}
