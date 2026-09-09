@@ -1,6 +1,6 @@
 # Playground CLI launch and real browser acceptance
 
-**Revision 1 · Independently reviewed and Frozen by controller. Dispatch only
+**Revision 2 · Independently reviewed and Frozen by controller. Dispatch only
 after the dependencies below are accepted.**
 Design baseline `8e1e840`; S1-06's [accepted evidence](reports/S1-06-supervised.md)
 proves embedding, Node checks and static review, not a running browser.
@@ -13,10 +13,12 @@ continues beyond this fixed synthetic S1 leaf.
 
 ## Accepted dependency correction
 
-Retain historical IDs; execute **S1-07 → S1-09 → S1-08 → S1-10 → S1-11**.
+Retain historical IDs; execute **S1-07 → S1-09 → S1-08 → S1-10A → S1-10 → S1-11**.
 S1-09 requires accepted S1-07 and its stopped writer. S1-08 requires accepted
 S1-09 and therefore the actual release CLI, not a temporary launcher or a test
-child presented as product. S1-10 retains the independent two-root isolation
+child presented as product. [S1-10A](cards/S1-10A.md) separately extends the
+shared test capture helper before S1-10 consumes it; this insertion changes no
+S1-09 implementation or acceptance behavior. S1-10 retains the independent two-root isolation
 proof. S1-11 remains the final runnable-Playground review. Controller updates
 the existing index/backlog links after review; these docs do not claim them done.
 

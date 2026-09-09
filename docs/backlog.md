@@ -409,22 +409,23 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S1-08](handoff/codex/cards/S1-08.md) — depends on S1-09 real CLI acceptance.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` IN PROGRESS (Luna medium attempt1, zero failures)
-  Definition and done criteria: [S1-09](handoff/codex/cards/S1-09.md) — depends on S1-07.
-  Base `961db08a50ab60c1408a1c4049797b533b9a2317`, revision1 card blob
-  `e95a914701abcdbc5cdf705cf21e9f0cafd69386`; four exact files per card.
-  S1-07 accepted b7caaad; founder_worker Luna medium + independent Astra review.
-  30min/three targeted cycles per attempt, two failures then Astra.
-  Logs .harness/s1-09/; root owns recorded release process/HTTP smoke.
-  Existing CLI baseline saved baseline/sovereign and baseline-ui-help.* there.
+- [x] **P1 | `apps/cli/` | S1-09 — Add CLI wiring and preserve existing product behavior.** `lane:codex` accepted.
+  Product commit `6e0976c630f091f46aa51f64c11044b5f2a2fc6d`; four files +106/-0.
+  Three CLI groups/31tests, fullscoped, original Uihelp and actualrelease HTTP
+  smoke passed; independent Astra accepted after root test-module placement fix.
+  [Evidence and RED chronology limitation](handoff/codex/reports/S1-09-supervised.md).
+  Next S1-08; no browser/fullMVP acceptance implied.
+
+- [ ] **P1 | `crates/consultant-playground/tests/support/transport.rs` | S1-10A — Extend shared test process capture.** `lane:codex` Frozen; waits for S1-08.
+  Definition and done criteria: [S1-10A](handoff/codex/cards/S1-10A.md).
+  One helper file, two capture regressions; preserve existing S1-07 transport checks.
+
+- [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` Frozen; waits for S1-10A.
+  Definition and done criteria: [S1-10](handoff/codex/cards/S1-10.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/, apps/cli/tests/` | S1-10 — Prove two-process fake-root isolation.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-10](handoff/codex/cards/S1-after-design.md).
-  Complete only when the linked card's checks and independent acceptance pass.
-
-- [ ] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-11](handoff/codex/cards/S1-after-design.md).
+- [ ] **P1 | `docs/handoff/codex/, docs/product/` | S1-11 — Independently accept the runnable Playground.** `lane:codex` Frozen; waits for S1-10.
+  Definition and done criteria: [S1-11](handoff/codex/cards/S1-11.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` `needs:fable`
