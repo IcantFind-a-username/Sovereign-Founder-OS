@@ -40,14 +40,42 @@ pub enum Barrier {
     /// Inside `publish_record`: the temp file is written and fsynced, and the
     /// hard link that publishes it has not been attempted.
     LegacyAfterTempSyncBeforePublish,
+
+    // The broker's sequence, one barrier per step it claims to take in
+    // order. Each exists so a test can kill the process exactly there and
+    // assert what was — and was not — left behind. The claim "nothing is
+    // locked or opened before a supervisor authenticates" is only worth the
+    // kill that lands between those two moments.
+    /// The address is published; no supervisor has connected.
+    AfterAddressBeforeSupervisorHello,
+    /// A supervisor connected and authenticated; the lock is untouched.
+    AfterAuthenticatedHelloBeforeLock,
+    /// The process lock is held; the database is not open.
+    AfterLockBeforeRedbOpen,
+    /// The database is open; the broker has not reported ready.
+    AfterRedbOpenBeforeBrokerReady,
 }
 
 impl Barrier {
     pub const fn name(self) -> &'static str {
         match self {
             Barrier::LegacyAfterTempSyncBeforePublish => "LegacyAfterTempSyncBeforePublish",
+            Barrier::AfterAddressBeforeSupervisorHello => "AfterAddressBeforeSupervisorHello",
+            Barrier::AfterAuthenticatedHelloBeforeLock => "AfterAuthenticatedHelloBeforeLock",
+            Barrier::AfterLockBeforeRedbOpen => "AfterLockBeforeRedbOpen",
+            Barrier::AfterRedbOpenBeforeBrokerReady => "AfterRedbOpenBeforeBrokerReady",
         }
     }
+
+    /// Every barrier, so a matrix can enumerate them rather than a test
+    /// author remembering to add each new one.
+    pub const ALL: &'static [Barrier] = &[
+        Barrier::LegacyAfterTempSyncBeforePublish,
+        Barrier::AfterAddressBeforeSupervisorHello,
+        Barrier::AfterAuthenticatedHelloBeforeLock,
+        Barrier::AfterLockBeforeRedbOpen,
+        Barrier::AfterRedbOpenBeforeBrokerReady,
+    ];
 }
 
 /// Stop here if this process was asked to. Otherwise do nothing at all.
