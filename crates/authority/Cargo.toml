@@ -53,3 +53,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "broker_supervisor"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "broker_process_lock"
+required-features = ["owner-effect-fixture"]

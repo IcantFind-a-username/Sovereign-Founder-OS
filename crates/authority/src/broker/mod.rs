@@ -14,6 +14,7 @@
 
 pub mod bootstrap;
 pub mod listener;
+pub mod process_lock;
 pub mod protocol;
 pub mod supervisor;
 
@@ -47,7 +48,7 @@ pub fn run_owner_effect_fixture_broker(
         Ok(frame) => frame,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
     };
-    let _root = match bootstrap::classify(&frame.root) {
+    let root = match bootstrap::classify(&frame.root) {
         Ok(root) => root,
         Err(diagnostic) => return Err(emit(diagnostics, diagnostic)),
     };
@@ -70,6 +71,20 @@ pub fn run_owner_effect_fixture_broker(
     {
         return Err(emit(diagnostics, diagnostic));
     }
+    // Only now: a broker that has not proved its parent must not claim the
+    // store, and a broker that cannot prove it is alone must not either.
+    let _lock = match process_lock::acquire(root.path()) {
+        Ok(lock) => lock,
+        Err(process_lock::LockError::BrokerAlreadyRunning) => {
+            return Err(emit(
+                diagnostics,
+                protocol::Diagnostic::BrokerAlreadyRunning,
+            ))
+        }
+        Err(process_lock::LockError::Unavailable) => {
+            return Err(emit(diagnostics, protocol::Diagnostic::LockUnavailable))
+        }
+    };
     Err(BrokerExit::NotImplemented)
 }
 
