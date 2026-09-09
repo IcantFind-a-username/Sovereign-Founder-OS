@@ -1,3 +1,4 @@
+mod business_demo;
 mod demo;
 mod gauntlet_report;
 mod ui;
@@ -58,6 +59,12 @@ enum Commands {
         #[arg(long, default_value_t = 7788)]
         port: u16,
     },
+    /// Run the memory-only synthetic company/service exercise
+    BusinessDemo {
+        /// Port to bind on loopback
+        #[arg(long, default_value_t = 7789)]
+        port: u16,
+    },
     /// Demonstrate model-gateway health-aware failover and the Red-data guard
     ModelCheck,
     /// Demonstrate durable workflow checkpoints resuming across a crash
@@ -96,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Status => cmd_status()?,
         Commands::Ui { port, no_open } => ui::run(port, data_dir(), !no_open)?,
         Commands::Playground { port } => sovereign_consultant_playground::run(port)?,
+        Commands::BusinessDemo { port } => business_demo::run(port)?,
         Commands::ModelCheck => cmd_model_check(),
         Commands::WorkflowDemo => cmd_workflow_demo()?,
         Commands::VerifyExport { path } => cmd_verify_export(&path)?,

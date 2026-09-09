@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Business demo · Sovereign Founder OS</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font: 16px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 920px;
+      padding: 24px; background: #f4f7f7; color: #18373d; overflow-wrap: anywhere; }
+    .banner { padding: 14px 18px; border-left: 4px solid #21766b; background: #dcefeb; }
+    h1 { margin-bottom: 8px; } h2 { margin-top: 0; }
+    nav { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+    main { background: #fff; border: 1px solid #c8d7d8; border-radius: 12px; padding: 24px; }
+    label { display: block; font-weight: 600; margin: 16px 0; }
+    input, textarea { display: block; width: 100%; max-width: 100%; margin-top: 6px;
+      padding: 11px; font: inherit; font-weight: 400; color: inherit; background: #fff;
+      border: 1px solid #7f979a; border-radius: 6px; }
+    textarea { min-height: 90px; resize: vertical; }
+    input[readonly] { background: #eef3f3; }
+    button { min-height: 44px; padding: 10px 16px; font: inherit; border: 1px solid #28645f;
+      border-radius: 6px; background: #edf5f3; color: #174a43; cursor: pointer; margin: 4px 8px 4px 0; }
+    button[type=submit], [aria-current=page] { background: #1b655a; color: white; }
+    button:disabled { opacity: .65; cursor: wait; }
+    :focus-visible { outline: 3px solid #ae6900; outline-offset: 3px; }
+    [aria-invalid=true] { border: 2px solid #aa302c; }
+    #status { min-height: 1.5em; }
+    #reset-confirmation { border: 1px solid #a86819; background: #fff7e9; padding: 16px; margin-top: 12px; }
+    footer { font-size: 14px; margin-top: 18px; }
+    @media (max-width: 480px) { body { padding: 12px; } main { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="banner">Synthetic exercise; memory only. Use invented data. No AI or external business actions.</div>
+  <h1>Business demo</h1>
+  <p>Shape one practice company and service. Changes disappear when this process stops.</p>
+  <nav aria-label="Exercise pages">
+    <button type="button" data-route="today">Today</button>
+    <button type="button" data-route="company">Company and service</button>
+  </nav>
+  <main id="app" aria-busy="true">Loading exercise state…</main>
+  <footer>This unauthenticated local preview does not protect real customer data. Customer discovery and later business stages are not connected yet.</footer>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
