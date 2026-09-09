@@ -55,3 +55,9 @@ task	package	target	profile	test_name
 4	sovereign-authority	broker_process_lock	owner-effect-fixture	dropping_the_lock_releases_it
 4	sovereign-authority	broker_process_lock	owner-effect-fixture	an_unusable_root_is_unavailable_not_already_running
 4	sovereign-authority	broker_process_lock	owner-effect-fixture	the_lock_is_held_across_processes_and_survives_being_killed
+4	sovereign-authority	broker_store	owner-effect-fixture	a_locked_root_yields_a_store
+4	sovereign-authority	broker_store	owner-effect-fixture	the_store_cannot_be_opened_without_a_held_lock
+4	sovereign-authority	broker_store	owner-effect-fixture	a_second_open_in_one_process_is_refused
+4	sovereign-authority	broker_store	owner-effect-fixture	an_unrecognised_file_is_unavailable_not_recreated
+4	sovereign-authority	broker_store	owner-effect-fixture	an_unavailable_root_fails_closed
+4	sovereign-authority	broker_store	owner-effect-fixture	a_committed_write_survives_reopening
