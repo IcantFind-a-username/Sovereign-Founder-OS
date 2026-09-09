@@ -7,3 +7,6 @@ mod catalog;
 // The pure handler follows domain and catalog.
 #[cfg_attr(not(test), allow(dead_code))]
 mod http;
+// Compile-time assets follow the pure handler.
+#[cfg_attr(not(test), allow(dead_code))]
+mod assets;

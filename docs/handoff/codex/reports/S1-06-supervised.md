@@ -1,4 +1,4 @@
-# S1-06 supervised execution — not accepted
+# S1-06 supervised acceptance
 
 Source base da47f15d167e4f41cdf2aa48182fbc6f0575ab98; first claim fe119f4;
 card revision1 blob0b801adb59f596ccb7089b3c501e144e29d80f2a. Exact ten files
@@ -41,7 +41,7 @@ byte checks unchanged. Widening renderer locale to string cleared a type error
 without implementing the frozen DTO/Locale typing. This is second substantive
 failure despite green narrow checks. No third Luna attempt.
 
-## Astra fallback pending
+## Astra fallback accepted
 
 Same ten-file ownership, no gates/HTTP/domain/catalog/dependencies/docs change.
 Replace/refactor UI and tests to satisfy complete assets contract, real32keys
@@ -51,3 +51,32 @@ Preserve attempts and separate fallback logs. Independent review remains
 required after stopped candidate, including explicit Node/checkJs runs;
 existing scoped gate checks only the older CLI frontend tsc, so its green
 alone does not prove this new frontend type check. Full Goal13.1 remains active.
+
+
+Fresh /root/s1_06_fallback (Astra high) rewrote the implementation and tests
+within the same ten files. New regression suite on the unchanged failed code
+produced140 tests,41 pass/99 fail; fallback-red-node.log preserves that actual
+RED. After repair140/140 pass, with final explicit new-frontend tsc also green.
+All four named groups now substantively check catalog/locale, exact requests,
+all11 errors and invalid response matrices, import effects and no retries.
+Rust tests compare all six asset byte arrays to the exact files. Responsive,
+keyboard/ARIA styling and DOM state logic received source review, not browser
+acceptance. No generic framework/tool, dependency or extra runtime dictionary.
+
+Stopped10-file diff+803/-0, nine new files. Key blobs: app
+113ad093681ffb0a5ce8abe29d00676f641275ce; UI
+c7f51fab80a69fe97e98393f63cc32184dcba789; Node tests
+e96d3826862a634370e8754f6d4bd609cd3660be; assets.rs
+5c00b3c3e04eadceb3bdfcd265945307c00e32b0. Rust formatting initially differed,
+recorded fallback-fmt-initial.log, then corrected without production logic change.
+Final Node/tsc/Rust/Clippy/fmt/diff/scoped and explicit workspace checks exited0.
+An already launched explicit workspace test/Clippy duplicated scoped work;
+no further rerun needed. Full scoped log fallback-scoped-full.log SHA256
+e67f2b327af550800a3ad4a5002d6e0fe971d931651e2144f927dc4d345df809.
+
+Independent /root/recovery_spec_card_review accepted exact candidate bound to
+HEAD4ba15c8cc31e3ed8dca8ca29fd89f8c45c088d5d, closing seven prior gaps.
+Two Luna failures remain recorded. Next nominated S1-G07 (transport gate).
+Accepted scope is static UI/embedding only: actual network/browser interception,
+375px rendering, keyboard and end-to-end operations remain unrun until server.
+Full business/real-model/legal MVP Goal is not complete.

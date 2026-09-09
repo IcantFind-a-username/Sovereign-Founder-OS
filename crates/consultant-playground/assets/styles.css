@@ -1,0 +1,80 @@
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #173437;
+  background: #f3f7f5;
+  line-height: 1.5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; overflow-wrap: anywhere; }
+.shell { max-width: 1040px; margin: auto; padding: 16px; }
+h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2rem); }
+h2 { font-size: 1.25rem; }
+.notice {
+  background: #d9efeb;
+  border-left: 4px solid #176b6b;
+  padding: 12px 14px;
+}
+.notice:empty { display: none; }
+.languages, .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+button {
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  padding: 9px 16px;
+  border: 2px solid #176b6b;
+  border-radius: 8px;
+  background: #fff;
+  color: #124b4c;
+  font: inherit;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+button:hover:not(:disabled), button[aria-pressed="true"], button.suggested {
+  background: #176b6b;
+  color: #fff;
+}
+button.suggested { border-width: 3px; text-decoration: underline; text-underline-offset: 3px; }
+button[aria-pressed="true"] { text-decoration: underline; text-underline-offset: 3px; }
+button:disabled { cursor: default; border-style: dashed; }
+:focus-visible { outline: 3px solid #153c91; outline-offset: 3px; }
+.cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.card {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #9ab8b4;
+  border-radius: 10px;
+  padding: 18px;
+}
+.card h2, .guidance h2, #search-results h2 { margin-top: 0; }
+dl { margin: 0; }
+dl div {
+  display: grid;
+  grid-template-columns: minmax(0, 35%) minmax(0, 1fr);
+  gap: 10px;
+  border-top: 1px solid #dbe7e5;
+  padding: 8px 0;
+}
+dt { font-weight: 650; }
+dd { margin: 0; }
+.guidance, #search-results {
+  margin-top: 16px;
+  background: #e7f3f0;
+  border: 1px solid #9ab8b4;
+  padding: 18px;
+  border-radius: 10px;
+}
+.actions { margin-top: 16px; }
+.actions button { flex: 1 1 190px; }
+.static-message { padding: 18px; background: #fff4d6; border-radius: 8px; }
+.static-message span { display: block; }
+.static-message span[lang] { margin-top: 4px; }
+[hidden] { display: none !important; }
+@media (min-width: 720px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 479px) {
+  .actions button { flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
