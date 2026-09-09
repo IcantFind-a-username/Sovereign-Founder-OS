@@ -1,0 +1,17 @@
+[package]
+name = "sovereign-fault-testing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Never published, and never a production dependency: this crate exists only
+# so tests can make real operations fail. A `[dependencies]` edge to it from
+# any shipping crate is a defect. `no_production_crate_depends_on_this` in
+# src/tests.rs parses every workspace manifest and fails on one.
+publish = false
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = "3"

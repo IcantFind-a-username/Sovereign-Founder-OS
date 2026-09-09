@@ -4,6 +4,7 @@ members = [
     "crates/authority",
     "crates/contracts",
     "crates/effects",
+    "crates/fault-testing",
     "crates/execution",
     "crates/identity",
     "crates/model",

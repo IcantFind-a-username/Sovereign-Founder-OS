@@ -848,7 +848,7 @@ while the controller routes eligible design/review cards to the strong role.
   pass in `cargo test -p sovereign-adversarial-tests` and the honesty texts
   match the tested reality.
 
-- [ ] **P2 | `crates/fault-testing/` | Stand up the shared fault-injection dev crate.**
+- [x] **P2 | `crates/fault-testing/` | Stand up the shared fault-injection dev crate.** Landed 2026-09-09; unblocks the vault/ledger/effects entries below.
   First slice of ROADMAP v0.1's "add process-kill, concurrency, and
   filesystem-fault tests" (ROADMAP.md:190-191). Today every crate hand-rolls
   corruption helpers, no test injects a *failing write*, and only
@@ -872,7 +872,7 @@ while the controller routes eligible design/review cards to the strong role.
   `cargo build --workspace --locked` shows no production dependency edge to
   the new crate.
 
-- [ ] **P2 | `crates/vault/` | Inject write failures and pin the entry/manifest tear semantics.**
+- [x] **P2 | `crates/vault/` | Inject write failures and pin the entry/manifest tear semantics.** Landed 2026-09-09.
   Blocked on the `crates/fault-testing` entry above. `put` performs two
   separate atomic renames (`<name>.enc` then `manifest.json`,
   src/lib.rs:86-97, 114-119), and no test makes a vault write fail. Done
@@ -885,7 +885,7 @@ while the controller routes eligible design/review cards to the strong role.
   and a later `put("b", …)` re-lists it; `cargo test -p sovereign-vault`
   passes.
 
-- [ ] **P2 | `crates/audit-ledger/` | Inject append failures and prove the chain survives.**
+- [x] **P2 | `crates/audit-ledger/` | Inject append failures and prove the chain survives.** Landed 2026-09-09; the durable step is `save`, so that is what the fault targets.
   Blocked on the `crates/fault-testing` entry above. No test today makes an
   append fail (`src/lib.rs:188` is only checked on the success path). Done
   when: `append_fails_closed_when_the_ledger_directory_is_unavailable`
@@ -895,7 +895,7 @@ while the controller routes eligible design/review cards to the strong role.
   stale `.tmp` beside the ledger and asserts the next append succeeds and
   removes or replaces it; `cargo test -p sovereign-audit-ledger` passes.
 
-- [ ] **P2 | `crates/effects/` | Inject outbox write failures and surface revoke failures.**
+- [x] **P2 | `crates/effects/` | Inject outbox write failures and surface revoke failures.** Landed 2026-09-09; `revoke` already propagated removal errors, so no fix was needed — only the test proving it.
   Blocked on the `crates/fault-testing` entry above. `write_exclusive_atomic`
   (src/lib.rs:218-238) has no failing-write coverage, and `revoke`
   (src/lib.rs:155-176) must be checked for swallowed removal errors — if it
@@ -1079,7 +1079,7 @@ while the controller routes eligible design/review cards to the strong role.
   `crates/identity/tests/public_api.rs` exercises key lifecycle through the
   public API only and passes.
 
-- [ ] **P2 | `crates/vault/` | Create the vault key, manifest, and entry files with owner-only permissions.**
+- [x] **P2 | `crates/vault/` | Create the vault key, manifest, and entry files with owner-only permissions.** Landed 2026-09-09; opening an older vault also tightens what it already holds.
   `write_atomic` (src/lib.rs:118-137) uses `std::fs::File::create` with no mode
   and `init` (src/lib.rs:51) uses `create_dir_all`, so under a default umask the
   master key `vault.key` (src/lib.rs:52-59, 160-163) lands at 0644 inside a 0755
