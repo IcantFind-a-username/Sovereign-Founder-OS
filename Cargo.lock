@@ -1459,6 +1459,7 @@ dependencies = [
  "sovereign-audit-ledger",
  "sovereign-authority",
  "sovereign-capability",
+ "sovereign-consultant-playground",
  "sovereign-contracts",
  "sovereign-effects",
  "sovereign-execution",
