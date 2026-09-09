@@ -1,3 +1,6 @@
 // TODO(Task 2): the next slice consumes this private teaching domain.
 #[cfg_attr(not(test), allow(dead_code))]
 mod domain;
+// Keep the catalog declaration paired with the domain declaration.
+#[cfg_attr(not(test), allow(dead_code))]
+mod catalog;

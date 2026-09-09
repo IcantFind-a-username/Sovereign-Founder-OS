@@ -276,11 +276,18 @@ while the controller routes eligible design/review cards to the strong role.
   [Execution evidence](handoff/codex/reports/S1-G03-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` IN PROGRESS (Luna medium; attempt 1, no failures)
+- [x] **P1 | `crates/consultant-playground/` | S1-03 — Add complete bilingual catalogs.** `lane:codex` DONE (attempt 1 accepted, no substantive failures)
   Definition and done criteria: [S1-03](handoff/codex/cards/S1-03.md).
   Base `1122087691b3adde60c1db178f0af3d44daee8c5`; card blob
   `7799e89b394ece03b75f9e9058036e3da754dd11`. New catalog.rs plus lib.rs only.
-  G03 accepted in `4274b13`; a fresh worker context implements this card.
+  G03 accepted in `4274b13`; fresh worker `/root/s1_03_luna` implemented this card.
+  Controller independently accepted exact 27-row content, JSON shape and tests;
+  full workspace test/clippy and scoped gate passed (process43427 exit0).
+  [Execution evidence](handoff/codex/reports/S1-03-supervised.md).
+  Complete only when the linked card's checks and independent acceptance pass.
+
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G04 — Admit fixed search and guidance.** `lane:codex` Frozen; depends on S1-03 acceptance.
+  Definition and done criteria: [S1-G04](handoff/codex/cards/S1-G04.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-04 — Add fixed search and guidance.** `lane:codex` `needs:fable`
