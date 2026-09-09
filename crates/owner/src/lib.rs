@@ -32,6 +32,9 @@ pub mod approval;
 pub mod config;
 
 #[cfg(feature = "owner-effect-fixture")]
+pub mod http_guard;
+
+#[cfg(feature = "owner-effect-fixture")]
 pub mod registry;
 
 #[cfg(feature = "owner-effect-fixture")]

@@ -152,3 +152,17 @@ task	package	target	profile	test_name
 10	sovereign-authority	reservation_atomicity	owner-effect-fixture	a_replay_reserves_nothing_new
 10	sovereign-authority	reservation_atomicity	owner-effect-fixture	the_same_key_with_a_different_fingerprint_conflicts
 10	sovereign-authority	reservation_atomicity	owner-effect-fixture	a_reservation_survives_reopening_the_store
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	the_known_routes_are_accepted
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	an_unknown_route_is_refused_before_anything_else
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	methods_are_not_interchangeable
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	a_query_string_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	the_origin_must_match_exactly
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	a_missing_origin_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	the_host_must_match_the_compiled_origin
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	cross_site_fetch_metadata_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	a_non_json_content_type_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	an_oversized_body_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	a_duplicated_security_header_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	a_cookie_without_its_csrf_partner_is_refused
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	only_the_pre_session_routes_run_without_credentials
+9	sovereign-owner	fixture_loopback	owner-effect-fixture	no_api_changes_the_origin
