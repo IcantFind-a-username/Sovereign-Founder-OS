@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# The fixture's separate evidence chain. Non-default: a shipped build has no
+# reason to carry a projection type that exists to describe synthetic effects.
+default = []
+owner-effect-fixture = []
+
 [dependencies]
 sovereign-contracts = { workspace = true }
 sovereign-identity = { workspace = true }
@@ -21,3 +27,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 sovereign-fault-testing = { path = "../fault-testing" }
 tempfile = "3"
+
+[[test]]
+name = "effect_v1"
+required-features = ["owner-effect-fixture"]
