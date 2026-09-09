@@ -65,3 +65,71 @@ Admission checks passed: local Markdown targets, exact six-document scope,
 exit0: self-test/file-size/fmt). Raw `.harness/s2-00/first-slice-admission.log`.
 No product tests were needed for these status/claim-only changes; product
 checks become mandatory on the implementation candidate.
+
+
+## Attempt 1 — changes requested
+
+Worker stopped. Independent `/root/blueprint_review` (actual Astra/max, existing
+reviewer reuse) rejected the eight-file uncommitted candidate over HEAD95c4af4.
+Exact snapshots/bindings are `.harness/s2-01a1/attempt1/root-candidate/manifest.json`,
+SHA256 `6ad0833f72f0261d556b7767cefb67a8f77b9ab6eb62737887aff61a8a31a2e9`.
+Full candidate including report: +529/-0; no dependency, S1 or out-of-scope writes.
+Backend blob `7609319dc1b16274528f71f32f74463c3b4bb417`, frontend
+`bb50127786c2507709859f2c2d96549a4fd3e893`, HTTP test
+`7c4a132530bd667dd5ee16929eb7f070cd3aead7`; worker report
+`aaa73da60d171d59ec479bd2f7bc776375ac7f0e` preserved with the snapshot.
+
+One substantive Luna failure. Required repair, in order:
+
+1. Restore exactly `/`, `/app.js`, `/api/demo`, `/api/demo/command`; remove
+   invented aliases. Match success/error envelopes, fixed status/code/headers,
+   per-route methods and 405 Allow. Serialization failure cannot become success.
+2. Enforce exact Host/Origin, POST custom header/media, GET body and POST length,
+   duplicate framing/Expect/upgrade checks before appropriate reads; reject
+   malformed/unknown/duplicate JSON fields. Preserve library pre-handler limits.
+3. Restore frozen signatures/error types and clone→validate→bounds→commit;
+   enforce revision/view limits, reset epoch difference with bounded retry,
+   short-field controls, complete replacement and unchanged-state rejection.
+4. Implement specified DOM rendering/fragment routing and exported signatures;
+   canonical fetches/custom header/redirect policy, one in-flight request, busy
+   controls, 409 refresh/explanation, 422 field retention, failed-state hiding
+   and working Reload, inline reset cancel and grouped money formatting.
+5. Replace shallow named-test bodies with the card's actual success/negative
+   matrices and unchanged-view assertions. Include stale revision/reset, detached
+   clone, exact startup capture, all routes/headers, real import-side-effect
+   detection and library pre-handler cases. Test names alone are insufficient.
+
+Full per-test repair details and candidate evidence:
+`.harness/s2-01a1/attempt1/independent-review.md`. Reviewer did not run browser,
+release or full gates because source violations already establish rejection.
+Those acceptance checks remain required after repair. Missing screenshots were
+honestly pending, not fabricated. The worker reported 4 unit/5 HTTP/4 Node passes
+and gate94908 ALL GREEN, but its report still said running; final evidence must
+be recorded accurately. Internal full-gate logs omit stdout summary by design.
+Controller's preliminary strict:false concern was disproved: compilerOptions
+correctly copy the existing frontend and are not a gate-relaxation finding.
+
+## Attempt 2 claim
+
+Same frozen A1 revision3/card/interface/write set; **failure count remains 1**.
+Reuse actual Luna medium `/root/s1_08_attempt2` for S2-01A1 attempt2. It starts
+from the preserved uncommitted attempt1 candidate plus this controller record
+commit. Do not misdescribe HEAD alone as containing that candidate. No source
+reset or earlier history deletion. Original raw snapshots/logs remain unchanged;
+new evidence only `.harness/s2-01a1/attempt2/`. Worker report path remains
+`reports/S2-01A1.md`, with prior exact report preserved in attempt1 snapshots.
+
+Budget30min, at most3 targeted repair cycles. A second substantive failure stops
+Luna and routes to Astra fallback/re-slicing; no third Luna retry. Repair test
+assertions first and retain authentic RED/GREEN outputs, then implement all
+five groups. Preserve the existing parser/helper/tsconfig reuse. Do not expand
+A1 into later business or pending S2 design. Return stable candidate and exact
+checks/remaining browser evidence for independent review; never self-accept.
+
+Controller independently reran test_changed on the unchanged attempt1 product
+candidate before recording attempt2: session47206 exited0; full workspace
+clippy/tests, fmt/size/self-test and legacy frontend tsc ran. Raw root-gate-full.log
+and root-gate-summary.log under attempt1 retain complete output and terminal
+summary. This passing gate does not overrule the source/behavior rejection.
+`git diff --check` passed. This commit records only backlog and this report;
+product candidate remains explicitly uncommitted and bound by its manifest.

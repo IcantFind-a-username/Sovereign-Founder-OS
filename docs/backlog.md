@@ -448,9 +448,10 @@ while the controller routes eligible design/review cards to the strong role.
   A1/A2 design independently admitted at c89f7c9; later design remains pending.
   Architect stopped after repair1; continue visible A1 implementation first.
 
-- [ ] **P1 | `apps/cli/` | S2-01A1 — Run editable company and service forms.** `lane:codex` claimed; Luna medium attempt1.
+- [ ] **P1 | `apps/cli/` | S2-01A1 — Run editable company and service forms.** `lane:codex` claimed; Luna medium attempt2.
   [Frozen card](handoff/codex/cards/S2-01A1.md), revision3; design admitted at c89f7c9.
-  Source base c89f7c908c154cdef3b929beec475ee46dc886e8; no prior implementation failures.
+  Original source base c89f7c908c154cdef3b929beec475ee46dc886e8; one substantive failure.
+  Attempt1 raw candidate preserved; attempt2 repairs exact independent checklist.
   [Claim and exact ownership](handoff/codex/reports/S2-01A1-supervised.md).
 
 - [ ] **P1 | `apps/cli/` | S2-01A2 — Add editable lead and discovery.** `lane:codex` ready design, awaiting A1 implementation acceptance.
