@@ -565,8 +565,40 @@ mod transport_capture_regressions {
         );
         // The fixture holds this listener until process termination. A new
         // bind independently proves cleanup released its OS-owned resource.
-        let listener = TcpListener::bind(("127.0.0.1", server.port)).unwrap();
-        drop(listener);
+        //
+        // Once released, the port is an ordinary free ephemeral port that any
+        // process may take — including a server another test binary spawned,
+        // since cargo runs these binaries in parallel. So a failed bind alone
+        // does not mean the fixture leaked: it means either that, or someone
+        // else got there first. Distinguish the two rather than failing on
+        // whichever process won a race.
+        assert_released(server.port);
+    }
+
+    /// The port is free, or somebody else now owns it. Both prove the fixture
+    /// let it go; only "nothing is listening and we still cannot bind" is the
+    /// leak this checks for.
+    fn assert_released(port: u16) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match TcpListener::bind(("127.0.0.1", port)) {
+                Ok(listener) => return drop(listener),
+                Err(error) if error.kind() == io::ErrorKind::AddrInUse => {
+                    if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                        // Another listener answers here now. The fixture's own
+                        // socket is gone, which is what this asserts.
+                        return;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "port {port} is neither bindable nor listening: the \
+                         fixture did not release it"
+                    );
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => panic!("unexpected bind error on port {port}: {error:?}"),
+            }
+        }
     }
 
     fn captured_child(mode: &str) -> (ChildServer, TcpStream) {
