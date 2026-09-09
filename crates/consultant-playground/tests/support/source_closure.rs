@@ -7,8 +7,8 @@ use std::path::Path;
 use crate::boundary::{
     source_boundary, SourceBoundaryKind, ASSETS_PRODUCTION, CATALOG_GUIDANCE_PRODUCTION,
     CATALOG_PRODUCTION, EXPECTED_LIB_ASSETS_SHAPE, EXPECTED_LIB_CATALOG_SHAPE,
-    EXPECTED_LIB_HTTP_SHAPE, EXPECTED_LIB_SHAPE, HTTP_PRODUCTION, READ_MODEL_DOMAIN_PRODUCTION,
-    TEACHING_DOMAIN_PRODUCTION,
+    EXPECTED_LIB_HTTP_SHAPE, EXPECTED_LIB_SERVER_SHAPE, EXPECTED_LIB_SHAPE, HTTP_PRODUCTION,
+    READ_MODEL_DOMAIN_PRODUCTION, TEACHING_DOMAIN_PRODUCTION,
 };
 use crate::manifest::ManifestFixture;
 use crate::production_sources::production_sources;
@@ -33,7 +33,8 @@ pub(crate) fn source_closure_boundary(source_root: &Path) -> Result<(), SourceCl
     let catalog = actual.contains(&source_root.join("catalog.rs"));
     let http = actual.contains(&source_root.join("http.rs"));
     let assets = actual.contains(&source_root.join("assets.rs"));
-    if (http && !catalog) || (assets && !http) {
+    let server = actual.contains(&source_root.join("server.rs"));
+    if (http && !catalog) || (assets && !http) || (server && !assets) {
         return Err(SourceClosureError::Inventory);
     }
     let mut expected = BTreeSet::from([source_root.join("domain.rs"), source_root.join("lib.rs")]);
@@ -46,6 +47,9 @@ pub(crate) fn source_closure_boundary(source_root: &Path) -> Result<(), SourceCl
     if assets {
         expected.insert(source_root.join("assets.rs"));
     }
+    if server {
+        expected.insert(source_root.join("server.rs"));
+    }
     if actual != expected {
         return Err(SourceClosureError::Inventory);
     }
@@ -53,7 +57,9 @@ pub(crate) fn source_closure_boundary(source_root: &Path) -> Result<(), SourceCl
         let source = fs::read_to_string(&path).map_err(|_| SourceClosureError::Unreadable)?;
         source_boundary(&path, &source).map_err(|error| SourceClosureError::Source(error.kind))?;
         if path == source_root.join("lib.rs") {
-            let expected_lib = if assets {
+            let expected_lib = if server {
+                EXPECTED_LIB_SERVER_SHAPE
+            } else if assets {
                 EXPECTED_LIB_ASSETS_SHAPE
             } else if http {
                 EXPECTED_LIB_HTTP_SHAPE

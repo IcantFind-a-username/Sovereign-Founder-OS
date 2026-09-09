@@ -22,7 +22,8 @@ S1-00 首个增量冻结 [动作契约](../playground-contract.md) 及以下配�
 
 [S1-07](S1-07.md) 的本地服务器接口已冻结；等待 S1-06 与先行 [S1-G07](S1-G07.md) 接受。
 
-S1-08–11 及其他依赖开放仍 **Blocked design**：
-浏览器、CLI、进程隔离及最终验收未冻结。沿用 standalone-v2
+[启动与浏览器契约](../playground-launch-contract.md) 已冻结：执行顺序为
+S1-07 → [S1-09 CLI](S1-09.md) → [S1-08 浏览器](S1-08.md) → S1-10 → S1-11。
+S1-10–11 的进程隔离及最终验收仍 **Blocked design**。沿用 standalone-v2
 目标；需要时另给精确接口、依赖/源码门迁移、写集和测试，不能提前施工。
 这里不维护第二份详细接口，也不因两张动作卡完成就声明 Playground 已可用。

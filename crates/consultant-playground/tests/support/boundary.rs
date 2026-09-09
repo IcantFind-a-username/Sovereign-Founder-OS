@@ -12,6 +12,20 @@ pub(crate) const EXPECTED_LIB_CATALOG_SHAPE: &str = "#[cfg_attr(not(test), allow
 
 pub(crate) const EXPECTED_LIB_HTTP_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;";
 pub(crate) const EXPECTED_LIB_ASSETS_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;\n// Compile-time assets follow the pure handler.\n#[cfg_attr(not(test), allow(dead_code))]\nmod assets;\n";
+pub(crate) const EXPECTED_LIB_SERVER_SHAPE: &str = r#"#[cfg_attr(not(test), allow(dead_code))]
+mod domain;
+#[cfg_attr(not(test), allow(dead_code))]
+mod catalog;
+#[cfg_attr(not(test), allow(dead_code))]
+mod http;
+#[cfg_attr(not(test), allow(dead_code))]
+mod assets;
+mod server;
+pub fn run(port: u16) -> std::io::Result<()> {
+    server::run(port)
+}
+"#;
+pub(crate) const SERVER_PRODUCTION: &str = include_str!("fixtures/server-production.rs.txt");
 pub(crate) const ASSETS_PRODUCTION: &str = include_str!("fixtures/assets-production.rs.txt");
 pub(crate) const HTTP_PRODUCTION: &str = include_str!("fixtures/http-production.rs.txt");
 
@@ -127,6 +141,8 @@ pub(crate) enum SourceBoundaryKind {
     HttpTestModuleShape,
     AssetsProductionShape,
     AssetsTestModuleShape,
+    ServerProductionShape,
+    ServerTestModuleShape,
     UnexpectedSourceFile,
 }
 
@@ -160,6 +176,7 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
         Some("catalog.rs") => validate_catalog_shape(&tokens),
         Some("http.rs") => validate_http_shape(&tokens),
         Some("assets.rs") => validate_assets_shape(&tokens),
+        Some("server.rs") => validate_server_shape(&tokens),
         Some(name) => Err(SourceBoundaryError::new(
             SourceBoundaryKind::UnexpectedSourceFile,
             format!("unexpected Task 1 source file `{name}`"),
@@ -168,6 +185,21 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
             SourceBoundaryKind::UnexpectedSourceFile,
             "source path has no UTF-8 file name",
         )),
+    }
+}
+
+fn validate_server_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production =
+        strip_exact_test_module(tokens, "server", SourceBoundaryKind::ServerTestModuleShape)?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(SERVER_PRODUCTION).expect("complete server fixture must lex");
+    if production == expected {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::ServerProductionShape,
+            token_mismatch("server.rs production", &expected, production),
+        ))
     }
 }
 
@@ -256,7 +288,13 @@ fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
     let catalog = RustLexer::lex(EXPECTED_LIB_CATALOG_SHAPE).expect("catalog lib shape must lex");
     let http = RustLexer::lex(EXPECTED_LIB_HTTP_SHAPE).expect("HTTP lib shape must lex");
     let assets = RustLexer::lex(EXPECTED_LIB_ASSETS_SHAPE).expect("asset lib shape must lex");
-    if tokens == expected || tokens == catalog || tokens == http || tokens == assets {
+    let server = RustLexer::lex(EXPECTED_LIB_SERVER_SHAPE).expect("server lib shape must lex");
+    if tokens == expected
+        || tokens == catalog
+        || tokens == http
+        || tokens == assets
+        || tokens == server
+    {
         return Ok(());
     }
     let module = RustLexer::lex("mod domain;").expect("expected module shape must lex");

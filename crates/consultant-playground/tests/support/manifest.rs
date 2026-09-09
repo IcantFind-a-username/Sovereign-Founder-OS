@@ -17,7 +17,7 @@ pub(crate) fn crate_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-pub(crate) fn manifest_boundary(manifest_path: &Path, expected_name: &str) -> Result<(), String> {
+pub(crate) fn cargo_metadata(manifest_path: &Path) -> Result<JsonValue, String> {
     let mut command = Command::new(
         std::env::var_os("CARGO").unwrap_or_else(|| std::ffi::OsString::from("cargo")),
     );
@@ -43,7 +43,11 @@ pub(crate) fn manifest_boundary(manifest_path: &Path, expected_name: &str) -> Re
         ));
     }
 
-    let metadata = JsonParser::parse(&output.stdout)?;
+    JsonParser::parse(&output.stdout)
+}
+
+pub(crate) fn manifest_boundary(manifest_path: &Path, expected_name: &str) -> Result<(), String> {
+    let metadata = cargo_metadata(manifest_path)?;
     let packages = json_array(json_field(&metadata, "packages")?, "packages")?;
     let canonical_manifest = fs::canonicalize(manifest_path)
         .map_err(|error| format!("could not canonicalize manifest: {error}"))?;
@@ -89,6 +93,24 @@ pub(crate) fn manifest_boundary(manifest_path: &Path, expected_name: &str) -> Re
     let source_root = package_root.join("src");
     source_root_boundary(&source_root)
         .map_err(|error| format!("Cargo package source root rejected: {error:?}"))?;
+    let parser_dependency = json_array(json_field(package, "dependencies")?, "dependencies")?
+        .iter()
+        .any(|dependency| {
+            json_field(dependency, "name").and_then(|value| json_string(value, "dependency.name"))
+                == Ok("httparse")
+        });
+    let server_source = fs::symlink_metadata(source_root.join("server.rs"))
+        .map(|metadata| metadata.file_type().is_file())
+        .or_else(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Ok(false)
+            } else {
+                Err(format!("could not inspect server source: {error}"))
+            }
+        })?;
+    if server_source != parser_dependency {
+        return Err("Cargo parser dependency and server source stage must be paired".into());
+    }
     let expected_lib = fs::canonicalize(source_root.join("lib.rs"))
         .map_err(|error| format!("could not canonicalize library source: {error}"))?;
     let mut library_targets = 0;
@@ -132,13 +154,17 @@ pub(crate) fn validate_dependencies(value: &JsonValue) -> Result<(), String> {
             .map(|dependency| json_string(json_field(dependency, "name")?, "dependency.name"))
             .collect::<Result<Vec<_>, _>>()?;
         names.sort_unstable();
-        if names != ["serde", "serde_json"] || dependencies.len() != 2 {
+        if names != ["serde", "serde_json"] && names != ["httparse", "serde", "serde_json"] {
             return Err("Cargo metadata reports unexpected dependency declarations".into());
         }
         for dependency in dependencies {
             let name = json_string(json_field(dependency, "name")?, "dependency.name")?;
             let expected_features: &[&str] = if name == "serde" { &["derive"] } else { &[] };
-            expect_json_string(dependency, "req", "^1")?;
+            expect_json_string(
+                dependency,
+                "req",
+                if name == "httparse" { "=1.10.1" } else { "^1" },
+            )?;
             expect_json_string(
                 dependency,
                 "source",
@@ -157,7 +183,7 @@ pub(crate) fn validate_dependencies(value: &JsonValue) -> Result<(), String> {
             if !matches!(json_field(dependency, "optional")?, JsonValue::Bool(false))
                 || !matches!(
                     json_field(dependency, "uses_default_features")?,
-                    JsonValue::Bool(true)
+                    JsonValue::Bool(defaults) if *defaults == (name != "httparse")
                 )
             {
                 return Err(format!("dependency `{name}` has unexpected flags"));
