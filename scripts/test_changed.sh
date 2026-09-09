@@ -161,6 +161,7 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   run_step "clippy(owner-effect-fixture)" cargo clippy \
     -p sovereign-authority -p sovereign-owner -p sovereign-cli --all-targets \
     --features owner-effect-fixture --locked -- -D warnings
+  run_step "owner-effect-profile-builds" ./scripts/check-owner-effect-profile-builds.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
