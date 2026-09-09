@@ -22,9 +22,10 @@ mod source_root;
 mod symlink_fixture;
 
 use boundary::{
-    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, CATALOG_PRODUCTION,
-    EXPECTED_DOMAIN_PRODUCTION, EXPECTED_LIB_CATALOG_SHAPE, EXPECTED_LIB_SHAPE,
-    READ_MODEL_DOMAIN_PRODUCTION,
+    source_boundary, SourceBoundaryKind, ACTION_DOMAIN_ADDITIONS, CATALOG_GUIDANCE_PRODUCTION,
+    CATALOG_PRODUCTION, EXPECTED_DOMAIN_PRODUCTION, EXPECTED_LIB_CATALOG_SHAPE,
+    EXPECTED_LIB_HTTP_SHAPE, EXPECTED_LIB_SHAPE, HTTP_PRODUCTION, READ_MODEL_DOMAIN_PRODUCTION,
+    TEACHING_DOMAIN_PRODUCTION,
 };
 use manifest::{crate_root, manifest_boundary, ManifestFixture};
 use production_sources::production_sources;
@@ -51,9 +52,16 @@ enum SourceClosureError {
 fn source_closure_boundary(source_root: &Path) -> Result<(), SourceClosureError> {
     let actual = production_sources(source_root).map_err(SourceClosureError::Root)?;
     let catalog = actual.contains(&source_root.join("catalog.rs"));
+    let http = actual.contains(&source_root.join("http.rs"));
+    if http && !catalog {
+        return Err(SourceClosureError::Inventory);
+    }
     let mut expected = BTreeSet::from([source_root.join("domain.rs"), source_root.join("lib.rs")]);
     if catalog {
         expected.insert(source_root.join("catalog.rs"));
+    }
+    if http {
+        expected.insert(source_root.join("http.rs"));
     }
     if actual != expected {
         return Err(SourceClosureError::Inventory);
@@ -62,7 +70,9 @@ fn source_closure_boundary(source_root: &Path) -> Result<(), SourceClosureError>
         let source = fs::read_to_string(&path).map_err(|_| SourceClosureError::Unreadable)?;
         source_boundary(&path, &source).map_err(|error| SourceClosureError::Source(error.kind))?;
         if path == source_root.join("lib.rs") {
-            let expected_lib = if catalog {
+            let expected_lib = if http {
+                EXPECTED_LIB_HTTP_SHAPE
+            } else if catalog {
                 EXPECTED_LIB_CATALOG_SHAPE
             } else {
                 EXPECTED_LIB_SHAPE
@@ -77,12 +87,19 @@ fn source_closure_boundary(source_root: &Path) -> Result<(), SourceClosureError>
     Ok(())
 }
 
-fn catalog_source_fixture(catalog_file: bool, catalog_lib: bool) -> ManifestFixture {
+fn catalog_source_fixture(
+    catalog_file: bool,
+    catalog_lib: bool,
+    http_file: bool,
+    http_lib: bool,
+) -> ManifestFixture {
     let fixture = ManifestFixture::new("");
     let source_root = fixture.root.join("src");
     fs::write(
         source_root.join("lib.rs"),
-        if catalog_lib {
+        if http_lib {
+            EXPECTED_LIB_HTTP_SHAPE
+        } else if catalog_lib {
             EXPECTED_LIB_CATALOG_SHAPE
         } else {
             EXPECTED_LIB_SHAPE
@@ -91,17 +108,146 @@ fn catalog_source_fixture(catalog_file: bool, catalog_lib: bool) -> ManifestFixt
     .expect("fixture lib");
     fs::write(
         source_root.join("domain.rs"),
-        format!("{READ_MODEL_DOMAIN_PRODUCTION}\n#[cfg(test)] mod tests {{}}"),
+        format!(
+            "{READ_MODEL_DOMAIN_PRODUCTION}\n{}\n#[cfg(test)] mod tests {{}}",
+            if http_file {
+                TEACHING_DOMAIN_PRODUCTION
+            } else {
+                ""
+            }
+        ),
     )
     .expect("fixture domain");
     if catalog_file {
         fs::write(
             source_root.join("catalog.rs"),
-            format!("{CATALOG_PRODUCTION}\n#[cfg(test)] mod tests {{}}"),
+            format!(
+                "{}\n#[cfg(test)] mod tests {{}}",
+                if http_file {
+                    CATALOG_GUIDANCE_PRODUCTION
+                } else {
+                    CATALOG_PRODUCTION
+                }
+            ),
         )
         .expect("fixture catalog");
     }
+    if http_file {
+        fs::write(
+            source_root.join("http.rs"),
+            format!("{HTTP_PRODUCTION}\n#[cfg(test)] mod tests {{}}"),
+        )
+        .expect("fixture HTTP");
+    }
     fixture
+}
+
+#[test]
+fn http_gate_accepts_old_and_pinned_next_closure() {
+    for (catalog_file, catalog_lib, http_file, http_lib, expected) in [
+        (false, false, false, false, Ok(())),
+        (true, true, false, false, Ok(())),
+        (true, true, true, true, Ok(())),
+        (
+            true,
+            true,
+            true,
+            false,
+            Err(SourceClosureError::LibInventoryPair),
+        ),
+        (
+            true,
+            true,
+            false,
+            true,
+            Err(SourceClosureError::LibInventoryPair),
+        ),
+        (
+            true,
+            false,
+            true,
+            false,
+            Err(SourceClosureError::LibInventoryPair),
+        ),
+        (
+            false,
+            false,
+            false,
+            true,
+            Err(SourceClosureError::LibInventoryPair),
+        ),
+        (
+            false,
+            false,
+            true,
+            false,
+            Err(SourceClosureError::Inventory),
+        ),
+        (false, true, true, true, Err(SourceClosureError::Inventory)),
+    ] {
+        let fixture = catalog_source_fixture(catalog_file, catalog_lib, http_file, http_lib);
+        assert_eq!(
+            source_closure_boundary(&fixture.root.join("src")),
+            expected,
+            "catalog file={catalog_file}, lib={catalog_lib}; HTTP file={http_file}, lib={http_lib}"
+        );
+    }
+    for (missing, expected) in [
+        ("domain.rs", SourceClosureError::Inventory),
+        ("lib.rs", SourceClosureError::Inventory),
+        ("catalog.rs", SourceClosureError::Inventory),
+        ("http.rs", SourceClosureError::LibInventoryPair),
+    ] {
+        let fixture = catalog_source_fixture(true, true, true, true);
+        let root = fixture.root.join("src");
+        assert_eq!(source_closure_boundary(&root), Ok(()));
+        fs::remove_file(root.join(missing)).expect("remove required source");
+        assert_eq!(
+            source_closure_boundary(&root),
+            Err(expected),
+            "missing {missing}"
+        );
+    }
+    for unknown in [
+        "unknown.rs",
+        "nested/unknown.rs",
+        "http/mod.rs",
+        "nested/http.rs",
+    ] {
+        let fixture = catalog_source_fixture(true, true, true, true);
+        let root = fixture.root.join("src");
+        assert_eq!(source_closure_boundary(&root), Ok(()));
+        let extra = root.join(unknown);
+        fs::create_dir_all(extra.parent().expect("extra parent")).expect("extra directory");
+        fs::write(extra, "").expect("extra source");
+        assert_eq!(
+            source_closure_boundary(&root),
+            Err(SourceClosureError::Inventory),
+            "{unknown}"
+        );
+    }
+    for (filename, source, expected) in [
+        ("http.rs", "", SourceBoundaryKind::HttpTestModuleShape),
+        (
+            "http.rs",
+            "#[path=\"../outside.rs\"] mod escaped; #[cfg(test)] mod tests {}",
+            SourceBoundaryKind::PathAttribute,
+        ),
+        (
+            "lib.rs",
+            "#[path=\"../outside.rs\"] mod http;",
+            SourceBoundaryKind::PathAttribute,
+        ),
+    ] {
+        let fixture = catalog_source_fixture(true, true, true, true);
+        let root = fixture.root.join("src");
+        assert_eq!(source_closure_boundary(&root), Ok(()));
+        fs::write(root.join(filename), source).expect("mutated source");
+        assert_eq!(
+            source_closure_boundary(&root),
+            Err(SourceClosureError::Source(expected))
+        );
+    }
 }
 
 #[cfg(any(unix, windows))]
@@ -522,7 +668,7 @@ fn catalog_gate_preserves_wrapper_and_source_closure() {
         (false, true, Err(SourceClosureError::LibInventoryPair)),
         (true, false, Err(SourceClosureError::LibInventoryPair)),
     ] {
-        let fixture = catalog_source_fixture(catalog_file, catalog_lib);
+        let fixture = catalog_source_fixture(catalog_file, catalog_lib, false, false);
         assert_eq!(
             source_closure_boundary(&fixture.root.join("src")),
             expected,
@@ -531,7 +677,7 @@ fn catalog_gate_preserves_wrapper_and_source_closure() {
     }
     for catalog in [false, true] {
         for unknown in ["unknown.rs", "nested/unknown.rs"] {
-            let fixture = catalog_source_fixture(catalog, catalog);
+            let fixture = catalog_source_fixture(catalog, catalog, false, false);
             let source_root = fixture.root.join("src");
             assert_eq!(source_closure_boundary(&source_root), Ok(()));
             let path = source_root.join(unknown);
@@ -544,7 +690,7 @@ fn catalog_gate_preserves_wrapper_and_source_closure() {
             );
         }
         for missing in ["lib.rs", "domain.rs"] {
-            let fixture = catalog_source_fixture(catalog, catalog);
+            let fixture = catalog_source_fixture(catalog, catalog, false, false);
             let source_root = fixture.root.join("src");
             assert_eq!(source_closure_boundary(&source_root), Ok(()));
             fs::remove_file(source_root.join(missing)).expect("remove required source");
@@ -563,7 +709,7 @@ fn catalog_gate_preserves_wrapper_and_source_closure() {
             SourceBoundaryKind::PathAttribute,
         ),
     ] {
-        let fixture = catalog_source_fixture(true, true);
+        let fixture = catalog_source_fixture(true, true, false, false);
         let source_root = fixture.root.join("src");
         assert_eq!(source_closure_boundary(&source_root), Ok(()));
         fs::write(source_root.join(filename), source).expect("mutated fixture source");
@@ -636,7 +782,7 @@ fn catalog_gate_rejects_source_symlink_escapes() {
         source_closure_boundary(&fixture.source_link),
         Err(SourceClosureError::Root(SourceRootError::RootSymlink))
     );
-    let valid = catalog_source_fixture(true, true);
+    let valid = catalog_source_fixture(true, true, false, false);
     let source_root = valid.root.join("src");
     assert_eq!(source_closure_boundary(&source_root), Ok(()));
     // Reuse the existing directory symlink fixture inside an otherwise valid
@@ -654,8 +800,16 @@ fn catalog_gate_rejects_source_symlink_escapes() {
         message.contains("production sources must not be symlinks"),
         "{message}"
     );
-    for filename in ["catalog.rs", "domain.rs", "lib.rs"] {
-        let valid = catalog_source_fixture(true, true);
+    for (http, filename) in [
+        (false, "catalog.rs"),
+        (false, "domain.rs"),
+        (false, "lib.rs"),
+        (true, "catalog.rs"),
+        (true, "domain.rs"),
+        (true, "lib.rs"),
+        (true, "http.rs"),
+    ] {
+        let valid = catalog_source_fixture(true, true, http, http);
         let source_root = valid.root.join("src");
         assert_eq!(source_closure_boundary(&source_root), Ok(()));
         let file = source_root.join(filename);

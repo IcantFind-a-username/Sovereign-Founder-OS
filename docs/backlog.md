@@ -312,19 +312,29 @@ while the controller routes eligible design/review cards to the strong role.
   passed (process56333). [Evidence and RED limitation](handoff/codex/reports/S1-04-supervised.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G05 — Freeze and admit the pure HTTP boundary.** `lane:codex` IN PROGRESS (Astra architecture; first candidate, no failures).
+- [x] **P1 | `crates/consultant-playground/tests/` | S1-G05 — Freeze and admit the pure HTTP boundary.** `lane:codex` Accepted (Astra architecture; candidate 2, one review rejection).
   Definition and done criteria: [S1-G05](handoff/codex/cards/S1-G05.md).
   Strong implementation plus independent strong review; product S1-05 remains Luna.
   Base `858329440fc482b6282bd27234c9df8337721bcd`; card blob
   `c0f480b579066d2fd177c96720262fea08349e9b`; exact four test files.
   S1-04 accepted in `8583294`.
+  Candidate 1 rejected: serde struct sequence decoding admitted top-level
+  one-element action arrays. Architecture repair adds an object-prefix guard
+  before direct serde parsing, preserving duplicate-field rejection; actual
+  pre/post behavior and guard mutations passed. Independent review accepted;
+  final workspace test/clippy/fmt and scoped gate passed.
+  [Evidence](handoff/codex/reports/S1-G05-supervised.md).
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` `needs:fable`
   Definition and done criteria: [S1-05](handoff/codex/cards/S1-05.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
+- [ ] **P1 | `crates/consultant-playground/tests/` | S1-G06 — Admit closed embedded assets.** `lane:codex` Frozen architecture task; depends on S1-05 acceptance.
+  Definition and done criteria: [S1-G06](handoff/codex/cards/S1-G06.md).
+  Strong implementation and independent strong review precede the Luna UI card.
+
 - [ ] **P1 | `crates/consultant-playground/` | S1-06 — Add exact embedded assets and base layout.** `lane:codex` `needs:fable`
-  Definition and done criteria: [S1-06](handoff/codex/cards/S1-after-design.md).
+  Definition and done criteria: [S1-06](handoff/codex/cards/S1-06.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/` | S1-07 — Add exact loopback server routes.** `lane:codex` `needs:fable`

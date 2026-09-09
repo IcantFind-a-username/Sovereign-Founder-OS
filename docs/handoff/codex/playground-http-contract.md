@@ -1,6 +1,6 @@
 # Playground 纯HTTP handler契约
 
-**Revision 1 · 主线程独立审阅接受，接口Frozen；G05已形成独立架构卡，仍需实际验收。**范围仅S1-G05建议→S1-05，不启动server或声明前置通过。
+**Revision 2 · 主线程独立审阅接受，接口Frozen；G05已形成独立架构卡，仍需实际验收。**范围仅S1-G05建议→S1-05，不启动server或声明前置通过。
 依据 [standalone-v2 Task 3](../../superpowers/plans/2026-08-14-consultant-playground-standalone-v2-implementation.md)、
 [domain/DTO](playground-contract.md)、[catalog](playground-catalog-contract.md)、
 [teaching输出](playground-guidance-contract.md)。真实业务/AI后续Goal不变。
@@ -19,6 +19,7 @@ pub(crate) struct HttpRequest<'a> {
     pub(crate) body: &'a [u8],
 }
 pub(crate) enum AssetRoute { Index, Styles, I18n, App, ConsultantUi, Favicon }
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum HandlerOutcome { Json(HttpResponse), Asset(AssetRoute) }
 pub(crate) struct HttpResponse {
     pub(crate) status: u16,
@@ -26,6 +27,7 @@ pub(crate) struct HttpResponse {
     pub(crate) body: ResponseBody,
 }
 // ResponseBody派生Serialize并使用serde(untagged)，仅下列两种。
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ResponseBody { State(StateResponse), Error(ErrorResponse) }
 impl PlaygroundHttpHandler {
     pub(crate) fn new() -> Self;
@@ -163,3 +165,7 @@ G05及S1-05命令沿卡；tiny_http暂不依赖/调用。后续传输直接复�
 复用serde/serde_json、内部session及两DTO、统一catalog、RustLexer/boundary/source closure/
 test_changed；新产品模块是纯handler，新增通用工具无。
 复用以上，禁止重新实现同类工具；需要新工具先在简报回复中申报。
+
+Revision 2架构裁决：两种闭合response enum有意保留固定DTO的内联快照，
+仅HandlerOutcome与ResponseBody各准入large_enum_variant局部lint注解；不改变
+已冻结接口为Box，不允许模块/crate级lint关闭，也不放宽其他检查。

@@ -1,4 +1,4 @@
-//! Exact-token-shape validation for `src/lib.rs` and `src/domain.rs`: the
+//! Exact-token-shape validation for the accepted playground source stages: the
 //! production source closure must match a pinned grammar so a rename,
 //! injected side effect, or path escape fails loudly instead of silently
 //! widening Task 1's boundary.
@@ -9,6 +9,9 @@ use crate::rust_lexer::{RustLexer, RustToken};
 
 pub(crate) const EXPECTED_LIB_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;";
 pub(crate) const EXPECTED_LIB_CATALOG_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;";
+
+pub(crate) const EXPECTED_LIB_HTTP_SHAPE: &str = "#[cfg_attr(not(test), allow(dead_code))]\nmod domain;\n// Preserve accepted declaration order.\n#[cfg_attr(not(test), allow(dead_code))]\nmod catalog;\n// The pure handler follows domain and catalog.\n#[cfg_attr(not(test), allow(dead_code))]\nmod http;";
+pub(crate) const HTTP_PRODUCTION: &str = include_str!("fixtures/http-production.rs.txt");
 
 pub(crate) const EXPECTED_DOMAIN_PRODUCTION: &str = r####"
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -118,6 +121,8 @@ pub(crate) enum SourceBoundaryKind {
     DomainProductionShape,
     CatalogProductionShape,
     CatalogTestModuleShape,
+    HttpProductionShape,
+    HttpTestModuleShape,
     UnexpectedSourceFile,
 }
 
@@ -149,6 +154,7 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
         Some("lib.rs") => validate_lib_shape(&tokens),
         Some("domain.rs") => validate_domain_shape(&tokens),
         Some("catalog.rs") => validate_catalog_shape(&tokens),
+        Some("http.rs") => validate_http_shape(&tokens),
         Some(name) => Err(SourceBoundaryError::new(
             SourceBoundaryKind::UnexpectedSourceFile,
             format!("unexpected Task 1 source file `{name}`"),
@@ -157,6 +163,21 @@ pub(crate) fn source_boundary(path: &Path, source: &str) -> Result<(), SourceBou
             SourceBoundaryKind::UnexpectedSourceFile,
             "source path has no UTF-8 file name",
         )),
+    }
+}
+
+fn validate_http_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
+    let production =
+        strip_exact_test_module(tokens, "http", SourceBoundaryKind::HttpTestModuleShape)?;
+    reject_path_attributes(production)?;
+    let expected = RustLexer::lex(HTTP_PRODUCTION).expect("complete HTTP fixture must lex");
+    if production == expected {
+        Ok(())
+    } else {
+        Err(SourceBoundaryError::new(
+            SourceBoundaryKind::HttpProductionShape,
+            token_mismatch("http.rs production", &expected, production),
+        ))
     }
 }
 
@@ -213,7 +234,8 @@ fn validate_lib_shape(tokens: &[RustToken]) -> Result<(), SourceBoundaryError> {
     reject_path_attributes(tokens)?;
     let expected = RustLexer::lex(EXPECTED_LIB_SHAPE).expect("expected lib shape must lex");
     let catalog = RustLexer::lex(EXPECTED_LIB_CATALOG_SHAPE).expect("catalog lib shape must lex");
-    if tokens == expected || tokens == catalog {
+    let http = RustLexer::lex(EXPECTED_LIB_HTTP_SHAPE).expect("HTTP lib shape must lex");
+    if tokens == expected || tokens == catalog || tokens == http {
         return Ok(());
     }
     let module = RustLexer::lex("mod domain;").expect("expected module shape must lex");

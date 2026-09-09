@@ -1,0 +1,334 @@
+use std::sync::Mutex;
+
+use crate::catalog::{CatalogEntry, CATALOG};
+use crate::domain::{
+    PlaygroundAction, PlaygroundReadModel, PlaygroundSession, PlaygroundTeachingReadModel,
+};
+
+pub(crate) struct PlaygroundHttpHandler {
+    session: Mutex<PlaygroundSession>,
+}
+
+pub(crate) struct HttpRequest<'a> {
+    pub(crate) method: &'a str,
+    pub(crate) target: &'a str,
+    pub(crate) headers: &'a [(&'a str, &'a str)],
+    pub(crate) body: &'a [u8],
+}
+
+pub(crate) enum AssetRoute {
+    Index,
+    Styles,
+    I18n,
+    App,
+    ConsultantUi,
+    Favicon,
+}
+
+// Keep the bounded, fixed DTO snapshot inline, as required by the handler contract.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum HandlerOutcome {
+    Json(HttpResponse),
+    Asset(AssetRoute),
+}
+
+pub(crate) struct HttpResponse {
+    pub(crate) status: u16,
+    pub(crate) headers: &'static [(&'static str, &'static str)],
+    pub(crate) body: ResponseBody,
+}
+
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+// Keep the bounded, fixed DTO snapshot inline, as required by the handler contract.
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum ResponseBody {
+    State(StateResponse),
+    Error(ErrorResponse),
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct StateResponse {
+    profile: &'static str,
+    real_data_enabled: bool,
+    persistence: &'static str,
+    state: PlaygroundReadModel,
+    catalog: &'static [CatalogEntry; 32],
+    teaching: PlaygroundTeachingReadModel,
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct ErrorResponse {
+    profile: &'static str,
+    real_data_enabled: bool,
+    persistence: &'static str,
+    error: ErrorCode,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ErrorCode {
+    InvalidConfiguration,
+    InvalidHost,
+    OriginForbidden,
+    InvalidTarget,
+    NotFound,
+    MethodNotAllowed,
+    PayloadTooLarge,
+    UnexpectedBody,
+    UnsupportedMediaType,
+    InvalidActionRequest,
+    SessionUnavailable,
+}
+
+const JSON_HEADERS: &[(&str, &str)] = &[
+    ("Content-Type", "application/json; charset=utf-8"),
+    ("Cache-Control", "no-store"),
+    ("X-Content-Type-Options", "nosniff"),
+];
+const ALLOW_GET_HEADERS: &[(&str, &str)] = &[
+    ("Content-Type", "application/json; charset=utf-8"),
+    ("Cache-Control", "no-store"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("Allow", "GET"),
+];
+const ALLOW_POST_HEADERS: &[(&str, &str)] = &[
+    ("Content-Type", "application/json; charset=utf-8"),
+    ("Cache-Control", "no-store"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("Allow", "POST"),
+];
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ActionRequest {
+    action: WireAction,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(try_from = "String")]
+enum WireAction {
+    CorrectOfferPrice,
+    PromoteAcmeToCustomer,
+    ShowReportingSearch,
+    Reset,
+}
+
+impl TryFrom<String> for WireAction {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "CorrectOfferPrice" => Ok(Self::CorrectOfferPrice),
+            "PromoteAcmeToCustomer" => Ok(Self::PromoteAcmeToCustomer),
+            "ShowReportingSearch" => Ok(Self::ShowReportingSearch),
+            "Reset" => Ok(Self::Reset),
+            _ => Err("invalid action"),
+        }
+    }
+}
+
+impl WireAction {
+    fn into_domain(self) -> PlaygroundAction {
+        match self {
+            Self::CorrectOfferPrice => PlaygroundAction::CorrectOfferPrice,
+            Self::PromoteAcmeToCustomer => PlaygroundAction::PromoteAcmeToCustomer,
+            Self::ShowReportingSearch => PlaygroundAction::ShowReportingSearch,
+            Self::Reset => PlaygroundAction::Reset,
+        }
+    }
+}
+
+enum Route {
+    Asset(AssetRoute),
+    State,
+    Action,
+}
+
+impl Route {
+    fn from_target(target: &str) -> Option<Self> {
+        match target {
+            "/" => Some(Self::Asset(AssetRoute::Index)),
+            "/assets/styles.css" => Some(Self::Asset(AssetRoute::Styles)),
+            "/assets/i18n.js" => Some(Self::Asset(AssetRoute::I18n)),
+            "/assets/app.js" => Some(Self::Asset(AssetRoute::App)),
+            "/assets/consultant-ui.js" => Some(Self::Asset(AssetRoute::ConsultantUi)),
+            "/favicon.svg" => Some(Self::Asset(AssetRoute::Favicon)),
+            "/api/playground/consultant" => Some(Self::State),
+            "/api/playground/consultant/action" => Some(Self::Action),
+            _ => None,
+        }
+    }
+
+    fn method(&self) -> &'static str {
+        match self {
+            Self::Action => "POST",
+            Self::Asset(_) | Self::State => "GET",
+        }
+    }
+}
+
+impl PlaygroundHttpHandler {
+    pub(crate) fn new() -> Self {
+        Self {
+            session: Mutex::new(PlaygroundSession::new()),
+        }
+    }
+
+    pub(crate) fn handle(&self, request: HttpRequest<'_>, bound_port: u16) -> HandlerOutcome {
+        if bound_port == 0 {
+            return reject(ErrorCode::InvalidConfiguration);
+        }
+        let expected_host = format!("127.0.0.1:{bound_port}");
+        match unique_header(request.headers, "Host") {
+            Ok(Some(host))
+                if host == expected_host || (bound_port == 80 && host == "127.0.0.1") => {}
+            _ => return reject(ErrorCode::InvalidHost),
+        }
+        let expected_origin = format!("http://127.0.0.1:{bound_port}");
+        match unique_header(request.headers, "Origin") {
+            Ok(None) => {}
+            Ok(Some(origin))
+                if origin == expected_origin
+                    || (bound_port == 80 && origin == "http://127.0.0.1") => {}
+            _ => return reject(ErrorCode::OriginForbidden),
+        }
+        if !request.target.starts_with('/')
+            || request
+                .target
+                .contains(['?', '#', '%', '\\', '\r', '\n', '\0'])
+            || request.target.contains("//")
+            || request
+                .target
+                .split('/')
+                .any(|part| part == "." || part == "..")
+        {
+            return reject(ErrorCode::InvalidTarget);
+        }
+        let Some(route) = Route::from_target(request.target) else {
+            return reject(ErrorCode::NotFound);
+        };
+        let method = route.method();
+        if request.method != method {
+            return HandlerOutcome::Json(HttpResponse {
+                status: 405,
+                headers: if method == "POST" {
+                    ALLOW_POST_HEADERS
+                } else {
+                    ALLOW_GET_HEADERS
+                },
+                body: ErrorCode::MethodNotAllowed.body(),
+            });
+        }
+        if request.body.len() > 256 {
+            return reject(ErrorCode::PayloadTooLarge);
+        }
+        if request
+            .headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("Content-Encoding"))
+        {
+            return reject(ErrorCode::UnsupportedMediaType);
+        }
+        let action = if method == "GET" {
+            if !request.body.is_empty() {
+                return reject(ErrorCode::UnexpectedBody);
+            }
+            None
+        } else {
+            match unique_header(request.headers, "Content-Type") {
+                Ok(Some(media_type))
+                    if media_type.eq_ignore_ascii_case("application/json")
+                        || media_type.eq_ignore_ascii_case("application/json; charset=utf-8") => {}
+                _ => return reject(ErrorCode::UnsupportedMediaType),
+            }
+            // Serde structs also accept sequences; this endpoint requires a JSON object.
+            let first_json_byte = request
+                .body
+                .iter()
+                .copied()
+                .find(|byte| !matches!(*byte, b' ' | b'\t' | b'\r' | b'\n'));
+            if first_json_byte != Some(b"{"[0]) {
+                return reject(ErrorCode::InvalidActionRequest);
+            }
+            let parsed: ActionRequest = match serde_json::from_slice(request.body) {
+                Ok(parsed) => parsed,
+                Err(_) => return reject(ErrorCode::InvalidActionRequest),
+            };
+            Some(parsed.action.into_domain())
+        };
+        if let Route::Asset(asset) = route {
+            return HandlerOutcome::Asset(asset);
+        }
+        let mut session = match self.session.lock() {
+            Ok(session) => session,
+            Err(_) => return reject(ErrorCode::SessionUnavailable),
+        };
+        if let Some(action) = action {
+            session.apply(action);
+        }
+        HandlerOutcome::Json(HttpResponse {
+            status: 200,
+            headers: JSON_HEADERS,
+            body: ResponseBody::State(StateResponse::snapshot(&session)),
+        })
+    }
+}
+
+fn unique_header<'a>(headers: &[(&'a str, &'a str)], name: &str) -> Result<Option<&'a str>, ()> {
+    let mut values = headers
+        .iter()
+        .filter(|(header, _)| header.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.trim_matches([' ', '\t']));
+    let first = values.next();
+    if values.next().is_some() {
+        Err(())
+    } else {
+        Ok(first)
+    }
+}
+
+impl StateResponse {
+    fn snapshot(session: &PlaygroundSession) -> Self {
+        Self {
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            state: session.read_model(),
+            catalog: &CATALOG,
+            teaching: session.teaching_read_model(),
+        }
+    }
+}
+
+impl ErrorCode {
+    fn body(self) -> ResponseBody {
+        ResponseBody::Error(ErrorResponse {
+            profile: "synthetic_playground",
+            real_data_enabled: false,
+            persistence: "none",
+            error: self,
+        })
+    }
+}
+
+fn reject(error: ErrorCode) -> HandlerOutcome {
+    let status = match error {
+        ErrorCode::InvalidConfiguration => 500,
+        ErrorCode::InvalidHost
+        | ErrorCode::InvalidTarget
+        | ErrorCode::UnexpectedBody
+        | ErrorCode::InvalidActionRequest => 400,
+        ErrorCode::OriginForbidden => 403,
+        ErrorCode::NotFound => 404,
+        ErrorCode::MethodNotAllowed => 405,
+        ErrorCode::PayloadTooLarge => 413,
+        ErrorCode::UnsupportedMediaType => 415,
+        ErrorCode::SessionUnavailable => 503,
+    };
+    HandlerOutcome::Json(HttpResponse {
+        status,
+        headers: JSON_HEADERS,
+        body: error.body(),
+    })
+}
