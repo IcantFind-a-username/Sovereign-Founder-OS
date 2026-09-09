@@ -18,7 +18,7 @@
 let lang = localStorage.getItem("sovereign-ui-lang")
   || (navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en");
 let view = localStorage.getItem("sovereign-ui-view") || "command";
-const VIEWS = ["command", "company", "customers", "documents", "team", "compliance", "security"];
+const VIEWS = ["command", "company", "customers", "documents", "team", "compliance", "privacy", "security"];
 if (!VIEWS.includes(view)) view = "command";
 let lastState = null;
 let lastGauntlet = null;
@@ -148,6 +148,7 @@ function renderAll() {
   renderTeam();
   renderProposalsInbox();
   renderCompliance();
+  renderPrivacy();
 }
 
 async function loadModelStatus() {
@@ -514,9 +515,10 @@ $("refresh").addEventListener("click", loadState);
 initCrm();
 initTeam();
 initCompliance();
+initPrivacy();
 applyLanguage();
 setView(view);
 loadState();
-loadWorkspace().then(() => { loadRoles(); loadPacks(); loadWorkSuggestions(); });
+loadWorkspace().then(() => { loadRoles(); loadPacks(); loadWorkSuggestions(); loadPrivacy(); });
 loadCommandCenter();
 loadModelStatus();

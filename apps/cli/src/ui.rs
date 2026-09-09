@@ -53,6 +53,7 @@ const UI_I18N_MVP_JS: &str = include_str!("../assets/i18n-mvp.js");
 const UI_CRM_JS: &str = include_str!("../assets/crm.js");
 const UI_TEAM_JS: &str = include_str!("../assets/team.js");
 const UI_COMPLIANCE_JS: &str = include_str!("../assets/compliance.js");
+const UI_PRIVACY_JS: &str = include_str!("../assets/privacy.js");
 const UI_FAVICON: &str = include_str!("../assets/favicon.svg");
 const JS_TYPE: &str = "application/javascript; charset=utf-8";
 
@@ -189,6 +190,7 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
         (Method::Get, "/assets/crm.js") => asset_response(UI_CRM_JS, JS_TYPE),
         (Method::Get, "/assets/team.js") => asset_response(UI_TEAM_JS, JS_TYPE),
         (Method::Get, "/assets/compliance.js") => asset_response(UI_COMPLIANCE_JS, JS_TYPE),
+        (Method::Get, "/assets/privacy.js") => asset_response(UI_PRIVACY_JS, JS_TYPE),
         (Method::Get, "/favicon.svg") => asset_response(UI_FAVICON, "image/svg+xml"),
         (Method::Get, "/api/state") => json_response(&state_json(root)),
         (Method::Get, "/api/command-center") => json_response(&command_center_json(root)),
@@ -207,7 +209,9 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
             Ok(body) => json_response(&verify_export_json(&body)),
             Err(error) => bad_request(&error),
         },
-        (Method::Post, path) if path.starts_with("/api/workspace/") => {
+        (Method::Post, path)
+            if path.starts_with("/api/workspace/") || path.starts_with("/api/privacy/") =>
+        {
             match read_json_body(request) {
                 Ok(body) => json_response(&workspace_post(path, &body, root)),
                 Err(error) => bad_request(&error),

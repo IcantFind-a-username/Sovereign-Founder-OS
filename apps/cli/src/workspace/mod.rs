@@ -37,6 +37,7 @@ mod erp_types;
 mod kernel_exec;
 mod model_config;
 mod ops;
+mod privacy_ops;
 mod reporting;
 mod send_workflow;
 mod store;
@@ -51,6 +52,8 @@ mod crew_tests;
 #[cfg(test)]
 mod erp_tests;
 #[cfg(test)]
+mod privacy_tests;
+#[cfg(test)]
 mod stage1_suite;
 #[cfg(test)]
 mod test_support;
@@ -63,6 +66,7 @@ pub use crew_roles::role_cards;
 pub use crew_types::*;
 pub use erp_types::*;
 pub use model_config::{provider_status, MODEL_CONFIG_FILE};
+pub use privacy_ops::{transforms_json, StoredPreset};
 pub use types::*;
 pub use util::parse_amount_cents;
 pub use verify::verify_export;

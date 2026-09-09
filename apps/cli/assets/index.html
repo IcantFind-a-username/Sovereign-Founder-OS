@@ -37,6 +37,7 @@
     <div class="group" data-i18n="nav_assist"></div>
     <button id="tab-team" data-i18n="tab_team"></button>
     <button id="tab-compliance" data-i18n="tab_compliance"></button>
+    <button id="tab-privacy" data-i18n="tab_privacy"></button>
     <div class="group" data-i18n="nav_setup"></div>
     <button id="tab-company" data-i18n="tab_company"></button>
     <button id="tab-security" data-i18n="tab_security"></button>
@@ -283,6 +284,37 @@
   </section>
 </div>
 
+<!-- ══════════════════ PRIVACY ══════════════════ -->
+<div id="view-privacy" class="page" hidden>
+  <div class="page-head">
+    <h1 data-i18n="tab_privacy"></h1>
+    <p data-i18n="pv_lede"></p>
+  </div>
+
+  <section>
+    <h2 data-i18n="pv_route_title"></h2>
+    <div class="panel"><div id="pv-presets"></div></div>
+  </section>
+
+  <section>
+    <h2 data-i18n="pv_preview_title"></h2>
+    <div class="panel pad">
+      <div class="form-row">
+        <div><label data-i18n="pv_purpose"></label>
+          <select id="pv-purpose">
+            <option value="draft_discovery_summary" data-i18n="pv_purpose_discovery"></option>
+            <option value="draft_proposal" data-i18n="pv_purpose_proposal"></option>
+            <option value="review_draft" data-i18n="pv_purpose_review"></option>
+          </select></div>
+        <div><label data-i18n="pv_subject"></label><select id="pv-subject"></select></div>
+        <button class="primary" id="pv-preview-run" data-i18n="pv_run"></button>
+        <span class="status-line" id="pv-status"></span>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:12px"><div id="pv-preview" class="empty" data-i18n="pv_no_preview"></div></div>
+  </section>
+</div>
+
 <!-- ══════════════════ COMPANY ══════════════════ -->
 <div id="view-company" class="page" hidden>
   <div class="page-head"><h1 data-i18n="co_title"></h1></div>
@@ -404,6 +436,7 @@
 <script src="/assets/crm.js"></script>
 <script src="/assets/team.js"></script>
 <script src="/assets/compliance.js"></script>
+<script src="/assets/privacy.js"></script>
 <script src="/assets/app.js"></script>
 </body>
 </html>

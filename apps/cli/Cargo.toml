@@ -23,6 +23,7 @@ sovereign-execution = { workspace = true }
 sovereign-identity = { workspace = true }
 sovereign-model = { workspace = true }
 sovereign-policy = { workspace = true }
+sovereign-privacy = { workspace = true }
 sovereign-sandbox = { workspace = true }
 sovereign-vault = { workspace = true }
 sovereign-workflow = { workspace = true }

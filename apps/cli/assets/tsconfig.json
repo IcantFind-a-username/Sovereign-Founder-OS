@@ -20,6 +20,7 @@
     "crm.js",
     "team.js",
     "compliance.js",
+    "privacy.js",
     "app.js"
   ]
 }

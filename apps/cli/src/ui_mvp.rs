@@ -10,7 +10,8 @@ use uuid::Uuid;
 
 use crate::ui::{str_field, uuid_field};
 use crate::workspace::{
-    self, ComplianceSubject, EmployeeStatus, ProjectStatus, RoleId, RunSubject, WorkspaceError,
+    self, ComplianceSubject, EmployeeStatus, ProjectStatus, RoleId, RunSubject, StoredPreset,
+    WorkspaceError,
 };
 
 type Body = serde_json::Value;
@@ -166,6 +167,35 @@ pub(crate) fn workspace_post(path: &str, body: &Body, root: &Path) -> Option<Bod
             store
                 .run_compliance_check(subject, lang)
                 .map(|report| serde_json::json!({ "ok": true, "report": report }))
+        }),
+        // ── The data-sovereignty boundary, surfaced ──────────────────
+        "/api/privacy/state" => read(root, |store| {
+            Ok(serde_json::json!({
+                "ok": true,
+                "preset": store.privacy_preset(),
+                "transforms": workspace::transforms_json()["transforms"],
+                // No public adapter exists yet; the page must not imply one.
+                "dispatch_available": false,
+            }))
+        }),
+        "/api/privacy/preset" => read(root, |store| {
+            let preset = match str_field(body, "preset")? {
+                "auto_protect" => StoredPreset::AutoProtect,
+                "local_only" => StoredPreset::LocalOnly,
+                other => return Err(WorkspaceError::Invalid(format!("unknown preset {other}"))),
+            };
+            store
+                .set_privacy_preset(preset)
+                .map(|preset| serde_json::json!({ "ok": true, "preset": preset }))
+        }),
+        "/api/privacy/preview" => read(root, |store| {
+            store
+                .exposure_preview(
+                    str_field(body, "purpose")?,
+                    optional_uuid(body, "customer_id")?,
+                    optional_uuid(body, "document_id")?,
+                )
+                .map(|view| serde_json::json!({ "ok": true, "preview": view }))
         }),
         "/api/workspace/compliance/rules" => read(root, |store| {
             let lang = body.get("lang").and_then(|v| v.as_str()).unwrap_or("en");
