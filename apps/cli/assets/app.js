@@ -55,8 +55,7 @@ function el(tag, className, text) {
  * @param {string} label
  */
 function badge(kind, label) {
-  const marks = { good: "✓ ", bad: "✗ ", warn: "⧗ ", neutral: "" };
-  return el("span", "badge " + kind, (marks[kind] || "") + label);
+  return el("span", "badge " + kind, label);
 }
 
 function table(headers, rows) {
@@ -160,15 +159,22 @@ async function loadModelStatus() {
 
 function renderModelStatus() {
   const line = $("model-status");
-  const hint = $("model-hint");
   const real = modelStatus && modelStatus.ok && modelStatus.providers.find(p => p.real_model);
   if (real) {
     line.replaceChildren(badge(real.health === "healthy" ? "good" : "warn", t("model_status_real")(real)));
-    hint.textContent = "";
+    line.title = "";
   } else {
     line.replaceChildren(badge("neutral", t("model_status_none")));
-    hint.textContent = t("model_status_hint") + (modelStatus && modelStatus.config_path ? " (" + modelStatus.config_path + ")" : "");
+    line.title = t("model_status_hint");
   }
+}
+
+// The limits of this preview, in one place instead of a banner on every
+// section. Stated as a list on the page that is actually about them.
+function renderLimits() {
+  const box = $("sec-limits");
+  if (!box) return;
+  box.replaceChildren(...t("sec_limits").map(line => el("li", null, line)));
 }
 
 /* ─────────────── Security Center ─────────────── */
@@ -276,7 +282,7 @@ async function loadState() {
     lastState = await (await fetch("/api/state")).json();
     renderState();
   } catch (error) {
-    $("stage") && ($("stage").textContent = t("state_failed") + error);
+    toast("bad", t("state_failed") + error);
   }
 }
 
@@ -471,6 +477,7 @@ function applyLanguage() {
   renderCommandCenter();
   renderWorkSuggestions();
   renderModelStatus();
+  renderLimits();
 }
 
 function setLanguage(next) {
@@ -498,6 +505,8 @@ $("theme-toggle").addEventListener("click", () => {
 $("lang-en").addEventListener("click", () => setLanguage("en"));
 $("lang-zh").addEventListener("click", () => setLanguage("zh"));
 VIEWS.forEach(name => $("tab-" + name).addEventListener("click", () => setView(name)));
+// The preview chip is a link to the page that explains it, not an alert.
+$("preview-chip").addEventListener("click", () => setView("security"));
 $("verify-btn").addEventListener("click", () => withBusy($("verify-btn"), verifyBackup));
 $("run").addEventListener("click", runGauntlet);
 $("refresh").addEventListener("click", loadState);

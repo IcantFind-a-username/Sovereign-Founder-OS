@@ -17,21 +17,35 @@
 </script>
 </head>
 <body>
-<div class="app-header">
-  <div class="header-inner">
-    <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 34 34" fill="none" aria-hidden="true">
-        <path d="M17 2.5 29.5 8v9.2c0 7.3-5.1 12.4-12.5 14.3C9.6 29.6 4.5 24.5 4.5 17.2V8L17 2.5Z"
-              stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
-        <circle class="seal" cx="17" cy="15" r="4.4" stroke="currentColor" stroke-width="2.2"/>
-        <path class="seal" d="M17 19.4v5.2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-      <div class="brand-text">
-        <h1 data-i18n="title">SOVEREIGN FOUNDER OS</h1>
-        <div class="sub" data-i18n="stage"></div>
-      </div>
-    </div>
-    <div class="header-controls">
+<div class="shell">
+
+<aside class="sidebar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+      <path d="M17 2.5 29.5 8v9.2c0 7.3-5.1 12.4-12.5 14.3C9.6 29.6 4.5 24.5 4.5 17.2V8L17 2.5Z"
+            stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
+      <circle cx="17" cy="15" r="4.2" stroke="currentColor" stroke-width="2.4"/>
+    </svg>
+    <span class="brand-text" data-i18n="title">Sovereign Founder OS</span>
+  </div>
+
+  <nav class="nav">
+    <button id="tab-command" data-i18n="tab_command"></button>
+    <div class="group" data-i18n="nav_work"></div>
+    <button id="tab-customers" data-i18n="tab_customers"></button>
+    <button id="tab-documents" data-i18n="tab_documents"></button>
+    <div class="group" data-i18n="nav_assist"></div>
+    <button id="tab-team" data-i18n="tab_team"></button>
+    <button id="tab-compliance" data-i18n="tab_compliance"></button>
+    <div class="group" data-i18n="nav_setup"></div>
+    <button id="tab-company" data-i18n="tab_company"></button>
+    <button id="tab-security" data-i18n="tab_security"></button>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="status-line" id="model-status"></div>
+    <button class="chip" id="preview-chip"><span class="dot"></span><span data-i18n="chip_preview"></span></button>
+    <div class="sidebar-controls">
       <button id="theme-toggle" class="icon-btn" aria-label="Theme">
         <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="12" cy="12" r="4.2"/>
@@ -47,42 +61,33 @@
       </div>
     </div>
   </div>
-  <nav class="tabs">
-    <button id="tab-command" data-i18n="tab_command"></button>
-    <button id="tab-company" data-i18n="tab_company"></button>
-    <button id="tab-customers" data-i18n="tab_customers"></button>
-    <button id="tab-documents" data-i18n="tab_documents"></button>
-    <button id="tab-team" data-i18n="tab_team"></button>
-    <button id="tab-compliance" data-i18n="tab_compliance"></button>
-    <button id="tab-security" data-i18n="tab_security"></button>
-  </nav>
-</div>
+</aside>
 
 <main>
-<div class="banner" data-i18n="experimental_banner"></div>
-<div class="model-line"><span id="model-status"></span> <span class="status-line" id="model-hint"></span></div>
 
 <!-- ══════════════════ TODAY ══════════════════ -->
-<div id="view-command" hidden>
+<div id="view-command" class="page" hidden>
+  <div class="page-head"><h1 data-i18n="tab_command"></h1></div>
+
+  <div class="panel pad" id="cc-venture" style="margin-bottom:12px"><span class="empty" data-i18n="cc_no_venture"></span></div>
+
+  <div class="metrics">
+    <div class="metric"><div class="label" data-i18n="cc_pending"></div><div class="value" id="cc-pending">–</div><div class="meta" data-i18n="cc_pending_meta"></div></div>
+    <div class="metric"><div class="label" data-i18n="cc_leads"></div><div class="value" id="cc-leads">–</div><div class="meta"><span id="cc-customers">–</span> <span data-i18n="cc_customers"></span></div></div>
+    <div class="metric"><div class="label" data-i18n="cc_projects"></div><div class="value" id="cc-projects">–</div><div class="meta" id="cc-projects-meta"></div></div>
+    <div class="metric"><div class="label" data-i18n="cc_followups"></div><div class="value" id="cc-followups">–</div><div class="meta" data-i18n="cc_followups_meta"></div></div>
+    <div class="metric"><div class="label" data-i18n="cc_receivable"></div><div class="value" id="cc-receivable">–</div><div class="meta" data-i18n="cc_receivable_meta"></div></div>
+    <div class="metric"><div class="label" data-i18n="cc_documents"></div><div class="value" id="cc-documents">–</div><div class="meta" id="cc-documents-meta"></div></div>
+  </div>
+
   <section>
-    <h2 data-i18n="cc_business_title"></h2>
-    <div class="panel pad" id="cc-venture"><span class="empty" data-i18n="cc_no_venture"></span></div>
-    <div class="tiles" style="margin-top:10px">
-      <div class="tile"><div class="label" data-i18n="cc_customers"></div><div class="value" id="cc-customers">–</div><div class="meta" data-i18n="cc_customers_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_leads"></div><div class="value" id="cc-leads">–</div><div class="meta" data-i18n="cc_leads_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_projects"></div><div class="value" id="cc-projects">–</div><div class="meta" id="cc-projects-meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_followups"></div><div class="value" id="cc-followups">–</div><div class="meta" data-i18n="cc_followups_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_receivable"></div><div class="value" id="cc-receivable">–</div><div class="meta" data-i18n="cc_receivable_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_documents"></div><div class="value" id="cc-documents">–</div><div class="meta" id="cc-documents-meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_pending"></div><div class="value" id="cc-pending">–</div><div class="meta" data-i18n="cc_pending_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_effects"></div><div class="value" id="cc-effects">–</div><div class="meta" id="cc-effects-meta"></div></div>
-    </div>
+    <h2 data-i18n="cc_decisions_title"></h2>
+    <div class="panel"><div id="cc-decisions" class="empty" data-i18n="cc_no_decisions"></div></div>
   </section>
 
   <section>
     <h2 data-i18n="cc_proposals_title"></h2>
-    <div class="honest" data-i18n="cc_proposals_note"></div>
-    <div class="panel" style="margin-top:10px"><div id="cc-proposals" class="empty" data-i18n="cc_no_proposals"></div></div>
+    <div class="panel"><div id="cc-proposals" class="empty" data-i18n="cc_no_proposals"></div></div>
   </section>
 
   <section>
@@ -92,99 +97,41 @@
 
   <section>
     <h2 data-i18n="cc_guidance_title"></h2>
-    <div class="honest" data-i18n="cc_guidance_note"></div>
-    <div class="panel" style="margin-top:10px"><div id="cc-guidance" class="empty" data-i18n="loading"></div></div>
-  </section>
-
-  <section>
-    <h2 data-i18n="cc_decisions_title"></h2>
-    <div class="panel"><div id="cc-decisions" class="empty" data-i18n="cc_no_decisions"></div></div>
+    <div class="panel"><div id="cc-guidance" class="empty" data-i18n="loading"></div></div>
   </section>
 
   <section>
     <h2 data-i18n="cc_evidence_title"></h2>
-    <div class="honest" data-i18n="cc_evidence_note"></div>
-    <div class="tiles" style="margin-top:10px">
-      <div class="tile"><div class="label" data-i18n="cc_chain"></div><div class="value" id="cc-chain">–</div><div class="meta" id="cc-chain-meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_signed"></div><div class="value" id="cc-signed">–</div><div class="meta" data-i18n="cc_signed_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_disclosures"></div><div class="value" id="cc-disclosures">–</div><div class="meta" data-i18n="cc_disclosures_meta"></div></div>
-      <div class="tile"><div class="label" data-i18n="cc_plugins"></div><div class="value" id="cc-plugins">–</div><div class="meta" data-i18n="cc_plugins_meta"></div></div>
-    </div>
-  </section>
-</div>
-
-<!-- ══════════════════ COMPANY ══════════════════ -->
-<div id="view-company" hidden>
-  <section>
-    <h2 data-i18n="co_title"></h2>
-    <div class="honest" data-i18n="co_note"></div>
-    <div class="panel pad form-grid" style="margin-top:10px">
-      <div><label data-i18n="ws_company_name"></label><input type="text" id="v-name" maxlength="200"></div>
-      <div><label data-i18n="ws_service_desc"></label><textarea id="v-service" maxlength="2000"></textarea></div>
-      <div class="form-row">
-        <div><label data-i18n="co_jurisdiction"></label>
-          <select id="p-jurisdiction">
-            <option value="" data-i18n="co_jurisdiction_unknown"></option>
-            <option value="SG">SG · Singapore</option><option value="MY">MY · Malaysia</option><option value="HK">HK · Hong Kong</option>
-            <option value="CN">CN · China</option><option value="AU">AU · Australia</option><option value="GB">GB · United Kingdom</option>
-            <option value="DE">DE · Germany</option><option value="EU">EU</option><option value="US">US · United States</option>
-          </select></div>
-        <div><label data-i18n="co_currency"></label><input type="text" id="p-currency" maxlength="3" placeholder="SGD"></div>
-        <div><label data-i18n="co_uen"></label><input type="text" id="p-uen" maxlength="32"></div>
-      </div>
-      <div class="form-row">
-        <div><label data-i18n="co_incorporated"></label><input type="date" id="p-incorporated"></div>
-        <div><label data-i18n="co_fye"></label><select id="p-fye"></select></div>
-        <div><label data-i18n="co_revenue"></label><input type="text" id="p-revenue" placeholder="250000.00"></div>
-        <div class="check"><label><input type="checkbox" id="p-gst"> <span data-i18n="co_gst"></span></label></div>
-      </div>
-      <div class="toolbar">
-        <button class="primary" id="v-save" data-i18n="co_save"></button>
-        <span class="status-line" id="v-status"></span>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <h2 data-i18n="ws_backup_title"></h2>
-    <div class="panel pad form-grid">
-      <div class="toolbar">
-        <a href="/api/export" download><button class="ghost" data-i18n="ws_export"></button></a>
-        <span class="status-line" data-i18n="ws_export_note"></span>
-      </div>
-      <div class="status-line" data-i18n="ws_verify_note"></div>
-      <div class="toolbar">
-        <input type="file" id="verify-file" accept="application/json,.json">
-        <button class="ghost" id="verify-btn" data-i18n="ws_verify"></button>
-        <span class="status-line" id="verify-status"></span>
-      </div>
-      <div id="verify-report" class="panel pad" hidden></div>
+    <div class="metrics">
+      <div class="metric"><div class="label" data-i18n="cc_chain"></div><div class="value" id="cc-chain">–</div><div class="meta" id="cc-chain-meta"></div></div>
+      <div class="metric"><div class="label" data-i18n="cc_signed"></div><div class="value" id="cc-signed">–</div><div class="meta" data-i18n="cc_signed_meta"></div></div>
+      <div class="metric"><div class="label" data-i18n="cc_effects"></div><div class="value" id="cc-effects">–</div><div class="meta" id="cc-effects-meta"></div></div>
+      <div class="metric"><div class="label" data-i18n="cc_disclosures"></div><div class="value" id="cc-disclosures">–</div><div class="meta" data-i18n="cc_disclosures_meta"></div></div>
+      <div class="metric"><div class="label" data-i18n="cc_plugins"></div><div class="value" id="cc-plugins">–</div><div class="meta" data-i18n="cc_plugins_meta"></div></div>
     </div>
   </section>
 </div>
 
 <!-- ══════════════════ CUSTOMERS ══════════════════ -->
-<div id="view-customers" hidden>
-  <section>
-    <h2 data-i18n="cu_title"></h2>
-    <div class="panel pad form-grid">
-      <div class="form-row">
-        <div><label data-i18n="ws_customer_name"></label><input type="text" id="c-name" maxlength="200"></div>
-        <div><label data-i18n="ws_customer_email"></label><input type="text" id="c-email" maxlength="254" placeholder="name@example.com"></div>
-        <div><label data-i18n="ws_customer_notes"></label><input type="text" id="c-notes" maxlength="500"></div>
-        <button class="primary" id="c-add" data-i18n="ws_add_customer"></button>
-      </div>
+<div id="view-customers" class="page" hidden>
+  <div class="page-head"><h1 data-i18n="cu_title"></h1></div>
+
+  <div class="panel pad">
+    <div class="form-row">
+      <div><label data-i18n="ws_customer_name"></label><input type="text" id="c-name" maxlength="200"></div>
+      <div><label data-i18n="ws_customer_email"></label><input type="text" id="c-email" maxlength="254" placeholder="name@example.com"></div>
+      <div><label data-i18n="ws_customer_notes"></label><input type="text" id="c-notes" maxlength="500"></div>
+      <button class="primary" id="c-add" data-i18n="ws_add_customer"></button>
     </div>
-    <div class="panel" style="margin-top:10px"><div id="customers" class="empty" data-i18n="ws_no_customers"></div></div>
-  </section>
+  </div>
+  <div class="panel" style="margin-top:12px"><div id="customers" class="empty" data-i18n="ws_no_customers"></div></div>
 
   <section id="customer-detail" hidden>
     <div class="toolbar" style="justify-content:space-between">
       <h2 id="cd-title" style="margin:0"></h2>
       <button class="ghost small" id="cd-close">✕</button>
     </div>
-    <div class="panel pad form-grid" style="margin-top:10px">
-      <h3 data-i18n="cu_edit_title"></h3>
+    <div class="panel pad form-grid">
       <div class="form-row">
         <div><label data-i18n="ws_customer_name"></label><input type="text" id="cd-name" maxlength="200"></div>
         <div><label data-i18n="ws_customer_email"></label><input type="text" id="cd-email" maxlength="254"></div>
@@ -192,9 +139,9 @@
         <div><label data-i18n="cu_jurisdiction"></label><input type="text" id="cd-jurisdiction" maxlength="3" placeholder="SG"></div>
       </div>
       <div><label data-i18n="ws_customer_notes"></label><input type="text" id="cd-notes" maxlength="500"></div>
-      <div><label data-i18n="cu_discovery"></label><textarea id="cd-discovery" style="min-height:140px"></textarea></div>
-      <div class="toolbar">
-        <label class="check"><input type="checkbox" id="cd-consent"> <span data-i18n="cu_consent"></span></label>
+      <div><label data-i18n="cu_discovery"></label><textarea id="cd-discovery" style="min-height:120px"></textarea></div>
+      <div class="toolbar" style="justify-content:space-between">
+        <span class="check"><label><input type="checkbox" id="cd-consent"> <span data-i18n="cu_consent"></span></label></span>
         <button class="primary" id="cd-save" data-i18n="cu_save"></button>
       </div>
       <div class="toolbar"><span class="status-line" data-i18n="cu_ask_team"></span><span id="cd-team" class="toolbar"></span></div>
@@ -230,32 +177,28 @@
 </div>
 
 <!-- ══════════════════ DOCUMENTS ══════════════════ -->
-<div id="view-documents" hidden>
-  <section>
-    <h2 data-i18n="ws_documents_title"></h2>
-    <div class="panel pad form-grid">
-      <div class="toolbar">
-        <div style="flex:1;min-width:200px"><label data-i18n="ws_for_customer"></label><select id="d-customer"></select></div>
-        <div style="width:140px"><label data-i18n="ws_amount"></label><input type="text" id="d-amount" placeholder="2500.00"></div>
-      </div>
-      <div class="toolbar">
-        <button class="primary" id="d-offer" data-i18n="ws_gen_offer"></button>
-        <button class="primary" id="d-invoice" data-i18n="ws_gen_invoice"></button>
-        <button class="ghost" id="d-assist" data-i18n="ws_assist"></button>
-        <span class="status-line" id="d-status"></span>
-      </div>
-      <div class="status-line" data-i18n="ws_doc_note"></div>
-      <div id="assist-box" hidden>
-        <div class="toolbar" style="justify-content:space-between">
-          <span class="badge warn" id="assist-label"></span>
-          <button class="ghost small" id="assist-copy" data-i18n="ws_assist_copy"></button>
-        </div>
-        <textarea id="assist-text" readonly style="min-height:120px"></textarea>
-        <div class="status-line" id="assist-meta"></div>
-      </div>
+<div id="view-documents" class="page" hidden>
+  <div class="page-head"><h1 data-i18n="ws_documents_title"></h1></div>
+
+  <div class="panel pad form-grid">
+    <div class="form-row">
+      <div><label data-i18n="ws_for_customer"></label><select id="d-customer"></select></div>
+      <div style="flex:0 0 140px"><label data-i18n="ws_amount"></label><input type="text" id="d-amount" placeholder="2500.00"></div>
+      <button class="primary" id="d-offer" data-i18n="ws_gen_offer"></button>
+      <button class="primary" id="d-invoice" data-i18n="ws_gen_invoice"></button>
+      <button class="ghost" id="d-assist" data-i18n="ws_assist"></button>
+      <span class="status-line" id="d-status"></span>
     </div>
-    <div class="panel" style="margin-top:10px"><div id="documents" class="empty" data-i18n="ws_no_documents"></div></div>
-  </section>
+    <div id="assist-box" hidden>
+      <div class="toolbar" style="justify-content:space-between">
+        <span class="badge warn" id="assist-label"></span>
+        <button class="ghost small" id="assist-copy" data-i18n="ws_assist_copy"></button>
+      </div>
+      <textarea id="assist-text" readonly style="min-height:110px;margin-top:8px"></textarea>
+      <div class="status-line" id="assist-meta"></div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:12px"><div id="documents" class="empty" data-i18n="ws_no_documents"></div></div>
 
   <section>
     <h2 data-i18n="ws_approvals_title"></h2>
@@ -264,12 +207,11 @@
 
   <section>
     <h2 data-i18n="rc_title"></h2>
-    <div class="honest" data-i18n="rc_note"></div>
-    <div class="panel" style="margin-top:10px"><div id="rc-table" class="empty" data-i18n="rc_none"></div></div>
-    <div class="panel pad form-grid" id="rc-form" hidden style="margin-top:10px">
+    <div class="panel"><div id="rc-table" class="empty" data-i18n="rc_none"></div></div>
+    <div class="panel pad" id="rc-form" hidden style="margin-top:12px">
       <div class="form-row">
         <div><label data-i18n="th_invoice"></label><select id="rc-invoice"></select></div>
-        <div><label data-i18n="rc_amount"></label><input type="text" id="rc-amount" placeholder="1000.00"></div>
+        <div style="flex:0 0 150px"><label data-i18n="rc_amount"></label><input type="text" id="rc-amount" placeholder="1000.00"></div>
         <button class="ghost" id="rc-record" data-i18n="rc_record"></button>
       </div>
     </div>
@@ -277,16 +219,17 @@
 </div>
 
 <!-- ══════════════════ TEAM ══════════════════ -->
-<div id="view-team" hidden>
-  <section>
-    <h2 data-i18n="tm_title"></h2>
-    <div class="honest" data-i18n="tm_note"></div>
-    <div class="cards" id="tm-roles" style="margin-top:10px"></div>
-  </section>
+<div id="view-team" class="page" hidden>
+  <div class="page-head">
+    <h1 data-i18n="tm_title"></h1>
+    <p data-i18n="tm_lede"></p>
+  </div>
+
+  <div class="cards" id="tm-roles"></div>
 
   <section>
     <h2 data-i18n="tm_run_title"></h2>
-    <div class="panel pad form-grid">
+    <div class="panel pad">
       <div id="tm-none" class="empty" data-i18n="tm_no_employees"></div>
       <div class="form-row" id="tm-run-panel" hidden>
         <div><label data-i18n="tm_employee"></label><select id="tm-employee"></select></div>
@@ -304,27 +247,30 @@
 </div>
 
 <!-- ══════════════════ COMPLIANCE ══════════════════ -->
-<div id="view-compliance" hidden>
-  <section>
-    <h2 data-i18n="cp_title"></h2>
-    <div class="honest" data-i18n="cp_note"></div>
-    <div class="panel pad form-grid" style="margin-top:10px">
-      <div class="mono" id="cp-pack"></div>
-      <div class="toolbar">
-        <button class="primary" id="cp-run-company" data-i18n="cp_run_company"></button>
-        <select id="cp-invoice"></select>
-        <button class="ghost" id="cp-run-invoice" data-i18n="cp_run_invoice"></button>
-        <span class="status-line" id="cp-status"></span>
-      </div>
+<div id="view-compliance" class="page" hidden>
+  <div class="page-head">
+    <h1 data-i18n="cp_title"></h1>
+    <p data-i18n="cp_lede"></p>
+  </div>
+
+  <div class="panel pad form-grid">
+    <div class="toolbar" style="justify-content:space-between">
+      <span class="mono" id="cp-pack"></span>
+      <span class="status-line" id="cp-status"></span>
     </div>
-    <div class="panel pad" style="margin-top:10px"><div id="cp-report" class="empty" data-i18n="cp_no_reports"></div></div>
-  </section>
+    <div class="toolbar">
+      <button class="primary" id="cp-run-company" data-i18n="cp_run_company"></button>
+      <select id="cp-invoice" style="max-width:320px"></select>
+      <button class="ghost" id="cp-run-invoice" data-i18n="cp_run_invoice"></button>
+    </div>
+  </div>
+  <div class="panel pad" style="margin-top:12px"><div id="cp-report" class="empty" data-i18n="cp_no_reports"></div></div>
 
   <section>
     <h2 data-i18n="cp_search_title"></h2>
     <div class="panel pad form-grid">
       <div class="toolbar">
-        <input type="text" id="cp-query" style="flex:1;min-width:220px" data-i18n-placeholder="cp_search_placeholder">
+        <input type="text" id="cp-query" style="flex:1;min-width:200px" data-i18n-placeholder="cp_search_placeholder">
         <button class="ghost" id="cp-search" data-i18n="cp_search"></button>
       </div>
       <div id="cp-hits"></div>
@@ -337,24 +283,78 @@
   </section>
 </div>
 
-<!-- ══════════════════ SECURITY ══════════════════ -->
-<div id="view-security" hidden>
-  <div class="tiles">
-    <div class="tile"><div class="label" data-i18n="tile_device"></div><div class="value" id="t-device">–</div><div class="meta" id="t-device-meta"></div></div>
-    <div class="tile"><div class="label" data-i18n="tile_events"></div><div class="value" id="t-events">–</div><div class="meta" id="t-chain"></div></div>
-    <div class="tile"><div class="label" data-i18n="tile_vault"></div><div class="value" id="t-vault">–</div><div class="meta" data-i18n="vault_meta"></div></div>
-    <div class="tile"><div class="label" data-i18n="tile_plugins"></div><div class="value" id="t-plugins">–</div><div class="meta" data-i18n="plugins_meta"></div></div>
+<!-- ══════════════════ COMPANY ══════════════════ -->
+<div id="view-company" class="page" hidden>
+  <div class="page-head"><h1 data-i18n="co_title"></h1></div>
+
+  <div class="panel pad form-grid">
+    <div class="form-row">
+      <div><label data-i18n="ws_company_name"></label><input type="text" id="v-name" maxlength="200"></div>
+      <div><label data-i18n="co_jurisdiction"></label>
+        <select id="p-jurisdiction">
+          <option value="" data-i18n="co_jurisdiction_unknown"></option>
+          <option value="SG">SG · Singapore</option><option value="MY">MY · Malaysia</option><option value="HK">HK · Hong Kong</option>
+          <option value="CN">CN · China</option><option value="AU">AU · Australia</option><option value="GB">GB · United Kingdom</option>
+          <option value="DE">DE · Germany</option><option value="EU">EU</option><option value="US">US · United States</option>
+        </select></div>
+      <div style="flex:0 0 110px"><label data-i18n="co_currency"></label><input type="text" id="p-currency" maxlength="3" placeholder="SGD"></div>
+    </div>
+    <div><label data-i18n="ws_service_desc"></label><textarea id="v-service" maxlength="2000"></textarea></div>
+    <div class="form-row">
+      <div><label data-i18n="co_uen"></label><input type="text" id="p-uen" maxlength="32"></div>
+      <div><label data-i18n="co_incorporated"></label><input type="date" id="p-incorporated"></div>
+      <div style="flex:0 0 120px"><label data-i18n="co_fye"></label><select id="p-fye"></select></div>
+      <div><label data-i18n="co_revenue"></label><input type="text" id="p-revenue" placeholder="250000.00"></div>
+    </div>
+    <div class="toolbar" style="justify-content:space-between">
+      <span class="check"><label><input type="checkbox" id="p-gst"> <span data-i18n="co_gst"></span></label></span>
+      <span class="toolbar"><span class="status-line" id="v-status"></span><button class="primary" id="v-save" data-i18n="co_save"></button></span>
+    </div>
+    <div class="note" data-i18n="co_note"></div>
   </div>
 
   <section>
+    <h2 data-i18n="ws_backup_title"></h2>
+    <div class="panel pad form-grid">
+      <div class="toolbar">
+        <a href="/api/export" download><button class="ghost" data-i18n="ws_export"></button></a>
+        <span class="status-line" data-i18n="ws_export_note"></span>
+      </div>
+      <div class="toolbar">
+        <input type="file" id="verify-file" accept="application/json,.json" style="flex:1;min-width:200px">
+        <button class="ghost" id="verify-btn" data-i18n="ws_verify"></button>
+        <span class="status-line" id="verify-status"></span>
+      </div>
+      <div id="verify-report" class="panel pad" hidden></div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════════════ SECURITY ══════════════════ -->
+<div id="view-security" class="page" hidden>
+  <div class="page-head"><h1 data-i18n="tab_security"></h1></div>
+
+  <div class="metrics">
+    <div class="metric"><div class="label" data-i18n="tile_device"></div><div class="value" id="t-device">–</div><div class="meta mono" id="t-device-meta"></div></div>
+    <div class="metric"><div class="label" data-i18n="tile_events"></div><div class="value" id="t-events">–</div><div class="meta" id="t-chain"></div></div>
+    <div class="metric"><div class="label" data-i18n="tile_vault"></div><div class="value" id="t-vault">–</div><div class="meta" data-i18n="vault_meta"></div></div>
+    <div class="metric"><div class="label" data-i18n="tile_plugins"></div><div class="value" id="t-plugins">–</div><div class="meta" data-i18n="plugins_meta"></div></div>
+  </div>
+
+  <section>
+    <h2 data-i18n="sec_limits_title"></h2>
+    <div class="panel pad">
+      <ul class="criteria" id="sec-limits"></ul>
+    </div>
+  </section>
+
+  <section>
     <h2 data-i18n="sec_integrity"></h2>
-    <div class="honest" data-i18n="sec_integrity_note"></div>
     <div class="panel"><div id="integrity" class="empty" data-i18n="loading"></div></div>
   </section>
 
   <section>
     <h2 data-i18n="sec_disclosures"></h2>
-    <div class="honest" data-i18n="sec_disclosures_note"></div>
     <div class="panel"><div id="disclosures" class="empty" data-i18n="loading"></div></div>
   </section>
 
@@ -373,13 +373,14 @@
     <div class="toolbar">
       <button id="run" class="primary" data-i18n="btn_run"></button>
       <button id="refresh" class="ghost" data-i18n="btn_refresh"></button>
-      <span class="mono" id="gauntlet-status"></span>
+      <span class="status-line" id="gauntlet-status"></span>
     </div>
-    <div class="panel"><div id="gauntlet" class="empty" data-i18n="gauntlet_intro"></div></div>
+    <div class="panel" style="margin-top:10px"><div id="gauntlet" class="empty" data-i18n="gauntlet_intro"></div></div>
   </section>
 </div>
 
 </main>
+</div>
 
 <div id="toasts" aria-live="polite"></div>
 
@@ -387,7 +388,7 @@
   <div class="dialog-title" id="confirm-title"></div>
   <div class="dialog-body" id="confirm-body"></div>
   <div class="dialog-seal">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 2.5 20.5 6v6.2c0 5-3.4 8.5-8.5 9.8-5.1-1.3-8.5-4.8-8.5-9.8V6L12 2.5Z"/>
     </svg>
     <span data-i18n="confirm_seal_note"></span>
@@ -397,12 +398,6 @@
     <button class="primary" id="confirm-ok" data-i18n="confirm_ok"></button>
   </div>
 </dialog>
-
-<footer>
-  <div class="footer-inner">
-    <p><strong data-i18n="footer_limits_title"></strong> <span data-i18n="footer_limits"></span></p>
-  </div>
-</footer>
 
 <script src="/assets/i18n.js"></script>
 <script src="/assets/i18n-mvp.js"></script>
