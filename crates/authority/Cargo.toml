@@ -7,6 +7,15 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Never default, and never forwarded by any shipping crate's features. The
+# fault-injection module compiles only under this flag, so a default build
+# contains neither the barrier names nor the environment variable that selects
+# one. scripts/check-fault-injection-excluded.sh proves that against the real
+# release artifact rather than trusting this comment.
+default = []
+fault-injection = []
+
 [dependencies]
 hex = { workspace = true }
 serde = { workspace = true }
@@ -16,4 +25,11 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
+sovereign-fault-testing = { path = "../fault-testing" }
 tempfile = "3"
+
+# Only meaningful with the barrier compiled in; without the feature the test
+# would reference a module that does not exist.
+[[test]]
+name = "subprocess_claims"
+required-features = ["fault-injection"]

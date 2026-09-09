@@ -680,6 +680,11 @@ where
         return Err(error);
     }
 
+    // The exact instant a crash is interesting: a complete, fsynced temp file
+    // exists and nothing is published. Absent from any default build.
+    #[cfg(feature = "fault-injection")]
+    fault_injection::reach(fault_injection::Barrier::LegacyAfterTempSyncBeforePublish);
+
     match std::fs::hard_link(&temp_path, final_path) {
         Ok(()) => {
             let _ = std::fs::remove_file(&temp_path);
@@ -762,6 +767,9 @@ fn sync_directory(_directory: &Path) {}
 fn unavailable(error: impl std::fmt::Display) -> AuthorityError {
     AuthorityError::Unavailable(error.to_string())
 }
+
+#[cfg(feature = "fault-injection")]
+pub mod fault_injection;
 
 #[cfg(test)]
 mod tests;
