@@ -325,7 +325,7 @@ while the controller routes eligible design/review cards to the strong role.
   final workspace test/clippy/fmt and scoped gate passed.
   [Evidence](handoff/codex/reports/S1-G05-supervised.md).
 
-- [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` IN PROGRESS (fresh Luna medium; attempt1, zero failures).
+- [ ] **P1 | `crates/consultant-playground/` | S1-05 — Add bounded typed HTTP contracts.** `lane:codex` IN PROGRESS (Luna medium; attempt2 pending, one substantive failure).
   Definition and done criteria: [S1-05](handoff/codex/cards/S1-05.md).
   Source base `c978e9be1d609fb367510f72a8ea4f73db614164`; card revision1 blob
   `c78a9e9af185b947d7b377549acc4f2f0ade278a`. Exact write set src/http.rs
@@ -334,6 +334,14 @@ while the controller routes eligible design/review cards to the strong role.
   Preserve actual RED/GREEN under .harness/s1-05/; report to controller only.
   Budget: up to three focused repair cycles per candidate; stop at two rejected
   substantive attempts. Runtime token/time accounting unavailable; do not invent.
+  Attempt1 rejected by independent reviewer: production matched accepted fixture,
+  but all seven test groups lacked required coverage (full snapshots/isolation,
+  route/method/headers, port80/8123/Origin, strict bodies/arrays, precedence,
+  poison/lock release, all11 exact errors). Candidate http blob
+  `e54c88408591648c8444a69ec0f193b4b93c113d`; lib8aa01359.
+  Checks green; red.log was EXIT0 baseline, not RED. Preserve this limitation.
+  Attempt2 only repairs inline tests within the same two-file ownership;
+  production grammar unchanged. Second substantive rejection escalates to Astra.
   Complete only when the linked card's checks and independent acceptance pass.
 
 - [ ] **P1 | `crates/consultant-playground/tests/` | S1-G06 — Admit closed embedded assets.** `lane:codex` Frozen architecture task; depends on S1-05 acceptance.
