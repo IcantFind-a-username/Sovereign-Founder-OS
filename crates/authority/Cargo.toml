@@ -88,3 +88,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "exact_dispatch"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "migration"
+required-features = ["owner-effect-fixture"]

@@ -19,6 +19,7 @@ pub mod dispatch;
 pub mod exact_fixture;
 pub mod fixture_root;
 pub mod listener;
+pub mod platform_publish;
 pub mod process_lock;
 pub mod protocol;
 pub mod reservation;
