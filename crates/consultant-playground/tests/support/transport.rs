@@ -14,13 +14,39 @@ pub struct Response {
 }
 
 pub fn connect(port: u16) -> io::Result<TcpStream> {
-    let stream = TcpStream::connect_timeout(
-        &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
-        Duration::from_secs(2),
-    )?;
-    stream.set_read_timeout(Some(Duration::from_secs(8)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    // A loopback connect that returns EINVAL is a host quirk: seen on macOS
+    // 26.5 only under the full gate, never standalone (docs/backlog.md,
+    // "transport EINVAL"). Nothing has been sent yet, so trying again cannot
+    // duplicate a request; an error after the write is never retried.
+    let mut attempt = 0;
+    let stream = loop {
+        match TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+            Ok(stream) => break stream,
+            Err(error) if error.raw_os_error() == Some(22) && attempt < 3 => {
+                attempt += 1;
+                eprintln!(
+                    "transport: connect to {addr} returned EINVAL (attempt {attempt}), retrying"
+                );
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(error) => return Err(step("connect", error)),
+        }
+    };
+    stream
+        .set_read_timeout(Some(Duration::from_secs(8)))
+        .map_err(|error| step("set_read_timeout", error))?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .map_err(|error| step("set_write_timeout", error))?;
     Ok(stream)
+}
+
+/// Name the step an error came from. An intermittent failure under the gate
+/// otherwise says only which errno, and errno 22 has five possible sources
+/// in one request.
+fn step(name: &str, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{name}: {error}"))
 }
 
 pub fn raw_request(port: u16, method: &str, target: &str, headers: &str, body: &[u8]) -> Vec<u8> {
@@ -32,7 +58,9 @@ pub fn raw_request(port: u16, method: &str, target: &str, headers: &str, body: &
 
 pub fn request(port: u16, bytes: &[u8]) -> io::Result<Response> {
     let mut stream = connect(port)?;
-    stream.write_all(bytes)?;
+    stream
+        .write_all(bytes)
+        .map_err(|error| step("write", error))?;
     // A server that has already answered and closed leaves nothing to shut
     // down. Linux reports that as ENOTCONN; macOS lets the call succeed. The
     // difference says nothing about the server, and the response it sent is
@@ -41,9 +69,9 @@ pub fn request(port: u16, bytes: &[u8]) -> io::Result<Response> {
     match stream.shutdown(Shutdown::Write) {
         Ok(()) => {}
         Err(error) if peer_is_gone(&error) => {}
-        Err(error) => return Err(error),
+        Err(error) => return Err(step("shutdown", error)),
     }
-    read_response(&mut stream)
+    read_response(&mut stream).map_err(|error| step("read", error))
 }
 
 /// Whether an error means the connection is gone, under any of the names the
@@ -64,7 +92,9 @@ pub fn read_response(stream: &mut TcpStream) -> io::Result<Response> {
     let mut buf = [0; 4096];
     // Whole-second socket waits avoid the fractional-timeout EINVAL observed
     // on the test host. The absolute deadline bounds all retries to <9 seconds.
-    stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .map_err(|error| step("set_read_timeout(1s)", error))?;
     loop {
         if Instant::now() >= deadline {
             return Err(io::ErrorKind::TimedOut.into());

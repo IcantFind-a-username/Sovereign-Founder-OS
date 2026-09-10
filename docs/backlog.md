@@ -1532,6 +1532,21 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   The route sequence to convert is written out at the end of the walkthrough
   report above; `tests/support/ui_server.rs` already has `get`, `post` and
   `pending_approval` for it.
+- [ ] **P3 | `crates/consultant-playground/tests/support/transport.rs` | Transport EINVAL under the full gate on the macOS test host.**
+  `two_cli_roots_have_identical_complete_transcripts_and_no_writes`
+  (`apps/cli/tests/playground_isolation.rs:93`) failed twice on 2026-09-10
+  under the Stop-hook gate with `Os { code: 22, InvalidInput }` from
+  `transport::request`, at the 7th and the 17th exchange of the first root —
+  a server that had just answered. It passed 8/8 standalone and in three
+  background gate runs the same hour, and it touches nothing the day's
+  changes touched. The helper already avoids fractional socket timeouts for
+  a related EINVAL seen on this host; every timeout is whole-second now, so
+  the remaining sources are `connect_timeout`'s poll, `shutdown`, or a
+  `setsockopt` quirk in macOS 26.5. Mitigation in place: `request` names the
+  failing step in its error, and `connect` retries EINVAL up to three times
+  before any byte is sent (never after). Done when: the next occurrence
+  names its step and either the retry absorbs it or the step gets a targeted
+  fix; if it never recurs in a month, close as absorbed.
 - [ ] **P2 | `apps/cli/src/workspace/` | A rejected or revoked document has a way back to draft.**
   `decide(reject)` sets a document `rejected`; `revoke_delivery` sets it
   `revoked`; `update_document` and `request_send` both require `draft`. So a
