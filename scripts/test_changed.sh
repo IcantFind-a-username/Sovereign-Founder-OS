@@ -183,6 +183,9 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # no longer exists fails here rather than rotting, and CI runs the same
   # command against a clean checkout.
   run_step "owner-effect-manifest" ./scripts/run-owner-effect-tests.sh --all
+  # A separate workspace, so nothing else in this gate builds it.
+  run_step "owner-webauthn-adapter" cargo test \
+    --manifest-path fixtures/owner-webauthn/Cargo.toml --locked
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check

@@ -790,20 +790,7 @@ while the controller routes eligible design/review cards to the strong role.
 - [x] **P2 | `scripts/`, `docs/` | Owner-session Task 1 remainder: origin preflight harness and mechanism-matrix doc.**
 
 
-- [ ] **P2 | `crates/owner/` | Owner-session Task 5 remainder: the WebAuthn adapter, pending a dependency decision.** `needs:fable`
-  The fixture ceremony's *logic* landed 2026-09-10 (#68-#70): the frozen
-  configuration, the session lifetime, and the one-credential registry with
-  its 300-second one-use ceremonies. Those take `user_verified`, the
-  credential id and the returned handle as inputs, so every property is
-  already tested without a WebAuthn implementation.
-  What is missing is the adapter that turns a real browser response into
-  those inputs, which the plan pins as `webauthn-rs = "=0.5.5"`. Measured
-  before adding it: that pin resolves **116 packages**. They would be optional
-  and absent from a default build, but they still enter the audited lock file
-  and every one of them is dependency-review surface. That is a judgement
-  about audit burden rather than a coding step, so it is left for the owner
-  rather than taken silently. Decide, then implement `ceremony.rs` and the
-  `cfg(test)` virtual-authenticator adapter against it.
+- [x] **P2 | `crates/owner/` | Owner-session Task 5 remainder: the WebAuthn adapter.** Landed 2026-09-10 as `fixtures/owner-webauthn`, in its own workspace. The 116-package pin — 94 crates and a system OpenSSL binding — stays out of the audited core lock file entirely, the same shape `apps/desktop` already uses for the webview stack. Verified: `Cargo.lock` is unchanged, holds zero webauthn/openssl entries, and the crate is not a core workspace member. CI builds it in its own step, because nothing else can.
 - [ ] **P2 | `crates/authority/`, `apps/cli/` | Owner-session Task 4 remainder: migration gate and broker-build check.**
   The broker's core chain landed 2026-09-10 across six slices (#59-#66):
   bootstrap frame, root classification, loopback bind under one fixed
