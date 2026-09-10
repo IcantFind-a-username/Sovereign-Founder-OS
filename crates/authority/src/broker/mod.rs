@@ -15,6 +15,7 @@
 pub mod bootstrap;
 pub mod connections;
 pub mod corpus;
+pub mod dispatch;
 pub mod exact_fixture;
 pub mod fixture_root;
 pub mod listener;
