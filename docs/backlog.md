@@ -1510,6 +1510,11 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 - [x] **P1 | `apps/cli/assets/`, `apps/cli/src/ui_mvp.rs` | Seven-tab bilingual MVP pages.** Landed 2026-09-10; verified by hand in the in-app browser.
 
 - [ ] **P1 | `docs/`, `apps/cli/` | Live verification with a real Ollama model and the five-consultant usability protocol.**
+  2026-09-10: the half that needs no model ran — every route and page on a
+  fresh workspace, report at
+  `docs/handoff/reports/2026-09-10-mvp-walkthrough-without-a-model.md`, two
+  defects fixed in #91. The model half is blocked on Ollama being
+  installed on the founder's machine; nothing about model quality is known.
   Run every role against a real local model (`ollama serve`, a pulled model,
   `model.json` enabled) and record which proposals validated, which fell back
   to the template, and why; then run the five-consultant usability protocol
@@ -1524,6 +1529,35 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   size rules, JSON error envelopes, and that a malformed `RunSubject` or
   profile is a 200 `{ok:false}` with a message, never a panic. Done when
   `cargo test -p sovereign-cli` covers each route once.
+  The route sequence to convert is written out at the end of the walkthrough
+  report above; `tests/support/ui_server.rs` already has `get`, `post` and
+  `pending_approval` for it.
+- [ ] **P2 | `apps/cli/src/workspace/` | A rejected or revoked document has a way back to draft.**
+  `decide(reject)` sets a document `rejected`; `revoke_delivery` sets it
+  `revoked`; `update_document` and `request_send` both require `draft`. So a
+  founder who rejects a send to fix a line, or revokes one, can only start a
+  new document and lose the revision thread. Candidate rule: editing a
+  rejected or revoked document produces a new draft revision, with the
+  rejection or revocation kept in the audit chain. Done when: the rule is
+  chosen and written into the `DocumentStatus` doc comment, `update_document`
+  implements it, and a test walks draft → rejected → edited → sent.
+- [ ] **P3 | `apps/cli/src/workspace/crew_roles.rs`, `apps/cli/assets/team.js` | Role cards' reads / delivers / cannot lines get Chinese variants.**
+  `RoleCard` carries `title_en/zh` and `description_en/zh` but a single
+  English `reads`, `delivers`, `cannot`; the Chinese Team page shows three
+  English lines per card. Done when: the three fields have `_en/_zh` pairs
+  and `team.js` picks by language, with a test that no card's `_zh` is empty.
+- [ ] **P3 | `apps/cli/src/ui.rs`, `apps/cli/src/workspace/compliance.rs` | Venture-level disclosures name the company, not `(unknown)`.**
+  A company compliance check records a disclosure with `customer_id:
+  Uuid::nil()` and an audit resource of `customer:00000000-…`; the Security
+  page renders the customer as `(unknown)`. Done when: a venture-level
+  disclosure carries a venture subject (or `None`) and renders as the
+  company, and the audit resource says `venture:profile`.
+- [ ] **P3 | `apps/cli/assets/` | Two copy/layout nits from the walkthrough.**
+  Compliance page: the history box says "no checks yet" (`cp_no_reports`)
+  when exactly one report exists, because the list excludes the report shown
+  above it — say "no earlier checks". Documents page: a long title pushes the
+  second action button onto its own line. Done when both are gone in `zh`
+  and `en`.
 - [ ] **P2 | `apps/cli/src/workspace/` | Export/verify-export learns the new entities.**
   `verify_export` counts only customers/documents/approvals; extend the
   report (and the UI) to projects, tasks, follow-ups, payments, employees,
