@@ -79,6 +79,13 @@ const BUNDLE_DOMAIN: &[u8] = b"sovereign:authority-bundle:v1";
 pub enum AuthorityError {
     #[error("authority was already consumed")]
     AlreadyConsumed,
+    /// The bundle's approval is held by a different bundle. Distinct from
+    /// `AlreadyConsumed` because a bundle reports one outcome for six steps,
+    /// and a caller holding a fresh token and a spent approval needs to be
+    /// told which of the two it is holding — "try a new token" is the wrong
+    /// advice when the approval is what was used.
+    #[error("approval was already consumed by another bundle")]
+    ApprovalAlreadyConsumed,
     #[error("idempotency key was already consumed for the same invocation")]
     IdempotencyReplay,
     #[error("idempotency key was consumed for a different invocation")]
@@ -292,7 +299,8 @@ impl AuthorityStore {
     /// means this call observed the one `Authorized` outcome for the
     /// bundle — a durable `.committed` marker. Every other outcome,
     /// including a retry of a bundle someone else already committed, is
-    /// `AlreadyConsumed`, `Revoked`, a replay/conflict error, or
+    /// `AlreadyConsumed` (the token, or the commit itself),
+    /// `ApprovalAlreadyConsumed`, `Revoked`, a replay/conflict error, or
     /// `CorruptRecord`.
     pub fn consume_bundle(
         &self,
@@ -461,7 +469,7 @@ impl AuthorityStore {
                 if existing.bundle_hex.as_deref() == Some(bundle_hex) {
                     Ok(())
                 } else {
-                    Err(AuthorityError::AlreadyConsumed)
+                    Err(AuthorityError::ApprovalAlreadyConsumed)
                 }
             }
             Err(ClaimError::Store(error)) => Err(error),

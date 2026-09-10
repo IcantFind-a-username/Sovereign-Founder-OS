@@ -19,7 +19,7 @@ use sovereign_artifact::{
 use sovereign_identity::{ApprovalRole, AuthorityRole, IdentityError, RoleTrustStore, TypedSigner};
 use sovereign_policy::PolicyAuthorizationV2;
 
-use sovereign_authority::{AuthorityError, AuthorityStore};
+use sovereign_authority::{AuthorityError, AuthorityStore, BundlePart};
 
 use crate::approval::SignedApprovalV1;
 use thiserror::Error;
@@ -278,6 +278,12 @@ pub enum CapabilityV2Error {
     ApprovalFromFuture,
     #[error("approval was already consumed in this process")]
     ApprovalReused,
+    /// The token or the approval carries a durable revocation record. Distinct
+    /// from `Replay`: a replay is something spent by a legitimate earlier use,
+    /// a revocation is something the owner withdrew — and a caller that cannot
+    /// tell them apart cannot tell "try a fresh token" from "stop".
+    #[error("the token or its approval has been revoked")]
+    Revoked,
     #[error("approval evidence in the token does not match the presented approval")]
     ApprovalEvidenceMismatch,
     #[error("approval signing key is not trusted")]
@@ -527,6 +533,10 @@ pub struct CapabilityValidatorV2<C: TrustedClock> {
     expected_issuer: String,
     expected_audience: String,
     clock: C,
+    // The process-local mirrors below are not the durable record and do not
+    // pretend to be. With a store attached, the bundle transaction is what
+    // decides; these remain as the only defence when no store is attached at
+    // all, and as a cheap early refusal before a store round-trip.
     consumed_tokens: HashSet<Uuid>,
     idempotency: HashMap<Uuid, Digest>,
     approvals: Option<ApprovalTrust>,
@@ -748,24 +758,63 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
         }
 
         // Durable claims come after every validation and before the
-        // process-local bookkeeping. A partial failure burns the earlier
-        // claims and denies the request: fail closed, never fail open.
+        // process-local bookkeeping.
+        //
+        // With an approval present, all three claims — token, idempotency,
+        // approval — go through one bundle transaction (RFC 0003 Amendment 1).
+        // The claims are made under one durable intent, so a bundle that
+        // stops part-way — a crash, a store that went away — is retried as
+        // the same bundle and resumes where it stopped, rather than finding
+        // its own token already spent. The previous shape made the three
+        // claims in sequence with no intent record, so a failure on the third
+        // burned the first two for good on a request that was then denied.
+        // Both shapes fail closed; only the old one was also lossy.
+        //
+        // Revocation is checked inside the bundle, before any claim, and
+        // surfaces as its own error rather than as a replay.
         if let Some(store) = &self.authority_store {
-            store
-                .consume_token(claims.token_id, now_unix, claims.expires_at_unix)
-                .map_err(map_authority_error_token)?;
-            store
-                .bind_idempotency(
-                    claims.idempotency_key,
-                    fingerprint.as_bytes(),
-                    now_unix,
-                    claims.expires_at_unix,
-                )
-                .map_err(map_authority_error_idempotency)?;
-            if let Some((approval_id, approval_expires_at_unix)) = approval_claim {
-                store
-                    .consume_approval(approval_id, now_unix, approval_expires_at_unix)
-                    .map_err(map_authority_error_approval)?;
+            match approval_claim {
+                Some((approval_id, approval_expires_at_unix)) => {
+                    store
+                        .consume_bundle(
+                            BundlePart {
+                                id: claims.token_id,
+                                expires_at_unix: claims.expires_at_unix,
+                            },
+                            BundlePart {
+                                id: approval_id,
+                                expires_at_unix: approval_expires_at_unix,
+                            },
+                            BundlePart {
+                                id: claims.idempotency_key,
+                                expires_at_unix: claims.expires_at_unix,
+                            },
+                            fingerprint.as_bytes(),
+                            now_unix,
+                        )
+                        .map_err(map_authority_error_bundle)?;
+                }
+                None => {
+                    // No approval, so no bundle: the authority store offers
+                    // the transaction only for the three-part case. This
+                    // path keeps two sequential claims, and keeps the old
+                    // defect with them — an idempotency failure after the
+                    // token was consumed burns that token. It is the
+                    // no-approval path, so nothing a person authorised is
+                    // lost, but it is a gap and is named as one rather than
+                    // hidden behind the bundle above.
+                    store
+                        .consume_token(claims.token_id, now_unix, claims.expires_at_unix)
+                        .map_err(map_authority_error_token)?;
+                    store
+                        .bind_idempotency(
+                            claims.idempotency_key,
+                            fingerprint.as_bytes(),
+                            now_unix,
+                            claims.expires_at_unix,
+                        )
+                        .map_err(map_authority_error_idempotency)?;
+                }
             }
         }
 
@@ -1073,9 +1122,24 @@ fn compare_invocation_claims(
     Ok(())
 }
 
+/// The bundle reports one outcome for the whole transaction. `AlreadyConsumed`
+/// is the bundle's word for "another caller committed this bundle first",
+/// which from this side is a replay; `Revoked` is its own thing and stays so.
+fn map_authority_error_bundle(error: AuthorityError) -> CapabilityV2Error {
+    match error {
+        AuthorityError::Revoked => CapabilityV2Error::Revoked,
+        AuthorityError::AlreadyConsumed => CapabilityV2Error::Replay,
+        AuthorityError::ApprovalAlreadyConsumed => CapabilityV2Error::ApprovalReused,
+        AuthorityError::IdempotencyReplay => CapabilityV2Error::IdempotencyReplay,
+        AuthorityError::IdempotencyConflict => CapabilityV2Error::IdempotencyConflict,
+        _ => CapabilityV2Error::AuthorityStoreUnavailable,
+    }
+}
+
 fn map_authority_error_token(error: AuthorityError) -> CapabilityV2Error {
     match error {
         AuthorityError::AlreadyConsumed => CapabilityV2Error::Replay,
+        AuthorityError::Revoked => CapabilityV2Error::Revoked,
         _ => CapabilityV2Error::AuthorityStoreUnavailable,
     }
 }
@@ -1084,13 +1148,6 @@ fn map_authority_error_idempotency(error: AuthorityError) -> CapabilityV2Error {
     match error {
         AuthorityError::IdempotencyReplay => CapabilityV2Error::IdempotencyReplay,
         AuthorityError::IdempotencyConflict => CapabilityV2Error::IdempotencyConflict,
-        _ => CapabilityV2Error::AuthorityStoreUnavailable,
-    }
-}
-
-fn map_authority_error_approval(error: AuthorityError) -> CapabilityV2Error {
-    match error {
-        AuthorityError::AlreadyConsumed => CapabilityV2Error::ApprovalReused,
         _ => CapabilityV2Error::AuthorityStoreUnavailable,
     }
 }
