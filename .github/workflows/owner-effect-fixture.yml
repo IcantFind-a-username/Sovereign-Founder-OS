@@ -1,0 +1,74 @@
+name: Owner-effect fixture
+
+# The fixture's tests do not run in the main CI job, and it took noticing
+# rather than reading to find that out. `cargo test --workspace` skips every
+# target with `required-features`, silently and with a zero exit — so a
+# hundred-odd tests behind `owner-effect-fixture` had only ever run on a
+# developer's machine. That is the worst shape for a test suite: present,
+# green, and not consulted.
+#
+# This workflow is where they run. It is separate from `ci.yml` rather than
+# folded into it, so that the fixture's own dependencies — redb, hmac — and
+# its longer, process-spawning tests cannot slow down or destabilise the gate
+# that guards ordinary changes.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Every target that carries `required-features`, which is the set the
+      # main job cannot see.
+      - name: Fixture tests
+        run: |
+          cargo test -p sovereign-authority -p sovereign-owner -p sovereign-cli \
+            --no-default-features --features owner-effect-fixture --locked
+
+      # The barriers live behind a second feature, so the kill matrix needs
+      # both. This is also the only place the two-feature combination is
+      # exercised by tests rather than only compiled.
+      - name: Kill matrix
+        run: |
+          cargo test -p sovereign-cli --test broker_kill_matrix \
+            --no-default-features --features owner-effect-fixture,fault-injection \
+            --locked -- --test-threads=1
+
+      # Repeated, because the matrix spawns processes and kills them: a case
+      # that is broken one time in twenty passes a single run. Five is a
+      # compromise between catching that and not making every pull request
+      # wait; the script accepts up to fifty for a deliberate soak.
+      - name: Kill matrix, repeated
+        run: ./scripts/exact-effect-kill-matrix.sh --iterations 5
+
+      - name: Subprocess claims
+        run: ./scripts/run-authority-subprocess-claims.sh --iterations 5
+
+      # The boundary gates. They run in the local gate on every session too;
+      # here they run against a clean checkout, where a stale artefact cannot
+      # make one of them pass.
+      - name: Boundary and corpus gates
+        run: |
+          ./scripts/check-owner-effect-boundary.sh
+          ./scripts/check-owner-effect-canaries.sh
+          ./scripts/check-owner-effect-value-free.sh
+          ./scripts/check-owner-effect-crypto-profile.sh
+          ./scripts/check-owner-effect-documentation.sh
+          ./scripts/check-fault-injection-excluded.sh
+
+      # Every registered row, run through the checked runner, so a row naming
+      # a test that no longer exists fails here rather than rotting.
+      - name: Registered manifest rows
+        run: ./scripts/run-owner-effect-tests.sh --all
