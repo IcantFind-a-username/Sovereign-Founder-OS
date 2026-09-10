@@ -114,10 +114,15 @@ pub enum DocumentStatus {
     Draft,
     PendingApproval,
     ApprovedPendingDelivery,
+    /// A send request the owner turned down. Not a dead end: it happened
+    /// before anything reached the customer, so an edit reopens the document
+    /// as a new draft revision, and the rejected revision's fate stays on the
+    /// audit chain.
     Rejected,
     /// An approved send whose composed outbox file the owner later revoked.
     /// The signed approval evidence remains; the local effect was undone and
-    /// the revocation is itself audited.
+    /// the revocation is itself audited. Like `Rejected`, an edit reopens it
+    /// as a new draft revision.
     Revoked,
     /// The owner has attested they delivered the composed message to the
     /// customer themselves. Stage 1 sends nothing over the network — this is a

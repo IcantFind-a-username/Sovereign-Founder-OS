@@ -202,9 +202,19 @@ impl Store {
         self.gate("update", &resource)?;
         let mut workspace = self.load()?;
         let document = workspace.document_mut(document_id)?;
-        if document.status != DocumentStatus::Draft {
-            return Err(invalid("only drafts can be edited"));
-        }
+        // Rejected and revoked both happened before anything reached the
+        // customer, so the document goes back to its author: the edit becomes
+        // a new draft revision and the old revision's fate stays on the audit
+        // chain. Anything sent or delivered stays immutable.
+        let reopened_from = match document.status {
+            DocumentStatus::Draft => None,
+            DocumentStatus::Rejected | DocumentStatus::Revoked => Some(document.status),
+            _ => {
+                return Err(invalid(
+                    "only drafts, rejected and revoked documents can be edited",
+                ))
+            }
+        };
         if document.kind == DocumentKind::Invoice && amount_cents.is_none() {
             return Err(invalid("invoice needs an amount"));
         }
@@ -221,20 +231,33 @@ impl Store {
             document.amount_cents = amount_cents;
             changed.push("amount_cents");
         }
-        if changed.is_empty() {
+        if changed.is_empty() && reopened_from.is_none() {
             return Ok(workspace);
+        }
+        // Reopening is a change in its own right, even with every field the
+        // same: the rejected revision stays rejected, and this is a new one.
+        if reopened_from.is_some() {
+            document.status = DocumentStatus::Draft;
         }
         document.revision += 1;
         document.updated_at = now();
         let revision = document.revision;
-        self.commit(
-            &workspace,
-            vec![AuditEntry {
+        let mut entries = Vec::new();
+        if let Some(from) = reopened_from {
+            entries.push(AuditEntry {
+                action: "document.reopened".into(),
+                resource: resource.clone(),
+                payload: serde_json::json!({ "from": from, "revision": revision }),
+            });
+        }
+        if !changed.is_empty() {
+            entries.push(AuditEntry {
                 action: "document.update".into(),
                 resource,
                 payload: serde_json::json!({ "changed": changed, "revision": revision }),
-            }],
-        )?;
+            });
+        }
+        self.commit(&workspace, entries)?;
         Ok(workspace)
     }
 
