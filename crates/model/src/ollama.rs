@@ -139,9 +139,14 @@ fn parse_loopback_base_url(base_url: &str) -> Result<(String, u16), OllamaConfig
 }
 
 /// Minimal HTTP/1.1 response parser: status line, headers, then a body framed
-/// by `Content-Length` or by connection close. Chunked transfer is refused
-/// rather than implemented; Ollama answers non-streaming requests with a
-/// content length.
+/// by `Content-Length`, by chunked transfer, or by connection close.
+///
+/// Chunked is not optional. Ollama's Go server sets a content length only
+/// when the whole body fits its write buffer; a non-streaming `/api/generate`
+/// answer of more than a few hundred bytes — every real crew draft — comes
+/// back `Transfer-Encoding: chunked`. Refusing it made the provider fail on
+/// exactly the responses that mattered, and the gateway failed over to the
+/// template drafter with the health probe (a short `/api/tags`) still green.
 fn parse_response(raw: &[u8]) -> Result<(u16, Vec<u8>), String> {
     let split = raw
         .windows(4)
@@ -156,12 +161,13 @@ fn parse_response(raw: &[u8]) -> Result<(u16, Vec<u8>), String> {
         .and_then(|code| code.parse::<u16>().ok())
         .ok_or_else(|| format!("malformed status line: {status_line}"))?;
     let mut content_length: Option<usize> = None;
+    let mut chunked = false;
     for line in lines {
         if let Some((name, value)) = line.split_once(':') {
             let name = name.trim().to_ascii_lowercase();
             let value = value.trim();
             if name == "transfer-encoding" && value.to_ascii_lowercase().contains("chunked") {
-                return Err("chunked responses are not supported".into());
+                chunked = true;
             }
             if name == "content-length" {
                 content_length = Some(value.parse().map_err(|_| "bad content-length")?);
@@ -169,12 +175,47 @@ fn parse_response(raw: &[u8]) -> Result<(u16, Vec<u8>), String> {
         }
     }
     let body = &raw[split + 4..];
-    let body = match content_length {
-        Some(length) if length <= body.len() => &body[..length],
-        Some(_) => return Err("truncated response body".into()),
-        None => body,
+    let body = if chunked {
+        dechunk(body)?
+    } else {
+        match content_length {
+            Some(length) if length <= body.len() => body[..length].to_vec(),
+            Some(_) => return Err("truncated response body".into()),
+            None => body.to_vec(),
+        }
     };
-    Ok((status, body.to_vec()))
+    Ok((status, body))
+}
+
+/// Decode a chunked transfer body: a hex size line (any `;extension` is
+/// ignored), that many bytes, CRLF, repeated until the zero-size chunk.
+/// Trailers after the last chunk are ignored. Anything malformed or
+/// truncated is refused rather than guessed at, and the decoded body can
+/// only be smaller than the raw bytes the caller already bounded.
+fn dechunk(mut raw: &[u8]) -> Result<Vec<u8>, String> {
+    let mut body = Vec::new();
+    loop {
+        let line_end = raw
+            .windows(2)
+            .position(|pair| pair == b"\r\n")
+            .ok_or_else(|| "malformed chunk: no size line".to_owned())?;
+        let size_text =
+            std::str::from_utf8(&raw[..line_end]).map_err(|_| "malformed chunk size".to_owned())?;
+        let size = usize::from_str_radix(size_text.split(';').next().unwrap_or("").trim(), 16)
+            .map_err(|_| format!("malformed chunk size: {size_text:?}"))?;
+        raw = &raw[line_end + 2..];
+        if size == 0 {
+            return Ok(body);
+        }
+        if raw.len() < size + 2 {
+            return Err("truncated chunk".into());
+        }
+        body.extend_from_slice(&raw[..size]);
+        if &raw[size..size + 2] != b"\r\n" {
+            return Err("malformed chunk terminator".into());
+        }
+        raw = &raw[size + 2..];
+    }
 }
 
 impl ModelProvider for OllamaProvider {
@@ -267,17 +308,33 @@ mod tests {
     }
 
     #[test]
-    fn responses_are_framed_by_content_length_and_chunked_is_refused() {
+    fn responses_are_framed_by_content_length_or_chunked_transfer() {
         let (status, body) =
             parse_response(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhelloEXTRA").unwrap();
         assert_eq!(status, 200);
         assert_eq!(body, b"hello");
         let (status, body) = parse_response(b"HTTP/1.1 404 Not Found\r\n\r\nnope").unwrap();
         assert_eq!((status, body.as_slice()), (404, &b"nope"[..]));
-        assert!(parse_response(
-            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n"
+        // Chunked, as Ollama answers any non-trivial non-streaming request:
+        // two chunks, an extension on one size line, a trailer after the end.
+        let (status, body) = parse_response(
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n3;ext=1\r\nhel\r\n2\r\nlo\r\n0\r\nX-Trailer: t\r\n\r\n",
         )
-        .is_err());
+        .unwrap();
+        assert_eq!((status, body.as_slice()), (200, &b"hello"[..]));
+        // Malformed or cut-off chunking is refused, never guessed at.
+        for raw in [
+            &b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhel"[..],
+            &b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\nhello\r\n0\r\n\r\n"[..],
+            &b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhelloXX0\r\n\r\n"[..],
+            &b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n"[..],
+        ] {
+            assert!(
+                parse_response(raw).is_err(),
+                "{:?}",
+                String::from_utf8_lossy(raw)
+            );
+        }
         assert!(parse_response(b"HTTP/1.1 200 OK\r\nContent-Length: 50\r\n\r\nshort").is_err());
         assert!(parse_response(b"garbage").is_err());
     }
