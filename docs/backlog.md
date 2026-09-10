@@ -1547,7 +1547,12 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   before any byte is sent (never after). Done when: the next occurrence
   names its step and either the retry absorbs it or the step gets a targeted
   fix; if it never recurs in a month, close as absorbed.
-- [ ] **P2 | `apps/cli/src/workspace/` | A rejected or revoked document has a way back to draft.**
+- [x] **P2 | `apps/cli/src/workspace/` | A rejected or revoked document has a way back to draft.**
+  Landed 2026-09-10. Rule chosen: both states happen before anything reaches
+  the customer, so an edit reopens the document as a new draft revision
+  (`document.reopened` on the chain, then `document.update` if fields
+  changed); delivered stays final. Documents page offers the editor for
+  both states and says what saving does.
   `decide(reject)` sets a document `rejected`; `revoke_delivery` sets it
   `revoked`; `update_document` and `request_send` both require `draft`. So a
   founder who rejects a send to fix a line, or revokes one, can only start a

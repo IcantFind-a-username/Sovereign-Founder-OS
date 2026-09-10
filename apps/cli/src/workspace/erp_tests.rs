@@ -247,6 +247,68 @@ fn draft_edits_bump_the_revision_and_sent_documents_are_immutable() {
         .is_err());
 }
 
+/// The rule: rejected and revoked both happen before anything reaches the
+/// customer, so an edit takes the document back to draft as a new revision,
+/// and what happened to the old revision stays on the chain. Delivered is
+/// the one state that is genuinely final.
+#[test]
+fn rejected_and_revoked_documents_reopen_as_a_new_draft_revision() {
+    let (dir, store) = store();
+    store.set_venture("Acme", "Service").unwrap();
+    let workspace = store.add_customer("Acme Ltd", "", "").unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Offer, customer_id, None, "en")
+        .unwrap();
+    let document_id = workspace.documents[0].id;
+
+    // Rejected: back to the author, with a revision bump and a reopen event.
+    let workspace = store.request_send(document_id).unwrap();
+    let workspace = store.decide(workspace.approvals[0].id, false).unwrap();
+    assert_eq!(workspace.documents[0].status, DocumentStatus::Rejected);
+    let workspace = store
+        .update_document(document_id, "Second try", "Scope: narrower.", None)
+        .unwrap();
+    assert_eq!(workspace.documents[0].status, DocumentStatus::Draft);
+    assert_eq!(workspace.documents[0].revision, 2);
+    let recent = actions(&dir);
+    assert!(
+        recent.contains(&"document.reopened".to_string()),
+        "no reopen event: {recent:?}"
+    );
+    assert_eq!(recent.last().unwrap(), "document.update");
+
+    // And it can be sent again, on its new revision.
+    let workspace = store.request_send(document_id).unwrap();
+    let approval_id = workspace.approvals.last().unwrap().id;
+    let workspace = store.decide(approval_id, true).unwrap();
+    assert_eq!(
+        workspace.documents[0].status,
+        DocumentStatus::ApprovedPendingDelivery
+    );
+
+    // Revoked: the same way back, even when nothing in the text changes —
+    // reopening is itself the change.
+    let workspace = store.revoke_delivery(document_id).unwrap();
+    assert_eq!(workspace.documents[0].status, DocumentStatus::Revoked);
+    let workspace = store
+        .update_document(document_id, "Second try", "Scope: narrower.", None)
+        .unwrap();
+    assert_eq!(workspace.documents[0].status, DocumentStatus::Draft);
+    assert_eq!(workspace.documents[0].revision, 3);
+    assert_eq!(actions(&dir).last().unwrap(), "document.reopened");
+    assert!(store.request_send(document_id).is_ok());
+
+    // Delivered is final: what the customer holds cannot be rewritten.
+    let approval_id = store.load().unwrap().approvals.last().unwrap().id;
+    store.decide(approval_id, true).unwrap();
+    store.confirm_delivery(document_id).unwrap();
+    let error = store
+        .update_document(document_id, "Rewritten", "x", None)
+        .unwrap_err();
+    assert!(error.to_string().contains("only drafts"), "{error}");
+}
+
 #[test]
 fn accepting_a_sent_offer_promotes_the_lead_and_opens_the_project_flow() {
     let (dir, store, customer_id, offer_id, _invoice_id) = seeded();

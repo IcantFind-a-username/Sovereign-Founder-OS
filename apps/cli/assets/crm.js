@@ -311,10 +311,13 @@ function renderDocumentCard(d) {
   head.appendChild(el("span", "status-line", t("doc_revision")(d.revision || 1)));
   if (d.amount_cents != null) head.appendChild(el("span", "mono", money(d.amount_cents)));
   if (d.due_at) head.appendChild(el("span", "status-line", t("doc_due")(fmtDate(d.due_at))));
-  if (d.status === "draft") {
+  const editable = d.status === "draft" || d.status === "rejected" || d.status === "revoked";
+  if (editable) {
     const edit = el("button", "ghost small", t("doc_edit"));
     edit.addEventListener("click", () => { editingDocumentId = editingDocumentId === d.id ? null : d.id; renderDocuments(); });
     head.appendChild(edit);
+  }
+  if (d.status === "draft") {
     const submit = el("button", "ghost small", t("ws_submit_send"));
     submit.addEventListener("click", () => withBusy(submit, async () => applyResult(await api("/api/workspace/request-send", { document_id: d.id }))));
     head.appendChild(submit);
@@ -334,12 +337,13 @@ function renderDocumentCard(d) {
     head.appendChild(revoke);
   }
   wrap.appendChild(head);
+  if (d.status === "rejected" || d.status === "revoked") wrap.appendChild(el("div", "status-line", t("doc_reopen_hint")));
   const approvalWithEvidence = ws.approvals.find(a => a.document_id === d.id && a.evidence);
   if (approvalWithEvidence) {
     wrap.appendChild(el("div", "mono", t("ws_evidence")(approvalWithEvidence.evidence)));
     if (approvalWithEvidence.evidence.outbox) wrap.appendChild(el("div", "mono", t("ws_outbox")(approvalWithEvidence.evidence.outbox)));
   }
-  if (editingDocumentId === d.id && d.status === "draft") {
+  if (editingDocumentId === d.id && editable) {
     const form = el("div", "form-grid");
     const title = /** @type {HTMLInputElement} */ (el("input")); title.value = d.title; title.maxLength = 200;
     const body = /** @type {HTMLTextAreaElement} */ (el("textarea")); body.value = d.body; body.style.minHeight = "220px";
