@@ -16,6 +16,7 @@ use sovereign_capability::v2::{
     CapabilityV2IssueRequest, CapabilityV2ValidationContext, CapabilityValidatorV2, TrustedClock,
 };
 use sovereign_contracts::{AutomationLevel, DataClass};
+use sovereign_fault_testing::BlockedPath;
 use sovereign_identity::{
     ApprovalRole, AuthorityRole, KeyValidity, PublisherRole, RoleTrustStore, TypedSigner,
 };
@@ -632,7 +633,9 @@ fn expired_approval_purges_at_approval_expiry() {
     let store = sovereign_authority::AuthorityStore::open(dir.path()).unwrap();
     assert_eq!(store.purge_expired(NOW + 31).unwrap(), 2);
     assert_eq!(store.purge_expired(NOW + 119).unwrap(), 0);
-    assert_eq!(store.purge_expired(NOW + 120).unwrap(), 1);
+    // Three, not one: the approval record, and the bundle's intent and
+    // commit records, which expire with the bundle's longest-lived part.
+    assert_eq!(store.purge_expired(NOW + 120).unwrap(), 3);
 }
 
 #[test]
@@ -807,5 +810,153 @@ fn broken_authority_store_fails_closed() {
     assert_eq!(
         consume(&mut validator, &token, &invocation, &policy_decision, None).unwrap_err(),
         CapabilityV2Error::AuthorityStoreUnavailable
+    );
+}
+
+/// The token is opaque until it is authorized, and the issuer mints its id.
+/// To learn the id without spending anything durable, authorize once through
+/// a throwaway validator with no store attached: its process-local mirror is
+/// the only thing that records the use, and it is dropped here.
+fn minted_ids(
+    token: &CapabilityTokenV2,
+    invocation: &PreparedInvocation,
+    policy_decision: &PolicyAuthorizationV2,
+    approval: &SignedApprovalV1,
+) -> (Uuid, Uuid, i64) {
+    let authorized = validator_at(NOW + 1)
+        .authorize_and_consume_approved(token, context(invocation, policy_decision), Some(approval))
+        .unwrap();
+    let claims = authorized.claims();
+    let approval_id = claims
+        .approval_evidence
+        .as_ref()
+        .expect("an approved token carries its approval's id")
+        .approval_id;
+    (claims.token_id, approval_id, claims.expires_at_unix)
+}
+
+/// A revoked token is refused as revoked, not as a replay. The difference is
+/// advice: a replay says "this token was spent, get a fresh one", a
+/// revocation says "the owner withdrew this, stop" — and a caller that cannot
+/// tell them apart hands out the wrong one.
+#[test]
+fn a_revoked_token_is_refused_as_revoked_not_as_a_replay() {
+    let dir = tempfile::tempdir().unwrap();
+    let invocation = prepared("revoked token");
+    let idempotency = Uuid::from_u128(40);
+    let policy_decision = decision(&invocation, AutomationLevel::L3BoundedAuto, idempotency);
+    let approval = approve_at(NOW, &invocation, &policy_decision, 120);
+    let token = issuer_at(NOW)
+        .issue_approved(
+            request_with_ttl(&invocation, &policy_decision, idempotency, 30),
+            &approval,
+        )
+        .unwrap();
+
+    let (token_id, _, expires_at_unix) =
+        minted_ids(&token, &invocation, &policy_decision, &approval);
+    let store = sovereign_authority::AuthorityStore::open(dir.path()).unwrap();
+    store
+        .revoke_token(token_id, NOW + 1, expires_at_unix)
+        .unwrap();
+
+    let mut validator = validator_at(NOW + 1).with_authority_store(store);
+    assert_eq!(
+        consume(
+            &mut validator,
+            &token,
+            &invocation,
+            &policy_decision,
+            Some(&approval),
+        ),
+        Err(CapabilityV2Error::Revoked)
+    );
+}
+
+/// The approval side of the same distinction. The token is fresh and
+/// unspent; what was withdrawn is the person's approval behind it.
+#[test]
+fn a_revoked_approval_is_refused_as_revoked() {
+    let dir = tempfile::tempdir().unwrap();
+    let invocation = prepared("revoked approval");
+    let idempotency = Uuid::from_u128(41);
+    let policy_decision = decision(&invocation, AutomationLevel::L3BoundedAuto, idempotency);
+    let approval = approve_at(NOW, &invocation, &policy_decision, 120);
+    let token = issuer_at(NOW)
+        .issue_approved(
+            request_with_ttl(&invocation, &policy_decision, idempotency, 30),
+            &approval,
+        )
+        .unwrap();
+    let (_, approval_id, _) = minted_ids(&token, &invocation, &policy_decision, &approval);
+
+    let store = sovereign_authority::AuthorityStore::open(dir.path()).unwrap();
+    store
+        .revoke_approval(approval_id, NOW + 1, NOW + 120)
+        .unwrap();
+
+    let mut validator = validator_at(NOW + 1).with_authority_store(store);
+    assert_eq!(
+        consume(
+            &mut validator,
+            &token,
+            &invocation,
+            &policy_decision,
+            Some(&approval),
+        ),
+        Err(CapabilityV2Error::Revoked)
+    );
+}
+
+/// The claim that motivated the bundle. A bundle that stops after claiming
+/// the token — here because the approvals directory went away under it — is
+/// retried as the same bundle and completes. Under the old sequential shape
+/// the first attempt had already spent the token on its own, and the retry
+/// was refused as a replay of a request that never succeeded.
+#[test]
+fn a_bundle_interrupted_after_the_token_claim_resumes_on_retry() {
+    let dir = tempfile::tempdir().unwrap();
+    let invocation = prepared("interrupted bundle");
+    let idempotency = Uuid::from_u128(42);
+    let policy_decision = decision(&invocation, AutomationLevel::L3BoundedAuto, idempotency);
+    let approval = approve_at(NOW, &invocation, &policy_decision, 120);
+    let token = issuer_at(NOW)
+        .issue_approved(
+            request_with_ttl(&invocation, &policy_decision, idempotency, 30),
+            &approval,
+        )
+        .unwrap();
+
+    // Open first so the store has its directories, then take the approvals
+    // directory away. The bundle claims the token and binds the idempotency
+    // key before it reaches the approval, and fails there.
+    let store = sovereign_authority::AuthorityStore::open(dir.path()).unwrap();
+    let blocked = BlockedPath::block(dir.path().join("approvals")).unwrap();
+    let mut first = validator_at(NOW + 1).with_authority_store(store);
+    assert_eq!(
+        consume(
+            &mut first,
+            &token,
+            &invocation,
+            &policy_decision,
+            Some(&approval),
+        ),
+        Err(CapabilityV2Error::AuthorityStoreUnavailable)
+    );
+    drop(blocked);
+
+    // A fresh validator over the same store, so nothing process-local can be
+    // what makes the retry succeed.
+    let mut retry = validator_at(NOW + 1)
+        .with_authority_store(sovereign_authority::AuthorityStore::open(dir.path()).unwrap());
+    assert_eq!(
+        consume(
+            &mut retry,
+            &token,
+            &invocation,
+            &policy_decision,
+            Some(&approval),
+        ),
+        Ok(())
     );
 }

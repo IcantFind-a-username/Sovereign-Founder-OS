@@ -1459,6 +1459,7 @@ dependencies = [
  "sovereign-artifact",
  "sovereign-authority",
  "sovereign-contracts",
+ "sovereign-fault-testing",
  "sovereign-identity",
  "sovereign-policy",
  "tempfile",

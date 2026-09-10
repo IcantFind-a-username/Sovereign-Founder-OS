@@ -45,6 +45,38 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `crates/capability/` | Uncommitted authority-bundle refactor in `v2.rs` regresses the approval-reuse gate and leaves a dead mapper.**
+  Diagnosed 2026-09-10 by the stop gate during a planning-only session that
+  made no source edits; the failure belongs to the pre-existing uncommitted
+  working tree on `feature/component-wit-input-abi` (`git diff
+  crates/capability/src/v2.rs`, +79/−18). The diff replaces the three
+  separate `.map_err(map_authority_error_{token,idempotency,approval})` calls
+  with one `map_authority_error_bundle` path (`v2.rs:1126`), which maps
+  `AuthorityError::AlreadyConsumed` → `CapabilityV2Error::Replay` for every
+  claim kind. Two consequences:
+  1. `map_authority_error_approval` (`v2.rs:1152`, the only producer of
+     `ApprovalReused` from the durable store) is now unreferenced, so
+     `cargo clippy -p sovereign-authority -p sovereign-owner -p sovereign-cli
+     --all-targets --features owner-effect-fixture --locked -- -D warnings`
+     fails with `dead_code`.
+  2. `cargo test -p sovereign-capability --test approval_v2 --locked` fails
+     2/12: `durable_approval_survives_token_expiry_purge_until_approval_expiry`
+     (`approval_v2.rs:603`, gets `Replay`, expects `ApprovalReused`) and
+     `expired_approval_purges_at_approval_expiry` (`approval_v2.rs:635`,
+     purge leaves 3 claims, expects 1 — the bundle's claims no longer purge
+     independently at the approval's own expiry).
+  These two tests are the verified deliverable of owner-session plan Task 2
+  (run log 2026-08-26 below) and back THREAT_MODEL.md "Attached Authority
+  Store rejects approval reuse after token expiry/purge". Not fixed in
+  passing because it is a semantics decision, not a typo: either (a) keep the
+  distinction — map approval-claim consumption to `ApprovalReused` inside the
+  bundle path and restore per-claim-kind purge, then delete nothing; or
+  (b) if the bundle deliberately collapses approval reuse into `Replay`,
+  update both tests, delete `map_authority_error_approval`, and reword the
+  THREAT_MODEL.md verification line in the same commit. Done when the clippy
+  command above and `cargo test -p sovereign-capability --locked` are green
+  and `./scripts/test_changed.sh` passes on a stop.
+
 - [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Strengthen the full-chain Goal and context recovery instructions.**
   Extend the canonical MVP Goal with founder-runnable end-to-end acceptance,
   active context reduction, persistent recovery summaries, and continuation
@@ -670,8 +702,14 @@ while the controller routes eligible design/review cards to the strong role.
   durable outcome, and `cargo test -p sovereign-authority` covers each. Test
   names are pinned by Amendment 1 part (e) — use them verbatim.
 
-- [ ] **P1 | `crates/capability/` | Consume through the bundle transaction and surface revocation as a typed rejection.**
-  Blocked on the two `crates/authority` entries above.
+- [x] **P1 | `crates/capability/` | Consume through the bundle transaction and surface revocation as a typed rejection.**
+  Landed 2026-09-10. The approved path calls `consume_bundle`;
+  `CapabilityV2Error::Revoked` is its own variant, and authority gained
+  `ApprovalAlreadyConsumed` so the bundle can say which part was held
+  elsewhere (the public API's `ApprovalReused` promise depends on it). Three
+  regression tests in `crates/capability/tests/approval_v2.rs`, each shown to
+  fail against the sequential shape. The no-approval path is not covered — see
+  the P3 entry below.
   `authorize_and_consume_approved` (v2.rs:602) switches from three sequential
   claims to the bundle API; the in-memory mirrors (v2.rs:530-533) remain only
   as no-store-attached defense and say so; revocation maps to a new typed
@@ -680,6 +718,18 @@ while the controller routes eligible design/review cards to the strong role.
   no longer burns earlier claims through the public capability API, a revoked
   token/approval is rejected through `authorize_and_consume_approved` with
   the typed error, and `cargo test -p sovereign-capability` passes.
+
+- [ ] **P3 | `crates/authority/`, `crates/capability/` | Give the no-approval path a two-part bundle.**
+  `authorize_and_consume_approved` with `approval_claim == None` still makes
+  two sequential claims (token, then idempotency), because the authority
+  store offers the bundle only for the three-part case. An idempotency failure
+  after the token claim burns that token for good — the defect the bundle
+  removed from the approved path. Nothing a person authorised is at stake on
+  this path, which is why it is P3 and not P1. Done when: `consume_bundle`
+  (or a sibling) accepts an absent approval, the `None` arm in
+  `crates/capability/src/v2.rs` uses it, and a regression test mirrors
+  `a_bundle_interrupted_after_the_token_claim_resumes_on_retry` for a token
+  without an approval.
 
 - [x] **P1 | `rfcs/`, `docs/` | Pin the 1C0 mechanism design: admitted owner authenticator, single session, one-use approval issuer.**
   ROADMAP v0.1's largest un-designed block (ROADMAP.md:106, 184-186; exit
