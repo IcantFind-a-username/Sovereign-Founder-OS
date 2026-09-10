@@ -179,6 +179,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # a sentence that is nearly right gets quoted, and later a decision rests
   # on it.
   run_step "owner-effect-documentation" ./scripts/check-owner-effect-documentation.sh
+  # Every registered row, through the checked runner. A row naming a test that
+  # no longer exists fails here rather than rotting, and CI runs the same
+  # command against a clean checkout.
+  run_step "owner-effect-manifest" ./scripts/run-owner-effect-tests.sh --all
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
