@@ -43,3 +43,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "fixture_loopback"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "cross_port_attacks"
+required-features = ["owner-effect-fixture"]
