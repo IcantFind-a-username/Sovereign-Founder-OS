@@ -141,8 +141,42 @@ fn parse(raw: &[u8]) -> Response {
         httparse::Status::Complete(offset) => offset,
         httparse::Status::Partial => panic!("incomplete HTTP response"),
     };
+    // tiny_http switches to chunked transfer for bodies past its threshold
+    // (an export bundle is one), and a chunk-size line is not JSON.
+    let chunked = response.headers.iter().any(|header| {
+        header.name.eq_ignore_ascii_case("transfer-encoding")
+            && std::str::from_utf8(header.value)
+                .map(|value| value.to_ascii_lowercase().contains("chunked"))
+                .unwrap_or(false)
+    });
+    let body = if chunked {
+        dechunk(&raw[body_at..])
+    } else {
+        raw[body_at..].to_vec()
+    };
     Response {
         status: response.code.expect("status code"),
-        body: raw[body_at..].to_vec(),
+        body,
+    }
+}
+
+/// Decode a chunked transfer body: hex size line, that many bytes, CRLF,
+/// repeated until a zero-size chunk.
+fn dechunk(mut raw: &[u8]) -> Vec<u8> {
+    let mut body = Vec::new();
+    loop {
+        let line_end = raw
+            .windows(2)
+            .position(|pair| pair == b"\r\n")
+            .expect("chunk size line");
+        let size_text = std::str::from_utf8(&raw[..line_end]).expect("chunk size is text");
+        let size = usize::from_str_radix(size_text.split(';').next().unwrap_or("").trim(), 16)
+            .expect("chunk size is hex");
+        raw = &raw[line_end + 2..];
+        if size == 0 {
+            return body;
+        }
+        body.extend_from_slice(&raw[..size]);
+        raw = &raw[size + 2..];
     }
 }

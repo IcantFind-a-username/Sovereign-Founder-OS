@@ -152,3 +152,49 @@ fn a_body_over_the_cap_is_refused() {
     let state = response.json();
     assert_eq!(state["ok"], false, "{state}");
 }
+
+/// The export bundle is the one body the app itself asks a person to post
+/// back — "verify a backup file" — and a workspace with a few dozen records
+/// is already past the general cap. Before this test, every real backup was
+/// refused by the very route that exists to check it.
+#[test]
+fn an_export_past_the_general_cap_still_verifies() {
+    let server = UiServer::start();
+    let venture = server
+        .post(
+            "/api/workspace/venture",
+            &json!({ "name": "Cap Test Pte Ltd", "service": "backups" }),
+        )
+        .json();
+    assert_eq!(venture["ok"], true, "{venture}");
+    let notes = "n".repeat(2048);
+    for index in 0..48 {
+        let added = server
+            .post(
+                "/api/workspace/customer",
+                &json!({ "name": format!("Customer {index}"), "email": "", "notes": notes }),
+            )
+            .json();
+        assert_eq!(added["ok"], true, "{added}");
+    }
+
+    let get_headers = vec![
+        ("Host".to_string(), format!("127.0.0.1:{}", server.port())),
+        ("Connection".to_string(), "close".to_string()),
+    ];
+    let bundle = server
+        .exchange("GET", "/api/export", &get_headers, &[])
+        .json();
+    let size = serde_json::to_vec(&bundle).expect("serialize bundle").len();
+    assert!(
+        size > 64 * 1024,
+        "the export is {size} bytes, under the general cap, so this test proves nothing"
+    );
+
+    let verdict = server
+        .post("/api/verify-export", &json!({ "bundle": bundle }))
+        .json();
+    assert_eq!(verdict["ok"], true, "{verdict}");
+    assert_eq!(verdict["report"]["audit_chain_verified"], true, "{verdict}");
+    assert_eq!(verdict["report"]["customers"], 48, "{verdict}");
+}

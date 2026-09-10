@@ -58,6 +58,12 @@ const UI_FAVICON: &str = include_str!("../assets/favicon.svg");
 const JS_TYPE: &str = "application/javascript; charset=utf-8";
 
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
+/// The one body the app itself asks a person to post back is an export
+/// bundle — "verify a backup file" — and a workspace with a handful of
+/// documents and a hundred audit events is already past the general cap.
+/// That route takes a larger body; larger is still bounded, for the same
+/// reason the general cap exists.
+const MAX_VERIFY_EXPORT_BODY_BYTES: usize = 32 * 1024 * 1024;
 
 /// Marker line printed once the server is listening, carrying the address it
 /// actually bound. A supervising process (the desktop shell) reads this from
@@ -205,10 +211,12 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
             Ok(body) => json_response(&workspace_assist(&body, root)),
             Err(error) => bad_request(&error),
         },
-        (Method::Post, "/api/verify-export") => match read_json_body(request) {
-            Ok(body) => json_response(&verify_export_json(&body)),
-            Err(error) => bad_request(&error),
-        },
+        (Method::Post, "/api/verify-export") => {
+            match read_json_body_capped(request, MAX_VERIFY_EXPORT_BODY_BYTES) {
+                Ok(body) => json_response(&verify_export_json(&body)),
+                Err(error) => bad_request(&error),
+            }
+        }
         (Method::Post, path)
             if path.starts_with("/api/workspace/") || path.starts_with("/api/privacy/") =>
         {
@@ -243,6 +251,13 @@ fn host_allowed(request: &tiny_http::Request, port: u16) -> bool {
 /// CSRF defense: cross-origin pages cannot send that content type without a
 /// CORS preflight, which this server never approves.
 fn read_json_body(request: &mut tiny_http::Request) -> Result<serde_json::Value, String> {
+    read_json_body_capped(request, MAX_REQUEST_BODY_BYTES)
+}
+
+fn read_json_body_capped(
+    request: &mut tiny_http::Request,
+    cap: usize,
+) -> Result<serde_json::Value, String> {
     let is_json = request
         .headers()
         .iter()
@@ -259,10 +274,10 @@ fn read_json_body(request: &mut tiny_http::Request) -> Result<serde_json::Value,
         return Err("Content-Type must be application/json".into());
     }
     let mut body = Vec::new();
-    std::io::Read::take(request.as_reader(), (MAX_REQUEST_BODY_BYTES + 1) as u64)
+    std::io::Read::take(request.as_reader(), (cap + 1) as u64)
         .read_to_end(&mut body)
         .map_err(|error| error.to_string())?;
-    if body.len() > MAX_REQUEST_BODY_BYTES {
+    if body.len() > cap {
         return Err("request body too large".into());
     }
     if body.is_empty() {
