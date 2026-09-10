@@ -72,3 +72,20 @@ jobs:
       # a test that no longer exists fails here rather than rotting.
       - name: Registered manifest rows
         run: ./scripts/run-owner-effect-tests.sh --all
+
+      # Its own workspace, so `cargo test --workspace` above cannot see it.
+      # This step is the only thing that builds it, which is exactly the cost
+      # of keeping 94 crates and an OpenSSL binding out of the core lock file.
+      - name: WebAuthn adapter (separate workspace)
+        run: cargo test --manifest-path fixtures/owner-webauthn/Cargo.toml --locked
+
+      # The isolation itself, checked rather than assumed.
+      - name: The core lock file stays clean
+        run: |
+          for crate in webauthn-rs openssl openssl-sys; do
+            if grep -q "^name = \"$crate\"" Cargo.lock; then
+              echo "FAIL  $crate entered the audited core lock file" >&2
+              exit 1
+            fi
+          done
+          echo "ok    no webauthn or openssl in the core lock file"

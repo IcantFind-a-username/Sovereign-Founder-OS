@@ -1,0 +1,32 @@
+# Its own workspace, on purpose.
+#
+# `webauthn-rs` resolves 94 further crates, among them a binding to the system
+# OpenSSL. Those are fine for a fixture and wrong for the audited core: they
+# would enter the workspace lock file, become dependency-review surface on
+# every pull request, and make the build depend on which OpenSSL happens to be
+# installed. The repository has already used this shape once, for
+# `apps/desktop`, and for the same reason — the webview stack never enters the
+# core lock file either.
+#
+# The consequence to know: this crate is not built by `cargo build
+# --workspace`, so its own CI step is what keeps it honest.
+[workspace]
+
+[package]
+name = "sovereign-owner-webauthn"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97.0"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+# Exactly the version RFC 0006's plan froze.
+webauthn-rs = "=0.5.5"
+# The fixture's ceremony logic, which this only feeds.
+sovereign-owner = { path = "../../crates/owner", features = ["owner-effect-fixture"] }
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+serde_json = "1"
