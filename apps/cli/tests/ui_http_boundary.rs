@@ -8,49 +8,7 @@
 mod ui_server;
 
 use serde_json::json;
-use ui_server::UiServer;
-
-/// Drive the shipped flow up to a pending approval and return its id.
-fn pending_approval(server: &UiServer) -> String {
-    let venture = server.post(
-        "/api/workspace/venture",
-        &json!({ "name": "Boundary Co", "service": "Pinning the HTTP surface" }),
-    );
-    assert_eq!(venture.status, 200, "venture: {:?}", venture.json());
-
-    let customer = server.post(
-        "/api/workspace/customer",
-        &json!({ "name": "A Customer", "email": "", "notes": "" }),
-    );
-    let state = customer.json();
-    assert_eq!(state["ok"], true, "customer: {state}");
-    let customer_id = state["workspace"]["customers"][0]["id"]
-        .as_str()
-        .expect("customer id")
-        .to_owned();
-
-    let offer = server.post(
-        "/api/workspace/offer",
-        &json!({ "customer_id": customer_id }),
-    );
-    let state = offer.json();
-    assert_eq!(state["ok"], true, "offer: {state}");
-    let document_id = state["workspace"]["documents"][0]["id"]
-        .as_str()
-        .expect("document id")
-        .to_owned();
-
-    let requested = server.post(
-        "/api/workspace/request-send",
-        &json!({ "document_id": document_id }),
-    );
-    let state = requested.json();
-    assert_eq!(state["ok"], true, "request-send: {state}");
-    state["workspace"]["approvals"][0]["id"]
-        .as_str()
-        .expect("approval id")
-        .to_owned()
-}
+use ui_server::{pending_approval, UiServer};
 
 /// A POST that carries no credential of any kind approves a real send, and
 /// the backend signs it as the owner's decision.
@@ -178,13 +136,7 @@ fn an_export_past_the_general_cap_still_verifies() {
         assert_eq!(added["ok"], true, "{added}");
     }
 
-    let get_headers = vec![
-        ("Host".to_string(), format!("127.0.0.1:{}", server.port())),
-        ("Connection".to_string(), "close".to_string()),
-    ];
-    let bundle = server
-        .exchange("GET", "/api/export", &get_headers, &[])
-        .json();
+    let bundle = server.get("/api/export").json();
     let size = serde_json::to_vec(&bundle).expect("serialize bundle").len();
     assert!(
         size > 64 * 1024,

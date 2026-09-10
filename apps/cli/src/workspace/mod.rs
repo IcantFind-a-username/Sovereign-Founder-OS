@@ -65,6 +65,7 @@ pub use compliance_pack::packs;
 pub use crew_roles::role_cards;
 pub use crew_types::*;
 pub use erp_types::*;
+pub(crate) use kernel_exec::admission_trust;
 pub use model_config::{provider_status, MODEL_CONFIG_FILE};
 pub use privacy_ops::{transforms_json, StoredPreset};
 pub use types::*;
@@ -103,7 +104,7 @@ const BUILTIN_PUBLISHER_SECRET: [u8; 32] = *b"sovereign-builtin-publisher-01!!";
 const BUILTIN_PUBLISHER_ISSUER: &str = "builtin.sovereign-founder-os";
 const RUNTIME_AUTHORITY_ISSUER: &str = "workspace-runtime.local";
 const OWNER_APPROVAL_ISSUER: &str = "founder-owner.local";
-const OWNER_ADMISSION_ISSUER: &str = "founder-device.workspace";
+pub(crate) const OWNER_ADMISSION_ISSUER: &str = "founder-device.workspace";
 const WORKSPACE_AUDIENCE: &str = "sovereign-runtime";
 const APPROVAL_TTL_SECONDS: i64 = 300;
 

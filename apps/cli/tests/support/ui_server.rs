@@ -61,8 +61,21 @@ impl UiServer {
         }
     }
 
+    /// Every test binary compiles this file on its own, so a helper one of
+    /// them does not call is dead code there: this one builds a wrong `Host`
+    /// in the boundary tests and nowhere else.
+    #[allow(dead_code)]
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// A GET with the app's own `Host`, no body, no credential.
+    pub fn get(&self, path: &str) -> Response {
+        let headers = vec![
+            ("Host".to_string(), format!("127.0.0.1:{}", self.port)),
+            ("Connection".to_string(), "close".to_string()),
+        ];
+        self.exchange("GET", path, &headers, &[])
     }
 
     /// A POST the app's own frontend could have sent: correct `Host`, correct
@@ -179,4 +192,46 @@ fn dechunk(mut raw: &[u8]) -> Vec<u8> {
         body.extend_from_slice(&raw[..size]);
         raw = &raw[size + 2..];
     }
+}
+
+/// Drive the shipped flow up to a pending approval and return its id.
+pub fn pending_approval(server: &UiServer) -> String {
+    let venture = server.post(
+        "/api/workspace/venture",
+        &serde_json::json!({ "name": "Boundary Co", "service": "Pinning the HTTP surface" }),
+    );
+    assert_eq!(venture.status, 200, "venture: {:?}", venture.json());
+
+    let customer = server.post(
+        "/api/workspace/customer",
+        &serde_json::json!({ "name": "A Customer", "email": "", "notes": "" }),
+    );
+    let state = customer.json();
+    assert_eq!(state["ok"], true, "customer: {state}");
+    let customer_id = state["workspace"]["customers"][0]["id"]
+        .as_str()
+        .expect("customer id")
+        .to_owned();
+
+    let offer = server.post(
+        "/api/workspace/offer",
+        &serde_json::json!({ "customer_id": customer_id }),
+    );
+    let state = offer.json();
+    assert_eq!(state["ok"], true, "offer: {state}");
+    let document_id = state["workspace"]["documents"][0]["id"]
+        .as_str()
+        .expect("document id")
+        .to_owned();
+
+    let requested = server.post(
+        "/api/workspace/request-send",
+        &serde_json::json!({ "document_id": document_id }),
+    );
+    let state = requested.json();
+    assert_eq!(state["ok"], true, "request-send: {state}");
+    state["workspace"]["approvals"][0]["id"]
+        .as_str()
+        .expect("approval id")
+        .to_owned()
 }

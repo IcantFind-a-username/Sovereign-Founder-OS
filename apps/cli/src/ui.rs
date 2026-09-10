@@ -602,16 +602,17 @@ fn integrity_json(root: &Path) -> serde_json::Value {
     }
 }
 
-/// List admission records from the on-disk store, verifying each record
-/// against the demo admission trust anchor. A record that fails verification
-/// is still listed — flagged unverified — because showing a tampered record
-/// as "absent" would hide evidence from the owner.
+/// List admission records from the on-disk store, verifying each against
+/// the keys that sign them: the owner's admission key for what the send path
+/// admitted, the demo key for what `sovereign demo` admitted. A record that
+/// fails both is still listed — flagged unverified — because showing a
+/// tampered record as "absent" would hide evidence from the owner.
 fn admitted_plugins_json(root: &Path) -> Vec<serde_json::Value> {
     let admissions_dir = root.join("artifacts").join("admissions");
     let Ok(entries) = std::fs::read_dir(&admissions_dir) else {
         return Vec::new();
     };
-    let trust = demo_admission_trust();
+    let trust = workspace::admission_trust(root);
     let now_unix = chrono::Utc::now().timestamp();
 
     let mut plugins = Vec::new();
@@ -632,12 +633,13 @@ fn admitted_plugins_json(root: &Path) -> Vec<serde_json::Value> {
         let Some(record) = record else {
             continue;
         };
-        match trust
-            .verify(&record, demo::ADMISSION_ISSUER, now_unix)
-            .ok()
+        let verified = [workspace::OWNER_ADMISSION_ISSUER, demo::ADMISSION_ISSUER]
+            .iter()
+            .find_map(|issuer| trust.verify(&record, issuer, now_unix).ok())
             .and_then(|verified| {
                 serde_json::from_slice::<AdmissionRecordClaimsV1>(verified.payload()).ok()
-            }) {
+            });
+        match verified {
             Some(claims) => plugins.push(serde_json::json!({
                 "verified": true,
                 "admission_id": claims.admission_id,
@@ -652,25 +654,11 @@ fn admitted_plugins_json(root: &Path) -> Vec<serde_json::Value> {
             None => plugins.push(serde_json::json!({
                 "verified": false,
                 "manifest_digest": &name[..12],
-                "error": "admission record failed verification against the demo trust anchor",
+                "error": "admission record failed verification against the owner and demo admission anchors",
             })),
         }
     }
     plugins
-}
-
-fn demo_admission_trust() -> RoleTrustStore<AdmissionRole> {
-    let now_unix = chrono::Utc::now().timestamp();
-    let mut trust = RoleTrustStore::<AdmissionRole>::new();
-    if let Ok(signer) = TypedSigner::<AdmissionRole>::from_secret_bytes(
-        demo::ADMISSION_ISSUER,
-        demo::DEMO_ADMISSION_SECRET,
-    ) {
-        if let Ok(validity) = KeyValidity::new(now_unix - 60, now_unix + 3_600) {
-            let _ = trust.trust_signer(&signer, validity);
-        }
-    }
-    trust
 }
 
 // ---------------------------------------------------------------------------
