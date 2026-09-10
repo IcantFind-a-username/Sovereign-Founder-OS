@@ -138,7 +138,13 @@ while the controller routes eligible design/review cards to the strong role.
   Definition and done criteria: [S0-00](handoff/codex/README.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex` IN PROGRESS (2026-09-09)
+> **`lane:codex` is dormant (2026-09-10).** Codex has no quota, `scripts/codex-control/` was
+> never created, and `.codex/` holds only `agents` and `config.toml`. The S0 cards are the
+> control scaffold for that tool and nothing else depends on them. Downgraded from P1 to P3 and
+> kept intact rather than deleted: if the lane resumes, the cards are here. While it is dormant
+> they must not sit at P1, where they made the priority list mean nothing.
+
+- [ ] **P3 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex` IN PROGRESS (2026-09-09)
   Definition and done criteria: [S0-01](handoff/codex/cards/S0-01.md).
   Complete only when the linked card's checks and independent acceptance pass.
   Attempt 1 smoke report: [S0-01 attempt 1](handoff/codex/reports/S0-01-attempt-1.md).
@@ -181,31 +187,31 @@ while the controller routes eligible design/review cards to the strong role.
   unknown. Stop on another binding mismatch. Keep W/R separation and independent
   review; do not reset S0-01/Luna failures or extend product authority.
 
-- [ ] **P1 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
+- [ ] **P3 | `scripts/codex-control/` | S0-02 — Validate event transitions.** `lane:codex`
   Definition and done criteria: [S0-02](handoff/codex/cards/S0-02.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `scripts/codex-control/` | S0-03 — Bind Git candidates to real check evidence.** `lane:codex`
+- [ ] **P3 | `scripts/codex-control/` | S0-03 — Bind Git candidates to real check evidence.** `lane:codex`
   Definition and done criteria: [S0-03](handoff/codex/cards/S0-03.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `scripts/codex-control/` | S0-04 — Enforce one controller and bounded recovery.** `lane:codex`
+- [ ] **P3 | `scripts/codex-control/` | S0-04 — Enforce one controller and bounded recovery.** `lane:codex`
   Definition and done criteria: [S0-04](handoff/codex/cards/S0-04.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `scripts/codex-control/` | S0-05A — Expose one controller CLI entry.** `lane:codex`
+- [ ] **P3 | `scripts/codex-control/` | S0-05A — Expose one controller CLI entry.** `lane:codex`
   Definition and done criteria: [S0-05A](handoff/codex/cards/S0-05A.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `scripts/codex-control/` | S0-05 — Rehearse escalation recovery and real handoff.** `lane:codex`
+- [ ] **P3 | `scripts/codex-control/` | S0-05 — Rehearse escalation recovery and real handoff.** `lane:codex`
   Definition and done criteria: [S0-05](handoff/codex/cards/S0-05.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `docs/handoff/codex/` | S0-06 — Accept the scaffold and nominate the next product card.** `lane:codex` `needs:fable`
+- [ ] **P3 | `docs/handoff/codex/` | S0-06 — Accept the scaffold and nominate the next product card.** `lane:codex` `needs:fable`
   Definition and done criteria: [S0-06](handoff/codex/cards/S0-06.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** `lane:codex` IN PROGRESS (first action slice accepted; later interfaces deferred)
+- [x] **P1 | `docs/handoff/codex/` | S1-00 — Freeze Playground interfaces and stage-gate migrations.** Closed 2026-09-10 as superseded: the backlog's own Ollama entry calls this "the superseded playground plan", and the founder MVP (`docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md`) replaced the playground as the product surface. `lane:codex` IN PROGRESS (first action slice accepted; later interfaces deferred)
   Definition and done criteria: [S1-00](handoff/codex/cards/S1-00.md).
   Complete only when the linked card's checks and independent acceptance pass.
 
@@ -440,7 +446,7 @@ while the controller routes eligible design/review cards to the strong role.
   Next S2-00 design; fixed S1 does not complete fullMVP.
   Complete only when the linked card's checks and independent acceptance pass.
 
-- [ ] **P1 | `docs/handoff/codex/` | S2-00 — Design the full synthetic business demo boundary.** `lane:codex` claimed; Astra architect.
+- [x] **P1 | `docs/handoff/codex/` | S2-00 — Design the full synthetic business demo boundary.** Closed 2026-09-10 as superseded by the founder MVP design record. The card asked for more than the MVP shipped; the unmet part is carried below as a P2 rather than left inside a dormant lane. `lane:codex` claimed; Astra architect.
   Definition and done criteria: [S2-00](handoff/codex/cards/S2-00.md).
   Revision1 blob9a14ba3d45295db32fa16bf1bc66ea16232176f1;
   base ac4e09d759c5f1beebd8e3837d06ddd50d98fb59; design attempt1, no implementation failures.
@@ -448,13 +454,13 @@ while the controller routes eligible design/review cards to the strong role.
   A1/A2 design independently admitted at c89f7c9; later design remains pending.
   Architect stopped after repair1; continue visible A1 implementation first.
 
-- [ ] **P1 | `apps/cli/` | S2-01A1 — Run editable company and service forms.** `lane:codex` claimed; Astra fallback after two Luna failures.
+- [x] **P1 | `apps/cli/` | S2-01A1 — Run editable company and service forms.** Closed 2026-09-10 as delivered elsewhere: the MVP's Company page and `/api/workspace/venture` + `/api/workspace/profile` are editable company and service forms. The Codex candidates that failed twice are moot. `lane:codex` claimed; Astra fallback after two Luna failures.
   [Frozen card](handoff/codex/cards/S2-01A1.md), revision3; design admitted at c89f7c9.
   Original source base c89f7c908c154cdef3b929beec475ee46dc886e8; two substantive failures.
   Both raw candidates preserved; no third Luna retry; fallback repairs frozen A1.
   [Claim and exact ownership](handoff/codex/reports/S2-01A1-supervised.md).
 
-- [ ] **P1 | `apps/cli/` | S2-01A2 — Add editable lead and discovery.** `lane:codex` ready design, awaiting A1 implementation acceptance.
+- [x] **P1 | `apps/cli/` | S2-01A2 — Add editable lead and discovery.** Closed 2026-09-10 as delivered elsewhere: the MVP's customer stages, `customer/update`, and discovery notes are editable lead and discovery. `lane:codex` ready design, awaiting A1 implementation acceptance.
   [Frozen card](handoff/codex/cards/S2-01A2.md), revision3; not yet claimed.
 
 - [ ] **P2 | `rfcs/, docs/handoff/codex/` | S3-00 — Freeze synthetic employee execution contracts.** `lane:codex` `needs:fable`
@@ -1438,6 +1444,14 @@ Founder MVP — Consultant Core v1, built by the orchestrator session on
 2026-09-10 (design record:
 `docs/superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md`).
 Entries here follow the queue rules above; `lane:codex` does not apply.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | Proposal revision and review: an accepted offer binds a proposal version, and a scope change requires a revised reference.**
+  Carried out of the closed S2-00 card (2026-09-10). Today an AI employee's proposal is
+  applied or rejected as one change; there is no revision history on a proposal and no
+  way to bind an engagement to the exact version that was accepted, so a later edit
+  silently changes what the customer agreed to. Done when: a proposal carries a version,
+  acceptance records which version, a change after acceptance produces a new version
+  that must be reviewed again, and the timeline shows all of it.
 
 - [x] **P1 | `apps/cli/src/workspace/` | Business graph: stages, discovery, editing, projects, tasks, follow-ups, payments, receivables, timeline (workspace v2).** Landed 2026-09-10 (`erp_types.rs`, `erp_ops.rs`, `erp_tests.rs`).
 - [x] **P1 | `crates/model/`, `apps/cli/src/workspace/` | Experimental loopback Ollama provider and per-device `model.json`.** Landed 2026-09-10.
