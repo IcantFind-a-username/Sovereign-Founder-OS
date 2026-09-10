@@ -345,6 +345,44 @@ impl Store {
     }
 }
 
+/// Every key that may have signed an admission record on this installation:
+/// the owner's admission key, minted into the vault the first time a
+/// document is sent (`owner_secret` above), and the demo command's fixed key
+/// for records `sovereign demo` wrote. A reader verifies against
+/// `OWNER_ADMISSION_ISSUER` first and `demo::ADMISSION_ISSUER` second.
+///
+/// Read-only on purpose. A page that lists records must not mint the key
+/// that signs them, so a vault that does not exist yet contributes no owner
+/// anchor rather than being created here.
+pub(crate) fn admission_trust(root: &std::path::Path) -> RoleTrustStore<AdmissionRole> {
+    let now_unix = now();
+    let mut trust = RoleTrustStore::<AdmissionRole>::new();
+    let Ok(validity) = KeyValidity::new(now_unix - 60, now_unix + 3_600) else {
+        return trust;
+    };
+    let vault_root = root.join("vault");
+    if vault_root.join("vault.key").exists() {
+        let owner_secret = Vault::init(&vault_root)
+            .and_then(|vault| vault.get("owner_admission_key"))
+            .ok()
+            .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok());
+        if let Some(secret) = owner_secret {
+            if let Ok(signer) =
+                TypedSigner::<AdmissionRole>::from_secret_bytes(OWNER_ADMISSION_ISSUER, secret)
+            {
+                let _ = trust.trust_signer(&signer, validity);
+            }
+        }
+    }
+    if let Ok(signer) = TypedSigner::<AdmissionRole>::from_secret_bytes(
+        crate::demo::ADMISSION_ISSUER,
+        crate::demo::DEMO_ADMISSION_SECRET,
+    ) {
+        let _ = trust.trust_signer(&signer, validity);
+    }
+    trust
+}
+
 /// Stage 2 — exactness: bind this document's canonical input and resource
 /// grant into a prepared invocation of the admitted tool.
 fn prepare_delivery_invocation(

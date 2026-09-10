@@ -58,6 +58,12 @@ const UI_FAVICON: &str = include_str!("../assets/favicon.svg");
 const JS_TYPE: &str = "application/javascript; charset=utf-8";
 
 const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
+/// The one body the app itself asks a person to post back is an export
+/// bundle — "verify a backup file" — and a workspace with a handful of
+/// documents and a hundred audit events is already past the general cap.
+/// That route takes a larger body; larger is still bounded, for the same
+/// reason the general cap exists.
+const MAX_VERIFY_EXPORT_BODY_BYTES: usize = 32 * 1024 * 1024;
 
 /// Marker line printed once the server is listening, carrying the address it
 /// actually bound. A supervising process (the desktop shell) reads this from
@@ -205,10 +211,12 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
             Ok(body) => json_response(&workspace_assist(&body, root)),
             Err(error) => bad_request(&error),
         },
-        (Method::Post, "/api/verify-export") => match read_json_body(request) {
-            Ok(body) => json_response(&verify_export_json(&body)),
-            Err(error) => bad_request(&error),
-        },
+        (Method::Post, "/api/verify-export") => {
+            match read_json_body_capped(request, MAX_VERIFY_EXPORT_BODY_BYTES) {
+                Ok(body) => json_response(&verify_export_json(&body)),
+                Err(error) => bad_request(&error),
+            }
+        }
         (Method::Post, path)
             if path.starts_with("/api/workspace/") || path.starts_with("/api/privacy/") =>
         {
@@ -243,6 +251,13 @@ fn host_allowed(request: &tiny_http::Request, port: u16) -> bool {
 /// CSRF defense: cross-origin pages cannot send that content type without a
 /// CORS preflight, which this server never approves.
 fn read_json_body(request: &mut tiny_http::Request) -> Result<serde_json::Value, String> {
+    read_json_body_capped(request, MAX_REQUEST_BODY_BYTES)
+}
+
+fn read_json_body_capped(
+    request: &mut tiny_http::Request,
+    cap: usize,
+) -> Result<serde_json::Value, String> {
     let is_json = request
         .headers()
         .iter()
@@ -259,10 +274,10 @@ fn read_json_body(request: &mut tiny_http::Request) -> Result<serde_json::Value,
         return Err("Content-Type must be application/json".into());
     }
     let mut body = Vec::new();
-    std::io::Read::take(request.as_reader(), (MAX_REQUEST_BODY_BYTES + 1) as u64)
+    std::io::Read::take(request.as_reader(), (cap + 1) as u64)
         .read_to_end(&mut body)
         .map_err(|error| error.to_string())?;
-    if body.len() > MAX_REQUEST_BODY_BYTES {
+    if body.len() > cap {
         return Err("request body too large".into());
     }
     if body.is_empty() {
@@ -587,16 +602,17 @@ fn integrity_json(root: &Path) -> serde_json::Value {
     }
 }
 
-/// List admission records from the on-disk store, verifying each record
-/// against the demo admission trust anchor. A record that fails verification
-/// is still listed — flagged unverified — because showing a tampered record
-/// as "absent" would hide evidence from the owner.
+/// List admission records from the on-disk store, verifying each against
+/// the keys that sign them: the owner's admission key for what the send path
+/// admitted, the demo key for what `sovereign demo` admitted. A record that
+/// fails both is still listed — flagged unverified — because showing a
+/// tampered record as "absent" would hide evidence from the owner.
 fn admitted_plugins_json(root: &Path) -> Vec<serde_json::Value> {
     let admissions_dir = root.join("artifacts").join("admissions");
     let Ok(entries) = std::fs::read_dir(&admissions_dir) else {
         return Vec::new();
     };
-    let trust = demo_admission_trust();
+    let trust = workspace::admission_trust(root);
     let now_unix = chrono::Utc::now().timestamp();
 
     let mut plugins = Vec::new();
@@ -617,12 +633,13 @@ fn admitted_plugins_json(root: &Path) -> Vec<serde_json::Value> {
         let Some(record) = record else {
             continue;
         };
-        match trust
-            .verify(&record, demo::ADMISSION_ISSUER, now_unix)
-            .ok()
+        let verified = [workspace::OWNER_ADMISSION_ISSUER, demo::ADMISSION_ISSUER]
+            .iter()
+            .find_map(|issuer| trust.verify(&record, issuer, now_unix).ok())
             .and_then(|verified| {
                 serde_json::from_slice::<AdmissionRecordClaimsV1>(verified.payload()).ok()
-            }) {
+            });
+        match verified {
             Some(claims) => plugins.push(serde_json::json!({
                 "verified": true,
                 "admission_id": claims.admission_id,
@@ -637,25 +654,11 @@ fn admitted_plugins_json(root: &Path) -> Vec<serde_json::Value> {
             None => plugins.push(serde_json::json!({
                 "verified": false,
                 "manifest_digest": &name[..12],
-                "error": "admission record failed verification against the demo trust anchor",
+                "error": "admission record failed verification against the owner and demo admission anchors",
             })),
         }
     }
     plugins
-}
-
-fn demo_admission_trust() -> RoleTrustStore<AdmissionRole> {
-    let now_unix = chrono::Utc::now().timestamp();
-    let mut trust = RoleTrustStore::<AdmissionRole>::new();
-    if let Ok(signer) = TypedSigner::<AdmissionRole>::from_secret_bytes(
-        demo::ADMISSION_ISSUER,
-        demo::DEMO_ADMISSION_SECRET,
-    ) {
-        if let Ok(validity) = KeyValidity::new(now_unix - 60, now_unix + 3_600) {
-            let _ = trust.trust_signer(&signer, validity);
-        }
-    }
-    trust
 }
 
 // ---------------------------------------------------------------------------
