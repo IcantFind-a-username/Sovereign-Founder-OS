@@ -84,3 +84,7 @@ required-features = ["owner-effect-fixture"]
 [[test]]
 name = "reservation_atomicity"
 required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "exact_dispatch"
+required-features = ["owner-effect-fixture"]

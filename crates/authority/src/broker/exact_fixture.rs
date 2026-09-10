@@ -66,11 +66,6 @@ impl std::fmt::Debug for EffectIntentId {
 /// message.
 pub struct ProtectedFixturePayload {
     intent_id: EffectIntentId,
-    // Read only by `sealed_bytes`, whose sole non-test caller will be the
-    // dispatcher in Task 11. Allowed for the non-test build until then, and
-    // narrowly: the allow names the field rather than the module, so the next
-    // unused thing here still fails.
-    #[cfg_attr(not(test), allow(dead_code))]
     bytes: Vec<u8>,
 }
 
@@ -143,11 +138,7 @@ impl ProtectedFixturePayload {
     /// leaves the type, and it does so only inside the crate that composed
     /// it.
     ///
-    /// It has no non-test caller yet — the dispatcher that will read it is
-    /// Task 11. The allow below is scoped to that fact and comes off when the
-    /// dispatcher lands; making the method `pub` to satisfy the lint would
-    /// have traded a warning for the property the type exists to have.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// Its one caller is the dispatcher, in this crate.
     pub(crate) fn sealed_bytes(&self) -> &[u8] {
         &self.bytes
     }
