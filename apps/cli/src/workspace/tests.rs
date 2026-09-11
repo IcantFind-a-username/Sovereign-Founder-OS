@@ -786,6 +786,125 @@ fn command_center_guidance_reports_pending_and_all_clear() {
     assert_eq!(kinds, vec!["all_clear"]);
 }
 
+/// One hand-edited-vault scenario: the record forged into state, the signed
+/// event whose absence must be reported, and how to forge it.
+struct ForgedRecord {
+    what: &'static str,
+    missing_event: &'static str,
+    forge: fn(&mut Workspace),
+}
+
+/// The three kinds of record the MVP added after the self-audit was written:
+/// an approved decision, a payment, and a compliance report. Each is state
+/// that either records money, changes the founder's records on an employee's
+/// say-so, or makes a compliance claim — so each must have signed evidence,
+/// and a vault edited to add one without its event must fail closed.
+#[test]
+fn integrity_check_covers_decisions_payments_and_compliance_reports() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Landing pages").unwrap();
+    let workspace = store.add_customer("Dr. Tan", "", "expo").unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+        .unwrap();
+    let invoice_id = workspace.documents[0].id;
+    let workspace = store.request_send(invoice_id).unwrap();
+    store.decide(workspace.approvals[0].id, true).unwrap();
+    store
+        .record_payment(invoice_id, 250_000, 1_700_000_000, "bank transfer")
+        .unwrap();
+    let workspace = store.hire_employee(RoleId::Analyst, "Analyst").unwrap();
+    let employee_id = workspace.employees[0].id;
+    let decision = store
+        .run_employee(
+            employee_id,
+            RunSubject {
+                customer_id: Some(customer_id),
+                document_id: None,
+                project_id: None,
+            },
+            "en",
+        )
+        .unwrap();
+    store.decide_proposal(decision.id, true).unwrap();
+    store
+        .run_compliance_check(ComplianceSubject { document_id: None }, "en")
+        .unwrap();
+
+    // Built only through the audited API, all three reconcile.
+    let clean_state = store.load().unwrap();
+    let clean = store.integrity_check().unwrap();
+    assert!(clean.ok, "{:?}", clean.findings);
+    assert!(clean.findings.is_empty(), "{:?}", clean.findings);
+
+    // Each tamper is the shape a hand-edited vault produces: a record that
+    // exists in state with nothing signed behind it.
+    let cases = [
+        ForgedRecord {
+            what: "an approved decision",
+            missing_event: "decision.approved",
+            forge: |workspace| {
+                let mut forged = workspace.decisions[0].clone();
+                forged.id = Uuid::new_v4();
+                forged.title = "Forged decision".into();
+                forged.status = DecisionStatus::Approved;
+                workspace.decisions.push(forged);
+            },
+        },
+        ForgedRecord {
+            what: "a second payment",
+            missing_event: "payment.record",
+            forge: |workspace| {
+                let mut forged = workspace.payments[0].clone();
+                forged.id = Uuid::new_v4();
+                workspace.payments.push(forged);
+            },
+        },
+        ForgedRecord {
+            what: "a second compliance report",
+            missing_event: "compliance.checked",
+            forge: |workspace| {
+                let mut forged = workspace.compliance_reports[0].clone();
+                forged.id = Uuid::new_v4();
+                workspace.compliance_reports.push(forged);
+            },
+        },
+    ];
+
+    for ForgedRecord {
+        what,
+        missing_event: event_name,
+        forge,
+    } in cases
+    {
+        let mut tampered = clean_state.clone();
+        forge(&mut tampered);
+        store.save(&tampered).unwrap();
+
+        let report = store.integrity_check().unwrap();
+        assert!(!report.ok, "{what} passed the self-audit");
+        assert!(
+            report.chain_verified,
+            "{what}: the chain itself is untouched"
+        );
+        assert!(
+            report.findings.iter().any(
+                |finding| finding.severity == "critical" && finding.detail.contains(event_name)
+            ),
+            "{what}: expected a finding naming {event_name}, got {:?}",
+            report.findings
+        );
+
+        // Back to clean, so each case is judged on its own.
+        store.save(&clean_state).unwrap();
+        assert!(
+            store.integrity_check().unwrap().ok,
+            "{what}: restore failed"
+        );
+    }
+}
+
 #[test]
 fn verify_export_accepts_genuine_bundle_and_rejects_tampering() {
     let (_dir, store) = store();

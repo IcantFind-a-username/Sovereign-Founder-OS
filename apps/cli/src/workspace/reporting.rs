@@ -2,6 +2,7 @@ use super::erp_ops::receivable_rows;
 use super::types::document_status_label;
 use super::util::{now, storage};
 use super::*;
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use sovereign_audit_ledger::AuditLedger;
@@ -252,6 +253,82 @@ impl Store {
             }
         }
 
+        // Counting, not existence, for the two kinds whose signed event names
+        // a subject rather than the record itself: two payments against one
+        // invoice share the invoice as their resource, and so do two
+        // compliance checks of the same subject. Asking only whether *an*
+        // event exists would let the second one hide behind the first one's
+        // evidence.
+        let count = |action: &str, resource: &str| {
+            events
+                .iter()
+                .filter(|event| event.action == action && event.resource == resource)
+                .count()
+        };
+
+        // An approved decision is how an AI employee's proposal becomes a
+        // change to the founder's own records. One sitting in state with
+        // nothing signed behind it is a change nobody agreed to.
+        for decision in &workspace.decisions {
+            if decision.status != DecisionStatus::Approved {
+                continue;
+            }
+            let resource = format!("decision:{}", decision.id);
+            if !has("decision.approved", &resource) {
+                findings.push(IntegrityFinding {
+                    severity: "critical",
+                    resource,
+                    detail: format!(
+                        "decision \"{}\" is approved with no signed decision.approved event",
+                        decision.title
+                    ),
+                });
+            }
+        }
+
+        let mut payments_per_invoice: BTreeMap<Uuid, usize> = BTreeMap::new();
+        for payment in &workspace.payments {
+            *payments_per_invoice.entry(payment.invoice_id).or_default() += 1;
+        }
+        for (invoice_id, recorded) in payments_per_invoice {
+            let resource = format!("document:{invoice_id}");
+            let signed = count("payment.record", &resource);
+            if signed < recorded {
+                findings.push(IntegrityFinding {
+                    severity: "critical",
+                    resource,
+                    detail: format!(
+                        "{recorded} payment(s) are recorded against this invoice with only \
+                         {signed} signed payment.record event(s)"
+                    ),
+                });
+            }
+        }
+
+        // Compliance reports, per subject, and one-way on purpose: the store
+        // drops the oldest report once it holds `MAX_COMPLIANCE_REPORTS`
+        // while its event stays on the chain, so more events than reports is
+        // history rather than a fault. Fewer is missing evidence.
+        let mut reports_per_subject: BTreeMap<String, usize> = BTreeMap::new();
+        for report in &workspace.compliance_reports {
+            *reports_per_subject
+                .entry(compliance_resource(&report.subject))
+                .or_default() += 1;
+        }
+        for (resource, stored) in reports_per_subject {
+            let signed = count("compliance.checked", &resource);
+            if signed < stored {
+                findings.push(IntegrityFinding {
+                    severity: "critical",
+                    resource,
+                    detail: format!(
+                        "{stored} compliance report(s) are stored for this subject with only \
+                         {signed} signed compliance.checked event(s)"
+                    ),
+                });
+            }
+        }
+
         // The reverse direction: signed events whose state never landed.
         // Commits are audit-first — every event of an operation in one chain
         // write, then the state write — so only the *tail* of the chain can
@@ -289,6 +366,33 @@ impl Store {
                         ),
                         "effect.revoked" => document_status != Some(DocumentStatus::Revoked),
                         "delivery.confirmed" => document_status != Some(DocumentStatus::Delivered),
+                        "decision.approved" => subject_id.is_some_and(|id| {
+                            !workspace.decisions.iter().any(|decision| {
+                                decision.id == id && decision.status == DecisionStatus::Approved
+                            })
+                        }),
+                        "payment.record" => subject_id.is_some_and(|id| {
+                            workspace
+                                .payments
+                                .iter()
+                                .filter(|payment| payment.invoice_id == id)
+                                .count()
+                                < count("payment.record", &event.resource)
+                        }),
+                        // Only meaningful below the trim cap: at the cap the
+                        // two counts diverge for a legitimate reason and this
+                        // would misfire on every check from then on.
+                        "compliance.checked" => {
+                            workspace.compliance_reports.len() < MAX_COMPLIANCE_REPORTS
+                                && workspace
+                                    .compliance_reports
+                                    .iter()
+                                    .filter(|report| {
+                                        compliance_resource(&report.subject) == event.resource
+                                    })
+                                    .count()
+                                    < count("compliance.checked", &event.resource)
+                        }
                         _ => false,
                     }
                 });
@@ -459,4 +563,15 @@ fn format_money(cents: u64) -> String {
         grouped.push(ch);
     }
     format!("{grouped}.{:02}", cents % 100)
+}
+
+/// A compliance report records its subject as `venture` or `document:<id>`;
+/// the signed event names the same subject as `venture:profile` or
+/// `document:<id>`. One function, so the two readings cannot drift apart.
+fn compliance_resource(subject: &str) -> String {
+    if subject == "venture" {
+        "venture:profile".to_owned()
+    } else {
+        subject.to_owned()
+    }
 }
