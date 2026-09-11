@@ -126,7 +126,7 @@ exclusive rights over abstract ideas.
 
 | Layer | Technology | State |
 | --- | --- | --- |
-| Sovereign Runtime | Rust (16 crates, one workspace) | Shipped |
+| Sovereign Runtime | Rust (18 crates, one workspace) | Shipped |
 | Local UI | Dependency-free JavaScript, JSDoc types checked with `tsc --checkJs`, no build step | Shipped |
 | Desktop shell | Tauri v2 (macOS), its own workspace so the webview stack stays out of the audited lock file | Shipped, ad-hoc signed |
 | Sandbox | Wasmtime — core Wasm, plus one zero-import WIT world | Experimental |
@@ -288,11 +288,13 @@ Important current limitations:
   Component/WIT plugin boundary with host interfaces remains a target; Secure
   Mesh remains Research.
 
-The Rust workspace contains sixteen crates covering contracts, identity,
+The Rust workspace contains eighteen crates covering contracts, identity,
 artifacts, policy, capabilities, authority, execution, effects, vault, audit,
 sandboxing, models, the data-sovereignty boundary, workflows, the consultant
-playground, and the vault-v2 engine skeleton; `cargo test --workspace` runs 494
-tests across 60 test binaries. The detailed maturity and
+playground, the vault-v2 engine skeleton, the RFC 0006 fixture owner ceremony,
+and shared fault injection — the last three unpublished, and the fixture owner
+crate empty in a default build; `cargo test --workspace` runs 538 tests across
+49 test binaries. The detailed maturity and
 release gates live in [ROADMAP.md](ROADMAP.md); sandbox protocol boundaries are
 in [RFC 0002](rfcs/0002-wasm-sandbox-and-plugin-capabilities.md).
 

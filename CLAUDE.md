@@ -12,13 +12,17 @@ Developer Preview maturity.
 
 ## Repo map
 
-- `crates/` — 16 workspace crates, package name = `sovereign-<dir>`:
+- `crates/` — 18 workspace crates, package name = `sovereign-<dir>`:
   `contracts` (canonical signed types), `policy`, `capability`, `authority`,
   `identity`, `vault`, `audit-ledger`, `sandbox` (wasmtime), `model`
   (gateway), `privacy` (RFC 0004 data-sovereignty boundary — the only way to
   build a public-compute job), `effects`, `execution`, `artifact`, `workflow`,
   `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
-  `publish = false`, no product path yet).
+  `publish = false`, no product path yet), `owner` (RFC 0006 fixture owner
+  ceremony — `publish = false`, every type behind the non-default
+  `owner-effect-fixture` feature so a default build contains nothing and there
+  is no product path to find), `fault-testing` (shared fault injection;
+  dev-dependency only, no shipping crate may depend on it).
 - `apps/desktop` — Tauri desktop shell, **its own workspace on purpose** so
   the webview stack never enters the audited core lock file or CI's
   `--workspace` runs. Build with `./apps/desktop/build-bundle.sh`.
@@ -41,7 +45,7 @@ Green on macOS 26.5 arm64 as well, as of 2026-08-15.
 
 ```bash
 ./scripts/test_changed.sh        # scoped gate: run this one during iteration
-cargo test --workspace --locked  # full suite (494 tests, 60 binaries, 2026-09-09)
+cargo test --workspace --locked  # full suite (538 tests, 49 binaries, 2026-09-11)
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo fmt --all --check
 ./scripts/check-file-size.sh     # god-file limit: 1200 rs / 800 frontend
