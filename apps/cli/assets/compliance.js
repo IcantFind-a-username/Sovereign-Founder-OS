@@ -59,7 +59,7 @@ function renderReport(report) {
     }
     row.appendChild(meta);
     row.appendChild(el("div", "status-line", t("cp_escalation") + ": " + f.escalation));
-    row.appendChild(el("div", "status-line", t("cp_facts") + ": " + f.facts_used.join(", ")));
+    row.appendChild(el("div", "status-line", t("cp_facts") + ": " + f.facts_used.map(k => t("fact_label")(k)).join(", ")));
     children.push(row);
   });
   box.replaceChildren(...children);
@@ -82,7 +82,8 @@ function renderCompliance() {
   const reports = (ws.compliance_reports || []).slice().reverse();
   renderReport(reports[0] || null);
   const history = $("cp-history");
-  if (reports.length <= 1) { history.replaceChildren(el("div", "empty", t("cp_no_reports"))); return; }
+  // The newest report is shown above; this list is everything before it.
+  if (reports.length <= 1) { history.replaceChildren(el("div", "empty", t(reports.length ? "cp_no_earlier" : "cp_no_reports"))); return; }
   history.replaceChildren(...reports.slice(1).map(r => {
     const row = renderReportSummary(r);
     const open = el("button", "ghost small", t("cu_open"));
@@ -93,7 +94,7 @@ function renderCompliance() {
 }
 
 async function runCheck(documentId) {
-  $("cp-status").textContent = "…";
+  $("cp-status").textContent = t("cp_running");
   const result = await api("/api/workspace/compliance/check", { document_id: documentId || null });
   $("cp-status").textContent = "";
   if (!result.ok) { toast("bad", result.error); return; }

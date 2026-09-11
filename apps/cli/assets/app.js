@@ -23,7 +23,8 @@ if (!VIEWS.includes(view)) view = "command";
 let lastState = null;
 let lastGauntlet = null;
 let lastCommand = null;
-let modelStatus = null;
+/** `undefined` until the first answer; `null` when asking failed. */
+let modelStatus = undefined;
 /** @type {Workspace|null} */
 let ws = null;
 
@@ -68,6 +69,7 @@ function table(headers, rows) {
     const tr = el("tr");
     cells.forEach(cell => {
       if (cell instanceof Node) { const td = el("td"); td.appendChild(cell); tr.appendChild(td); }
+      else if (cell && cell.num) tr.appendChild(el("td", "num", cell.num));
       else { tr.appendChild(el("td", cell && cell.mono ? "mono" : null, cell && cell.mono ? cell.mono : cell)); }
     });
     tbody.appendChild(tr);
@@ -160,7 +162,15 @@ async function loadModelStatus() {
 
 function renderModelStatus() {
   const line = $("model-status");
-  const real = modelStatus && modelStatus.ok && modelStatus.providers.find(p => p.real_model);
+  // "Could not ask" is not "nothing configured": saying the second when the
+  // first happened sends the founder to fix a config that is fine.
+  if (modelStatus === undefined) { line.replaceChildren(); return; }
+  if (!modelStatus || !modelStatus.ok) {
+    line.replaceChildren(badge("warn", t("model_status_unknown")));
+    line.title = t("model_status_unknown_hint");
+    return;
+  }
+  const real = modelStatus.providers.find(p => p.real_model);
   if (real) {
     line.replaceChildren(badge(real.health === "healthy" ? "good" : "warn", t("model_status_real")(real)));
     line.title = "";
@@ -226,7 +236,7 @@ function renderState() {
         d.customer == null ? t("disclosure_company") : d.customer,
         d.provider + " (" + d.provider_trust + ")",
         d.stayed_local ? badge("good", t("stayed_local")) : badge("warn", t("left_device")),
-        d.data_class,
+        t("data_class")(d.data_class),
         d.failover_from.length ? d.failover_from.map(skipLabel).join("; ") : "—",
       ])));
     disclosures.classList.remove("empty");
@@ -396,7 +406,10 @@ function renderCommandCenter() {
     line.appendChild(el("span", "svc", "· " + s.venture.service));
     vbox.replaceChildren(line);
   } else {
-    vbox.replaceChildren(el("span", "empty", t("cc_no_venture")));
+    // The first thing a new founder reads: a way there, not a description.
+    const start = el("button", "ghost", t("cc_no_venture"));
+    start.addEventListener("click", () => setView("company"));
+    vbox.replaceChildren(start);
   }
 
   $("cc-customers").textContent = s.counts.customers;
@@ -459,7 +472,7 @@ function renderCommandDecisions(decisions, proposalsPending) {
   box.replaceChildren(...decisions.map(d => {
     const row = el("div", "pad");
     row.appendChild(el("div", null, t("cc_decision_line")(d)));
-    if (d.policy_reason) row.appendChild(el("div", "status-line", d.policy_reason));
+    if (d.policy_reason) { const why = policyReason(d.action, d.policy_reason); why.className = "status-line"; row.appendChild(why); }
     const bar = el("div", "toolbar");
     const approve = el("button", "primary small", t("cc_approve"));
     approve.addEventListener("click", () => withBusy(approve, () => commandDecide(d.approval_id, true, d.document_title)));
@@ -508,6 +521,8 @@ function setLanguage(next) {
 }
 
 function setView(next) {
+  // A new page opens at its top, not at the scroll position of the last one.
+  const changed = view !== next;
   view = next;
   localStorage.setItem("sovereign-ui-view", next);
   VIEWS.forEach(name => {
@@ -516,6 +531,7 @@ function setView(next) {
   });
   if (next === "command") { loadCommandCenter(); loadWorkSuggestions(); }
   if (next === "security") loadState();
+  if (changed) window.scrollTo(0, 0);
 }
 
 $("theme-toggle").addEventListener("click", () => {

@@ -3,7 +3,7 @@
 // the Today view shows. Functions only; app.js calls initTeam().
 
 /**
- * @typedef {{id: string, title_en: string, title_zh: string, description_en: string, description_zh: string, reads: string, delivers: string, cannot: string}} RoleCard
+ * @typedef {{id: string, title_en: string, title_zh: string, description_en: string, description_zh: string, reads_en: string, reads_zh: string, delivers_en: string, delivers_zh: string, cannot_en: string, cannot_zh: string}} RoleCard
  * @typedef {{id: string, role: string, name: string, status: string, hired_at: number, runs: number, last_run_at: number|null}} Employee
  * @typedef {{id: string, employee_id: string, role: string, title: string, summary: string, change: any, evidence: string[], provider_id: string, provider_trust: string, model_backed: boolean, rejection: string|null, status: string, created_at: number, decided_at: number|null, outcome: string|null}} Decision
  * @typedef {{employee_id: string, role: string, subject: {customer_id: string|null, document_id: string|null, project_id: string|null}, subject_name: string, reason: string}} WorkSuggestion
@@ -22,6 +22,11 @@ async function loadRoles() {
 
 function roleTitle(card) { return lang === "zh" ? card.title_zh : card.title_en; }
 function roleDescription(card) { return lang === "zh" ? card.description_zh : card.description_en; }
+/** "Proposal Writer · Mei", or just the title when the name is the title. */
+function employeeLabel(e) {
+  const title = t("role_title")(e.role);
+  return e.name === title ? title : title + " · " + e.name;
+}
 
 function renderTeam() {
   if (!ws) return;
@@ -36,7 +41,8 @@ function renderTeam() {
     node.appendChild(head);
     node.appendChild(el("p", null, roleDescription(card)));
     const facts = el("dl", "role-facts");
-    [["tm_reads", card.reads], ["tm_delivers", card.delivers], ["tm_cannot", card.cannot]].forEach(([key, value]) => {
+    const zh = lang === "zh";
+    [["tm_reads", zh ? card.reads_zh : card.reads_en], ["tm_delivers", zh ? card.delivers_zh : card.delivers_en], ["tm_cannot", zh ? card.cannot_zh : card.cannot_en]].forEach(([key, value]) => {
       facts.appendChild(el("dt", null, t(key)));
       facts.appendChild(el("dd", null, value));
     });
@@ -68,7 +74,7 @@ function renderTeam() {
   const selected = select.value;
   const active = employees.filter(e => e.status === "hired");
   select.replaceChildren(...active.map(e => {
-    const option = /** @type {HTMLOptionElement} */ (el("option", null, t("role_title")(e.role) + " · " + e.name));
+    const option = /** @type {HTMLOptionElement} */ (el("option", null, employeeLabel(e)));
     option.value = e.id;
     return option;
   }));
@@ -136,9 +142,9 @@ async function runSelectedEmployee() {
   if (!employee) return;
   const options = subjectOptionsFor(employee.role);
   const option = options[Number($("tm-subject").value)];
-  $("tm-run-status").textContent = "…";
+  $("tm-run-status").textContent = t("tm_running");
   const ok = await runEmployee(employee.id, option ? option.subject : {});
-  $("tm-run-status").textContent = ok ? t("saved") : "";
+  $("tm-run-status").textContent = ok ? t("tm_ran_hint") : "";
 }
 
 /* ─────────────── Proposals inbox ─────────────── */
@@ -149,14 +155,14 @@ function renderChange(change) {
     if (!items || !items.length) return;
     box.appendChild(el("div", "status-line", label));
     const ul = el("ul", "criteria");
-    items.forEach(item => ul.appendChild(el("li", null, typeof item === "string" ? item : (item.title ? item.title + " · " + item.due_in_days + "d" : item.kind + ": " + item.detail))));
+    items.forEach(item => ul.appendChild(el("li", null, typeof item === "string" ? item : (item.title ? item.title + " · " + t("chg_due_in")(item.due_in_days) : item.kind + ": " + item.detail))));
     box.appendChild(ul);
   };
   switch (change.kind) {
     case "discovery_summary":
-      list("Problems", change.problems); list("Constraints", change.constraints);
-      box.appendChild(el("div", null, "Budget: " + change.budget));
-      list("Open questions", change.open_questions); list("Assumptions", change.assumptions);
+      list(t("chg_problems"), change.problems); list(t("chg_constraints"), change.constraints);
+      box.appendChild(el("div", null, t("chg_budget") + ": " + change.budget));
+      list(t("chg_open_questions"), change.open_questions); list(t("chg_assumptions"), change.assumptions);
       break;
     case "offer_draft":
     case "invoice_draft": {
@@ -166,16 +172,19 @@ function renderChange(change) {
       details.appendChild(el("summary", null, t("ws_view_content")));
       details.appendChild(el("pre", null, change.body));
       box.appendChild(details);
-      list("Assumptions", change.assumptions);
+      list(t("chg_assumptions"), change.assumptions);
       if (change.due_in_days) box.appendChild(el("div", "status-line", t("doc_due")(change.due_in_days + "d")));
       break;
     }
-    case "delivery_plan":
+    case "delivery_plan": {
       box.appendChild(el("div", null, change.project_name));
-      list(t("cu_tasks"), change.tasks); list("Acceptance", change.acceptance_criteria);
+      // In the order they fall due, the way the founder will work them.
+      const tasks = (change.tasks || []).slice().sort((a, b) => a.due_in_days - b.due_in_days);
+      list(t("cu_tasks"), tasks); list(t("chg_acceptance"), change.acceptance_criteria);
       break;
+    }
     case "review_findings":
-      list("Findings", change.findings.length ? change.findings : ["—"]);
+      list(t("chg_findings"), change.findings.length ? change.findings : ["—"]);
       break;
     case "compliance_report": {
       const report = (ws.compliance_reports || []).find(r => r.id === change.report_id);
@@ -204,9 +213,9 @@ function renderProposal(decision, showActions) {
   const details = el("details");
   details.appendChild(el("summary", null, t("prop_change_heading")));
   details.appendChild(renderChange(decision.change));
-  details.appendChild(el("div", "status-line", t("prop_evidence") + ": " + decision.evidence.join(", ")));
+  details.appendChild(el("div", "status-line", t("prop_evidence") + ": " + decision.evidence.map(k => t("fact_label")(k)).join(", ")));
   wrap.appendChild(details);
-  if (decision.outcome) wrap.appendChild(el("div", "mono", t("prop_outcome") + ": " + decision.outcome));
+  if (decision.outcome) wrap.appendChild(el("div", "status-line", t("prop_outcome") + ": " + outcomeLabel(decision.outcome)));
   if (showActions && decision.status === "pending") {
     const bar = el("div", "toolbar");
     const approve = el("button", "primary small", t("prop_approve"));
@@ -219,6 +228,19 @@ function renderProposal(decision, showActions) {
   return wrap;
 }
 
+/** "customer:<id>" → the customer's name; unknown shapes stay as they are. */
+function outcomeLabel(outcome) {
+  const [kind, id] = String(outcome).split(":");
+  const named = {
+    customer: () => (ws.customers.find(c => c.id === id) || {}).name,
+    document: () => (ws.documents.find(d => d.id === id) || {}).title,
+    project: () => (ws.projects.find(p => p.id === id) || {}).name,
+    venture: () => ws.venture && ws.venture.name,
+  }[kind];
+  const name = named && named();
+  return name ? t("outcome_label")(kind, name) : outcome;
+}
+
 async function decideProposal(decision, approve) {
   if (!await confirmAction(approve ? "approve_prop" : "reject_prop", decision.title)) return;
   const result = await api("/api/workspace/decision", { decision_id: decision.id, approve });
@@ -229,7 +251,8 @@ function renderProposalsInbox() {
   if (!ws) return;
   const box = $("cc-proposals");
   const pending = (ws.decisions || []).filter(d => d.status === "pending");
-  if (!pending.length) { box.className = "empty"; box.replaceChildren(document.createTextNode(t("cc_no_proposals"))); return; }
+  const hired = (ws.employees || []).some(e => e.status === "hired");
+  if (!pending.length) { box.className = "empty"; box.replaceChildren(document.createTextNode(t(hired ? "cc_no_proposals_hired" : "cc_no_proposals"))); return; }
   box.className = "";
   box.replaceChildren(...pending.slice().reverse().map(d => renderProposal(d, true)));
 }
@@ -238,7 +261,9 @@ function renderHistory() {
   const box = $("tm-history");
   const decisions = (ws.decisions || []).slice().reverse();
   if (!decisions.length) { box.replaceChildren(el("div", "empty", t("tm_no_history"))); return; }
-  box.replaceChildren(...decisions.map(d => renderProposal(d, false)));
+  // A pending proposal is decidable wherever it is shown: listing it here
+  // without its buttons left the founder looking for them.
+  box.replaceChildren(...decisions.map(d => renderProposal(d, true)));
 }
 
 /* ─────────────── Work suggestions ─────────────── */

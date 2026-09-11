@@ -162,10 +162,17 @@ function renderProjects(customer) {
       start.addEventListener("click", () => withBusy(start, async () => applyResult(await api("/api/workspace/project/status", { project_id: p.id, status: "active" }))));
       head.appendChild(start);
     }
-    if (p.status !== "done") {
+    const tasks = ws.tasks.filter(task => task.project_id === p.id)
+      .sort((a, b) => (a.due_at || Infinity) - (b.due_at || Infinity));
+    const openTasks = tasks.filter(task => !task.done_at).length;
+    if (p.status !== "done" && !openTasks) {
       const finish = el("button", "ghost small", t("cu_finish"));
       finish.addEventListener("click", () => withBusy(finish, async () => applyResult(await api("/api/workspace/project/status", { project_id: p.id, status: "done" }))));
       head.appendChild(finish);
+    } else if (p.status !== "done") {
+      // The server refuses to close a project with open tasks; say so here
+      // instead of offering a button that can only fail.
+      head.appendChild(el("span", "status-line", t("tm_finish_first")));
     }
     wrap.appendChild(head);
     if (p.acceptance_criteria && p.acceptance_criteria.length) {
@@ -173,7 +180,6 @@ function renderProjects(customer) {
       p.acceptance_criteria.forEach(c => list.appendChild(el("li", null, c)));
       wrap.appendChild(list);
     }
-    const tasks = ws.tasks.filter(task => task.project_id === p.id);
     const taskList = el("div", "tasks");
     tasks.forEach(task => {
       const row = el("div", "task-row");
@@ -255,7 +261,7 @@ function renderCustomerDocuments(customer) {
     row.appendChild(el("span", null, d.title));
     row.appendChild(badge(statusKind(d.status), t("status_" + d.status)));
     if (d.amount_cents != null) row.appendChild(el("span", "mono", money(d.amount_cents)));
-    if (d.accepted_at) row.appendChild(badge("good", t("cu_accept_offer")));
+    if (d.accepted_at) row.appendChild(badge("good", t("cu_accepted")));
     if (d.kind === "offer" && !d.accepted_at && (d.status === "approved_pending_delivery" || d.status === "delivered")) {
       const accept = el("button", "ghost small", t("cu_accept_offer"));
       accept.addEventListener("click", () => withBusy(accept, async () => {
@@ -274,7 +280,7 @@ async function loadTimeline(customerId) {
   if (selectedCustomerId !== customerId) return;
   if (!data.ok || !data.timeline.length) { box.replaceChildren(el("div", "empty", t("cu_no_timeline"))); return; }
   box.replaceChildren(table([t("th_time"), t("th_action"), t("th_resource")],
-    data.timeline.slice().reverse().map(e => [fmtTime(e.at), e.action, e.subject || e.resource])));
+    data.timeline.slice().reverse().map(e => [fmtTime(e.at), t("event_label")(e.action), e.subject || e.resource])));
 }
 
 function renderAskTeam(customer) {
@@ -282,7 +288,7 @@ function renderAskTeam(customer) {
   const hires = (ws.employees || []).filter(e => e.status === "hired" && ["analyst", "proposal_writer", "delivery_planner"].includes(e.role));
   if (!hires.length) { box.replaceChildren(el("span", "status-line", t("tm_no_employees"))); return; }
   box.replaceChildren(...hires.map(e => {
-    const button = el("button", "ghost small", t("role_title")(e.role) + " · " + e.name);
+    const button = el("button", "ghost small", employeeLabel(e));
     button.addEventListener("click", () => withBusy(button, () => runEmployee(e.id, { customer_id: customer.id })));
     return button;
   }));
@@ -336,6 +342,17 @@ function renderDocumentCard(d) {
     }));
     head.appendChild(revoke);
   }
+  // The next step after sending an offer is hearing back; it belongs where
+  // the founder just was, not only on the customer page.
+  if (d.kind === "offer" && !d.accepted_at && (d.status === "approved_pending_delivery" || d.status === "delivered")) {
+    const accept = el("button", "ghost small", t("cu_accept_offer"));
+    accept.addEventListener("click", () => withBusy(accept, async () => {
+      if (!await confirmAction("accept", d.title)) return;
+      await applyResult(await api("/api/workspace/offer/accepted", { document_id: d.id }), t("toast_accepted")(d.title));
+    }));
+    head.appendChild(accept);
+  }
+  if (d.accepted_at) head.appendChild(badge("good", t("cu_accepted")));
   wrap.appendChild(head);
   if (d.status === "rejected" || d.status === "revoked") wrap.appendChild(el("div", "status-line", t("doc_reopen_hint")));
   const approvalWithEvidence = ws.approvals.find(a => a.document_id === d.id && a.evidence);
@@ -369,6 +386,15 @@ function renderDocumentCard(d) {
   return wrap;
 }
 
+/** Why a send waits for the founder, in their words; the engine's own
+ *  wording stays one hover away rather than being the headline. */
+function policyReason(action, reason) {
+  const plain = action === "email.send";
+  const node = el("div", "why", plain ? t("policy_send_reason") : reason);
+  if (plain) node.title = reason;
+  return node;
+}
+
 function renderApprovals() {
   const approvals = $("approvals");
   const pending = ws.approvals.filter(a => a.status === "pending");
@@ -378,7 +404,7 @@ function renderApprovals() {
     const row = el("div", "approval");
     const info = el("div");
     info.appendChild(el("div", null, t("ws_approval_for") + (doc ? doc.title : a.document_id)));
-    info.appendChild(el("div", "why", a.policy_reason));
+    info.appendChild(policyReason(a.action, a.policy_reason));
     row.appendChild(info);
     const actions = el("div", "actions");
     const approve = el("button", "approve", "✓ " + t("ws_approve"));
@@ -413,7 +439,7 @@ async function loadReceivables() {
   $("rc-form").hidden = !open.length;
   if (!rows.length) { box.replaceChildren(el("div", "empty", t("rc_none"))); return; }
   box.replaceChildren(table([t("th_invoice"), t("th_customer"), t("th_amount"), t("th_paid"), t("th_outstanding"), t("th_due"), t("th_status")],
-    rows.map(r => [r.title, r.customer_name, money(r.amount_cents), money(r.paid_cents), money(r.outstanding_cents), fmtDate(r.due_at),
+    rows.map(r => [r.title, r.customer_name, {num: money(r.amount_cents)}, {num: money(r.paid_cents)}, {num: money(r.outstanding_cents)}, fmtDate(r.due_at),
       badge(r.status === "paid" ? "good" : r.status === "overdue" ? "bad" : "warn", t("rc_status")(r.status))])));
 }
 
@@ -433,7 +459,7 @@ async function createDocument(kind) {
 async function draftAssist() {
   const customer_id = $("d-customer").value;
   if (!customer_id) { $("d-status").textContent = t("ws_no_customers"); return; }
-  $("d-status").textContent = "…";
+  $("d-status").textContent = t("assist_running");
   const result = await api("/api/workspace/assist", { customer_id });
   if (!result.ok) { $("d-status").textContent = ""; toast("bad", result.error); return; }
   $("d-status").textContent = "";

@@ -61,9 +61,12 @@ pub struct RoleCard {
     pub title_zh: &'static str,
     pub description_en: &'static str,
     pub description_zh: &'static str,
-    pub reads: &'static str,
-    pub delivers: &'static str,
-    pub cannot: &'static str,
+    pub reads_en: &'static str,
+    pub reads_zh: &'static str,
+    pub delivers_en: &'static str,
+    pub delivers_zh: &'static str,
+    pub cannot_en: &'static str,
+    pub cannot_zh: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

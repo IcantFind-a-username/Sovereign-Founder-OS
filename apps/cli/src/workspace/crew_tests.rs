@@ -188,6 +188,34 @@ fn analyst_run_creates_a_pending_decision_with_a_disclosure_and_no_state_change(
         .any(|g| g.kind == "decide_proposals" && g.count == 1));
 }
 
+/// The hiring card is the contract a founder reads before hiring. It was
+/// half-translated: title and description in both languages, and what the
+/// employee reads, delivers and can never do in English only.
+#[test]
+fn every_role_card_is_bilingual_in_full() {
+    for card in super::crew_roles::role_cards() {
+        let role = card.id.as_str();
+        for (field, zh) in [
+            ("title", card.title_zh),
+            ("description", card.description_zh),
+            ("reads", card.reads_zh),
+            ("delivers", card.delivers_zh),
+            ("cannot", card.cannot_zh),
+        ] {
+            assert!(super::util::has_chinese(zh), "{role}.{field}_zh: {zh:?}");
+        }
+        for (field, en) in [
+            ("title", card.title_en),
+            ("description", card.description_en),
+            ("reads", card.reads_en),
+            ("delivers", card.delivers_en),
+            ("cannot", card.cannot_en),
+        ] {
+            assert!(!en.is_empty() && en.is_ascii(), "{role}.{field}_en: {en:?}");
+        }
+    }
+}
+
 /// The summary lands in the founder's own notes, so it is written in the
 /// language the notes are in — not English headings around Chinese items.
 #[test]
