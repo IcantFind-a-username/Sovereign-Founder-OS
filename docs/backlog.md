@@ -45,37 +45,26 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
-- [ ] **P1 | `crates/capability/` | Uncommitted authority-bundle refactor in `v2.rs` regresses the approval-reuse gate and leaves a dead mapper.**
-  Diagnosed 2026-09-10 by the stop gate during a planning-only session that
-  made no source edits; the failure belongs to the pre-existing uncommitted
-  working tree on `feature/component-wit-input-abi` (`git diff
-  crates/capability/src/v2.rs`, +79/−18). The diff replaces the three
-  separate `.map_err(map_authority_error_{token,idempotency,approval})` calls
-  with one `map_authority_error_bundle` path (`v2.rs:1126`), which maps
-  `AuthorityError::AlreadyConsumed` → `CapabilityV2Error::Replay` for every
-  claim kind. Two consequences:
-  1. `map_authority_error_approval` (`v2.rs:1152`, the only producer of
-     `ApprovalReused` from the durable store) is now unreferenced, so
-     `cargo clippy -p sovereign-authority -p sovereign-owner -p sovereign-cli
-     --all-targets --features owner-effect-fixture --locked -- -D warnings`
-     fails with `dead_code`.
-  2. `cargo test -p sovereign-capability --test approval_v2 --locked` fails
-     2/12: `durable_approval_survives_token_expiry_purge_until_approval_expiry`
-     (`approval_v2.rs:603`, gets `Replay`, expects `ApprovalReused`) and
-     `expired_approval_purges_at_approval_expiry` (`approval_v2.rs:635`,
-     purge leaves 3 claims, expects 1 — the bundle's claims no longer purge
-     independently at the approval's own expiry).
-  These two tests are the verified deliverable of owner-session plan Task 2
-  (run log 2026-08-26 below) and back THREAT_MODEL.md "Attached Authority
-  Store rejects approval reuse after token expiry/purge". Not fixed in
-  passing because it is a semantics decision, not a typo: either (a) keep the
-  distinction — map approval-claim consumption to `ApprovalReused` inside the
-  bundle path and restore per-claim-kind purge, then delete nothing; or
-  (b) if the bundle deliberately collapses approval reuse into `Replay`,
-  update both tests, delete `map_authority_error_approval`, and reword the
-  THREAT_MODEL.md verification line in the same commit. Done when the clippy
-  command above and `cargo test -p sovereign-capability --locked` are green
-  and `./scripts/test_changed.sh` passes on a stop.
+- [x] **P1 | `crates/capability/` | Uncommitted authority-bundle refactor in `v2.rs` regresses the approval-reuse gate and leaves a dead mapper.**
+  Closed 2026-09-11: the working tree this diagnosed is what landed as #90,
+  with the regression fixed rather than carried. The entry asked for a
+  decision between (a) keeping the approval-reuse distinction and (b)
+  collapsing it into `Replay`; **(a) was taken**, by giving the authority
+  store `AuthorityError::ApprovalAlreadyConsumed` so the bundle can say
+  *which* part another bundle holds. `map_authority_error_approval` is gone,
+  and both named tests pass.
+  One deliberate deviation from (a) as written, which said "restore
+  per-claim-kind purge": `expired_approval_purges_at_approval_expiry` now
+  expects **3** records at the approval's expiry, not 1. The approval's own
+  claim still purges on its own expiry; the other two are the bundle's intent
+  and commit records, which expire with the bundle's longest-lived part. That
+  is the bundle keeping its transaction, not a claim outliving its authority.
+  THREAT_MODEL.md:255 was re-read against this and still holds as written —
+  `durable_approval_survives_token_expiry_purge_until_approval_expiry` is
+  exactly that line and passes — so nothing was reworded.
+  Verified with the entry's own commands: the fixture-featured clippy across
+  authority/owner/cli is clean, and `cargo test -p sovereign-capability
+  --locked` is 15/15 + 13 + 2.
 
 - [x] **P1 | `docs/handoff/codex/`, `docs/backlog.md` | Strengthen the full-chain Goal and context recovery instructions.**
   Extend the canonical MVP Goal with founder-runnable end-to-end acceptance,
