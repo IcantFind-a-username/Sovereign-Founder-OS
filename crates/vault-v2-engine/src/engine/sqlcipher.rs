@@ -12,11 +12,42 @@
 //! connection is neither `Send` nor `Sync`, so it stays on the thread that
 //! owns the key material.
 
-use super::ffi;
+use super::ffi::{self, HardeningFailure};
 use super::secret::DbKey;
+use rusqlite::config::DbConfig;
+use rusqlite::limits::Limit;
 use rusqlite::OpenFlags;
 use std::marker::PhantomData;
 use std::path::Path;
+
+/// The runtime limits RFC 0005 Program 1A fixes, in the order the plan lists
+/// them. Each is set before the first page is read and then read back from
+/// the C library, because SQLite silently clamps a limit to its compile-time
+/// maximum and a clamped value would otherwise pass unnoticed.
+pub(crate) const FIXED_LIMITS: [(Limit, i32); 10] = [
+    (Limit::SQLITE_LIMIT_SQL_LENGTH, 64 * 1024),
+    (Limit::SQLITE_LIMIT_LENGTH, 16 * 1024 * 1024),
+    (Limit::SQLITE_LIMIT_COLUMN, 128),
+    (Limit::SQLITE_LIMIT_EXPR_DEPTH, 32),
+    (Limit::SQLITE_LIMIT_COMPOUND_SELECT, 16),
+    (Limit::SQLITE_LIMIT_VARIABLE_NUMBER, 999),
+    (Limit::SQLITE_LIMIT_TRIGGER_DEPTH, 0),
+    (Limit::SQLITE_LIMIT_ATTACHED, 0),
+    (Limit::SQLITE_LIMIT_LIKE_PATTERN_LENGTH, 256),
+    (Limit::SQLITE_LIMIT_WORKER_THREADS, 0),
+];
+
+/// Connection safety switches the plan requires, with the value each must
+/// hold. `DEFENSIVE` stops `writable_schema` from being used to corrupt the
+/// schema; `TRUSTED_SCHEMA` off stops SQL functions from running inside
+/// schema objects; the two `DQS` switches stop a double-quoted identifier
+/// from being silently reinterpreted as a string literal.
+const SAFETY_SWITCHES: [(DbConfig, bool); 4] = [
+    (DbConfig::SQLITE_DBCONFIG_DEFENSIVE, true),
+    (DbConfig::SQLITE_DBCONFIG_TRUSTED_SCHEMA, false),
+    (DbConfig::SQLITE_DBCONFIG_DQS_DML, false),
+    (DbConfig::SQLITE_DBCONFIG_DQS_DDL, false),
+];
 
 /// How a connection may be opened. The internal create mode is not reachable
 /// from outside the engine; the plan's compile-fail fixtures prove that once
@@ -66,6 +97,11 @@ pub(crate) enum OpenError {
     /// a file that is not an encrypted database. SQLCipher cannot tell these
     /// apart, and saying which would itself be a leak.
     WrongKeyOrNotADatabase,
+    /// A required setting did not take: native-code loading could not be
+    /// shown off, a safety switch did not hold, or a limit read back as
+    /// something other than the value set. The connection is refused rather
+    /// than returned half-hardened.
+    ProfileNotApplied,
 }
 
 /// The cipher's own integrity check found pages it could not authenticate.
@@ -92,16 +128,47 @@ pub(crate) fn open_sqlcipher(
     key: &DbKey,
     mode: ConnectionMode,
 ) -> Result<HardenedConnection, OpenError> {
-    let connection = rusqlite::Connection::open_with_flags(path, mode.flags())
-        .map_err(|_| OpenError::Unopenable)?;
+    // Open, key first, and switch off native-code loading — one audited
+    // unsafe entry point. The raw token lives only for this call.
+    let connection =
+        ffi::open_keyed_hardened(path, mode.flags().bits(), &key.raw()).map_err(|failure| {
+            match failure {
+                HardeningFailure::PathNotRepresentable | HardeningFailure::Unopenable => {
+                    OpenError::Unopenable
+                }
+                HardeningFailure::KeyRejected => OpenError::KeyRejected,
+                HardeningFailure::ExtensionLoadingNotDisabled => OpenError::ProfileNotApplied,
+            }
+        })?;
 
-    // First action after open. The raw token lives only for this statement.
-    ffi::key_main_database(&connection, &key.raw()).map_err(|_| OpenError::KeyRejected)?;
+    // The remaining no-page settings, each confirmed by what SQLite reports
+    // back rather than by the call having returned.
+    for (switch, required) in SAFETY_SWITCHES {
+        let held = connection
+            .set_db_config(switch, required)
+            .map_err(|_| OpenError::ProfileNotApplied)?;
+        if held != required {
+            return Err(OpenError::ProfileNotApplied);
+        }
+    }
+    for (limit, value) in FIXED_LIMITS {
+        connection
+            .set_limit(limit, value)
+            .map_err(|_| OpenError::ProfileNotApplied)?;
+        if connection
+            .limit(limit)
+            .map_err(|_| OpenError::ProfileNotApplied)?
+            != value
+        {
+            return Err(OpenError::ProfileNotApplied);
+        }
+    }
 
-    // The key is only proven by reading a page. `sqlite_master` exists in
-    // every database, so this touches page 1 and nothing the caller wrote.
+    // Only now is a page read, and the read is what proves the key.
+    // `sqlite_schema` exists in every database, so this touches page 1 and
+    // nothing the caller wrote.
     connection
-        .query_row("SELECT count(*) FROM sqlite_master", [], |row| {
+        .query_row("SELECT count(*) FROM sqlite_schema", [], |row| {
             row.get::<_, i64>(0)
         })
         .map_err(|_| OpenError::WrongKeyOrNotADatabase)?;
@@ -406,5 +473,220 @@ mod tests {
             ConnectionMode::ReadWriteCreateInternal
         )
         .is_ok());
+    }
+
+    /// Prepare *and step* a statement, returning SQLite's refusal if any.
+    ///
+    /// Stepping matters. Some limits are enforced when a statement compiles —
+    /// expression depth, SQL length, columns, compound terms, variable numbers
+    /// — and others only when it runs: LIKE patterns, value length, ATTACH,
+    /// extension loading, triggers. A helper that only prepared would report
+    /// the runtime ones as passing whatever their size, which is exactly the
+    /// false green a first probe of this code produced.
+    fn run(connection: &rusqlite::Connection, sql: &str) -> Result<(), String> {
+        let mut statement = connection.prepare(sql).map_err(|error| error.to_string())?;
+        let mut rows = statement.raw_query();
+        rows.next().map(|_| ()).map_err(|error| error.to_string())
+    }
+
+    /// Refused, and refused for the stated reason. A boundary-plus-one case
+    /// that failed on a typo in the constructed SQL would prove nothing, so
+    /// every refusal is matched against the message of the limit it tests.
+    fn assert_refused(connection: &rusqlite::Connection, sql: &str, because: &str) {
+        match run(connection, sql) {
+            Ok(()) => panic!("accepted past the limit: {} bytes of SQL", sql.len()),
+            Err(message) => assert!(
+                message.contains(because),
+                "refused, but not by the limit under test — expected {because:?}, got {message:?}"
+            ),
+        }
+    }
+
+    fn assert_accepted(connection: &rusqlite::Connection, sql: &str, what: &str) {
+        if let Err(message) = run(connection, sql) {
+            panic!("{what} at its boundary was refused: {message}");
+        }
+    }
+
+    /// Every fixed limit, read back from the C library and then exercised at
+    /// its boundary and one past it.
+    #[test]
+    fn oversized_values_and_sql_fail_at_fixed_limits() {
+        let (_dir, root) = canonical_tempdir();
+        let opened = open_sqlcipher(
+            &root.join("vault.db"),
+            &key(0x44),
+            ConnectionMode::ReadWriteCreateInternal,
+        )
+        .expect("open");
+        let connection = &opened.connection;
+
+        // What SQLite reports, not what was requested: a limit clamped to a
+        // compile-time maximum would show up here.
+        for (limit, value) in FIXED_LIMITS {
+            assert_eq!(
+                connection.limit(limit).expect("read a limit back"),
+                value,
+                "{limit:?} is not the fixed value"
+            );
+        }
+
+        // SQL text: 64 KiB. The statement is padded inside a comment so its
+        // length can be set to the byte.
+        let sql_of = |length: usize| {
+            let (head, tail) = ("SELECT 1 /*", "*/");
+            format!(
+                "{head}{}{tail}",
+                "x".repeat(length - head.len() - tail.len())
+            )
+        };
+        assert_accepted(connection, &sql_of(64 * 1024), "SQL of 64 KiB");
+        assert_refused(connection, &sql_of(64 * 1024 + 1), "statement too long");
+
+        // One value: 16 MiB.
+        assert_accepted(connection, "SELECT zeroblob(16777216)", "a 16 MiB value");
+        assert_refused(
+            connection,
+            "SELECT zeroblob(16777217)",
+            "string or blob too big",
+        );
+
+        // Columns: 128.
+        let columns = |count: usize| {
+            let list: Vec<String> = (0..count).map(|index| index.to_string()).collect();
+            format!("SELECT {}", list.join(","))
+        };
+        assert_accepted(connection, &columns(128), "128 columns");
+        assert_refused(connection, &columns(129), "too many columns");
+
+        // Expression depth: 32. A literal is depth one and each unary minus
+        // adds one, so 31 nested minuses is depth 32 exactly.
+        let nested = |depth: usize| format!("SELECT {}1{}", "-(".repeat(depth), ")".repeat(depth));
+        assert_accepted(connection, &nested(31), "expression depth 32");
+        assert_refused(connection, &nested(32), "Expression tree is too large");
+
+        // Compound terms: 16.
+        let compound = |terms: usize| vec!["SELECT 1"; terms].join(" UNION ALL ");
+        assert_accepted(connection, &compound(16), "16 compound terms");
+        assert_refused(
+            connection,
+            &compound(17),
+            "too many terms in compound SELECT",
+        );
+
+        // Variables: 999.
+        assert_accepted(connection, "SELECT ?999", "variable ?999");
+        assert_refused(
+            connection,
+            "SELECT ?1000",
+            "variable number must be between ?1 and ?999",
+        );
+
+        // LIKE pattern: 256 bytes.
+        let like = |length: usize| format!("SELECT 'a' LIKE '{}'", "a".repeat(length));
+        assert_accepted(connection, &like(256), "a 256-byte LIKE pattern");
+        assert_refused(connection, &like(257), "LIKE or GLOB pattern too complex");
+
+        // Attached databases: 0. The boundary is the connection as it stands;
+        // one attachment is past it.
+        assert_refused(
+            connection,
+            "ATTACH DATABASE ':memory:' AS other",
+            "too many attached databases",
+        );
+
+        // Trigger depth: 0, so no trigger may fire at all. The boundary is a
+        // write that fires none; one past it is a write that fires one.
+        connection
+            .execute_batch(
+                "CREATE TABLE fired (x);
+                 CREATE TABLE plain (x);
+                 CREATE TRIGGER on_fired AFTER INSERT ON fired
+                   BEGIN INSERT INTO plain VALUES (new.x); END;",
+            )
+            .expect("create the tables and the trigger");
+        assert_accepted(
+            connection,
+            "INSERT INTO plain VALUES (1)",
+            "a write that fires no trigger",
+        );
+        assert_refused(
+            connection,
+            "INSERT INTO fired VALUES (1)",
+            "too many levels of trigger recursion",
+        );
+
+        // Worker threads: 0. There is no statement that behaves differently at
+        // one past it — the limit governs how many helper threads a sort may
+        // start — so the readback above is the whole of the evidence.
+    }
+
+    /// Every route by which a connection could reach outside its own file is
+    /// shut: native code, another database, and the schema itself.
+    ///
+    /// "No dynamic SQL path" in the plan is a property of this module's API —
+    /// `HardenedConnection` has no method that takes SQL text — and it is the
+    /// source-closure gate's to prove once the public boundary exists, not a
+    /// runtime check. What runs here is everything that can be observed.
+    #[test]
+    fn extensions_attach_writable_schema_and_dynamic_sql_are_denied() {
+        let (_dir, root) = canonical_tempdir();
+        let opened = open_sqlcipher(
+            &root.join("vault.db"),
+            &key(0x55),
+            ConnectionMode::ReadWriteCreateInternal,
+        )
+        .expect("open");
+        let connection = &opened.connection;
+
+        // Native code. "not authorized" means the call was refused before any
+        // load was attempted; with loading enabled SQLite instead calls dlopen,
+        // fails on the missing file, and reports every path it searched —
+        // a different message, and a disclosure of its own.
+        //
+        // What this proves is that the SQL function is refused, not which of
+        // the two switches refused it: either one alone is enough, and the
+        // factory reads route two back and will not return a connection with it
+        // on. Route one's disable is pinned in source by `tests/ast_gate.rs`,
+        // which is the only place its presence can be shown.
+        assert_refused(
+            connection,
+            "SELECT load_extension('/no/such/library')",
+            "not authorized",
+        );
+
+        // Another database.
+        assert_refused(
+            connection,
+            "ATTACH DATABASE ':memory:' AS elsewhere",
+            "too many attached databases",
+        );
+
+        // The schema. Defensive mode is what makes `writable_schema` harmless:
+        // the pragma may be accepted, but the schema must not change. That is
+        // checked on the schema itself rather than on an error message.
+        connection
+            .execute_batch("CREATE TABLE records (x);")
+            .expect("create a table");
+        let before: String = connection
+            .query_row(
+                "SELECT sql FROM sqlite_schema WHERE name = 'records'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read the schema");
+        let _ = connection.execute_batch("PRAGMA writable_schema = ON;");
+        let tamper = connection.execute_batch(
+            "UPDATE sqlite_schema SET sql = 'CREATE TABLE records (x, smuggled)' WHERE name = 'records';",
+        );
+        assert!(tamper.is_err(), "the schema table accepted a write");
+        let after: String = connection
+            .query_row(
+                "SELECT sql FROM sqlite_schema WHERE name = 'records'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read the schema again");
+        assert_eq!(after, before, "the schema changed under writable_schema");
     }
 }

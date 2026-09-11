@@ -438,3 +438,58 @@ fn a_symlink_in_the_crate_tree_is_rejected() {
         outcome.violations
     );
 }
+
+/// The one switch in the FFI boundary that has no readback.
+///
+/// `sqlite3_enable_load_extension(db, 0)` turns off the switch behind the
+/// `load_extension()` SQL function. On a connection the factory returns, its
+/// effect cannot be observed: that SQL function is refused if either this
+/// switch or `SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION` is off, and the factory
+/// reads the second one back and refuses any connection with it on. So no
+/// runtime test can tell whether this call was made with `0`, with `1`, or at
+/// all — and changing it to `1` was measured to leave every runtime test green.
+///
+/// Its evidence is therefore here, in the parsed source: exactly one call,
+/// whose second argument is the integer literal `0`.
+#[test]
+fn extension_loading_route_one_is_switched_off_in_source() {
+    use syn::visit::Visit;
+
+    struct Calls(Vec<Option<u64>>);
+    impl<'ast> Visit<'ast> for Calls {
+        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+            let named = matches!(
+                &*call.func,
+                syn::Expr::Path(path)
+                    if path.path.segments.last().is_some_and(|segment| {
+                        segment.ident == "sqlite3_enable_load_extension"
+                    })
+            );
+            if named {
+                let second = call.args.iter().nth(1).and_then(|argument| match argument {
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Int(value),
+                        ..
+                    }) => value.base10_parse::<u64>().ok(),
+                    _ => None,
+                });
+                self.0.push(second);
+            }
+            syn::visit::visit_expr_call(self, call);
+        }
+    }
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/engine/ffi.rs");
+    let source = std::fs::read_to_string(&path).expect("read ffi.rs");
+    let file = syn::parse_file(&source).expect("parse ffi.rs");
+    let mut calls = Calls(Vec::new());
+    calls.visit_file(&file);
+
+    assert_eq!(
+        calls.0,
+        vec![Some(0)],
+        "sqlite3_enable_load_extension must be called exactly once, with the literal 0 \
+         (None means the argument is not an integer literal): found {:?}",
+        calls.0
+    );
+}
