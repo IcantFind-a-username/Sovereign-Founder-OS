@@ -1540,16 +1540,17 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   Done when: no file in `apps/cli/src/workspace/` is over 1000 lines and
   `cargo test -p sovereign-cli` is unchanged by the move.
 
-- [ ] **P2 | `apps/cli/src/` | HTTP-layer tests for the MVP routes.**
-  Extend the loopback HTTP boundary (HO-002) to cover `/api/workspace/profile`,
-  `customer/update`, `document/update`, `project`, `task`, `follow-up`,
-  `payment`, `employee/*`, `decision`, `compliance/*`: same Host/Content-Type/
-  size rules, JSON error envelopes, and that a malformed `RunSubject` or
-  profile is a 200 `{ok:false}` with a message, never a panic. Done when
-  `cargo test -p sovereign-cli` covers each route once.
-  The route sequence to convert is written out at the end of the walkthrough
-  report above; `tests/support/ui_server.rs` already has `get`, `post` and
-  `pending_approval` for it.
+- [x] **P2 | `apps/cli/src/` | HTTP-layer tests for the MVP routes.**
+  Landed 2026-09-11 as `apps/cli/tests/ui_mvp_routes.rs`: all 35 POST and 5
+  GET routes. The boundary rules (`Host`, `Content-Type`, the 64 KiB cap with
+  `verify-export`'s larger one as the named exception) are asserted by
+  iterating every route rather than on one representative, a malformed body
+  is answered on every route with the server still serving afterwards, and
+  the walkthrough's business flow runs end to end over HTTP.
+  `every_route_in_the_routers_is_named_by_this_file` scans the routers' own
+  source in both directions, so a route added without a test — or a test left
+  behind after a route is removed — fails the suite.
+
 - [ ] **P3 | `crates/consultant-playground/tests/support/transport.rs` | Transport EINVAL under the full gate on the macOS test host.**
   `two_cli_roots_have_identical_complete_transcripts_and_no_writes`
   (`apps/cli/tests/playground_isolation.rs:93`) failed twice on 2026-09-10
