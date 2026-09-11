@@ -1517,6 +1517,25 @@ while the controller routes eligible design/review cards to the strong role.
   verbatim, confirm the test count is unchanged, and for anything that runs
   (a route, a gauntlet) exercise it live rather than trusting the build. Done
   when every file is under 1000 lines, so the next change has room.
+- [ ] **P2 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.**
+  Found 2026-09-11 when a change passed the local gate and failed CI. The gate
+  maps each changed path to the package that *owns* it, so an edit to
+  `crates/consultant-playground/tests/support/transport.rs` scopes clippy and
+  tests to `sovereign-consultant-playground` alone. But `apps/cli` compiles
+  that file into two of its own test binaries by `#[path]`, with no Cargo
+  edge between them, so the breakage (a helper left dead in those binaries,
+  refused by `-D warnings`) was invisible until CI's workspace-wide clippy.
+  Three such includes exist today, all from `apps/cli/tests/`:
+  `consultant-playground/tests/support/transport.rs` (twice) and
+  `consultant-playground/src/{catalog,domain}.rs` — so a change to the
+  playground's *source*, not only its test support, has the same blind spot.
+  Fix: after mapping paths to packages, resolve every `#[path = "…"]` in the
+  workspace against its including file, and when the target is in the change
+  set add the *including* file's package too. Bash 3.2 has no `realpath -m`,
+  so resolve by joining and normalising in the script or fall back to FULL for
+  any changed file that is a `#[path]` target. Done when a self-test in
+  `scripts/tests/` changes an included file and asserts the including
+  package lands in scope — and a mutation that drops the new mapping fails it.
 
 ## MVP product line
 
