@@ -1517,6 +1517,25 @@ while the controller routes eligible design/review cards to the strong role.
   verbatim, confirm the test count is unchanged, and for anything that runs
   (a route, a gauntlet) exercise it live rather than trusting the build. Done
   when every file is under 1000 lines, so the next change has room.
+- [ ] **P2 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.**
+  Found 2026-09-11 when a change passed the local gate and failed CI. The gate
+  maps each changed path to the package that *owns* it, so an edit to
+  `crates/consultant-playground/tests/support/transport.rs` scopes clippy and
+  tests to `sovereign-consultant-playground` alone. But `apps/cli` compiles
+  that file into two of its own test binaries by `#[path]`, with no Cargo
+  edge between them, so the breakage (a helper left dead in those binaries,
+  refused by `-D warnings`) was invisible until CI's workspace-wide clippy.
+  Three such includes exist today, all from `apps/cli/tests/`:
+  `consultant-playground/tests/support/transport.rs` (twice) and
+  `consultant-playground/src/{catalog,domain}.rs` — so a change to the
+  playground's *source*, not only its test support, has the same blind spot.
+  Fix: after mapping paths to packages, resolve every `#[path = "…"]` in the
+  workspace against its including file, and when the target is in the change
+  set add the *including* file's package too. Bash 3.2 has no `realpath -m`,
+  so resolve by joining and normalising in the script or fall back to FULL for
+  any changed file that is a `#[path]` target. Done when a self-test in
+  `scripts/tests/` changes an included file and asserts the including
+  package lands in scope — and a mutation that drops the new mapping fails it.
 
 ## MVP product line
 
@@ -1581,21 +1600,34 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   source in both directions, so a route added without a test — or a test left
   behind after a route is removed — fails the suite.
 
-- [ ] **P3 | `crates/consultant-playground/tests/support/transport.rs` | Transport EINVAL under the full gate on the macOS test host.**
+- [x] **P3 | `crates/consultant-playground/tests/support/transport.rs` | Transport EINVAL under the full gate on the macOS test host.**
+  Closed 2026-09-11 by the entry's own condition: the next occurrence named
+  its step, and the step got a targeted fix. It recurred under the gate in
+  `business_demo_startup_and_routes` as
+  `read: set_read_timeout(1s): Invalid argument (os error 22)` — the step
+  labels added for exactly this said which call. Of the three suspects listed
+  below, the `setsockopt` quirk was the right one.
+  The call ran inside `read_response`, **after** the request was written. It
+  is the same race `request` already tolerates for `shutdown`: the server
+  answers and closes before we finish, and macOS refuses a socket option on a
+  connection its peer has closed. `request` now sets the one-second read wait
+  before the write, when the peer has nothing to answer and no reason to
+  close, and reads through a loop that sets nothing; `read_response` keeps its
+  old behaviour for the three callers in `server_transport.rs` that build
+  their own streams.
+  A structural fix rather than a proven one: the flake could not be
+  reproduced on demand, so what is established is that the failing call no
+  longer happens after the send on that path, whatever made it fail. Stressed
+  30/30 and green under a full gate. If it recurs, the step label will name
+  where, and that is a new entry.
+  Original diagnosis, kept for the record:
   `two_cli_roots_have_identical_complete_transcripts_and_no_writes`
   (`apps/cli/tests/playground_isolation.rs:93`) failed twice on 2026-09-10
   under the Stop-hook gate with `Os { code: 22, InvalidInput }` from
   `transport::request`, at the 7th and the 17th exchange of the first root —
-  a server that had just answered. It passed 8/8 standalone and in three
-  background gate runs the same hour, and it touches nothing the day's
-  changes touched. The helper already avoids fractional socket timeouts for
-  a related EINVAL seen on this host; every timeout is whole-second now, so
-  the remaining sources are `connect_timeout`'s poll, `shutdown`, or a
-  `setsockopt` quirk in macOS 26.5. Mitigation in place: `request` names the
-  failing step in its error, and `connect` retries EINVAL up to three times
-  before any byte is sent (never after). Done when: the next occurrence
-  names its step and either the retry absorbs it or the step gets a targeted
-  fix; if it never recurs in a month, close as absorbed.
+  a server that had just answered. Suspected sources then: `connect_timeout`'s
+  poll, `shutdown`, or a `setsockopt` quirk in macOS 26.5.
+
 - [x] **P2 | `apps/cli/src/workspace/` | A rejected or revoked document has a way back to draft.**
   Landed 2026-09-10. Rule chosen: both states happen before anything reaches
   the customer, so an edit reopens the document as a new draft revision

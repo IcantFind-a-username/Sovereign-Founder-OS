@@ -58,6 +58,19 @@ pub fn raw_request(port: u16, method: &str, target: &str, headers: &str, body: &
 
 pub fn request(port: u16, bytes: &[u8]) -> io::Result<Response> {
     let mut stream = connect(port)?;
+    // Set the read loop's one-second wait *before* the request goes out.
+    //
+    // It used to be set inside `read_response`, after the write — and that
+    // was the syscall failing under the gate: `set_read_timeout(1s): Invalid
+    // argument (os error 22)`, named by the step labels added for exactly
+    // this. It is the same race `shutdown` below already tolerates: the
+    // server answers and closes before we finish, and macOS refuses a socket
+    // option on a connection its peer has closed. Before the write the peer
+    // has nothing to answer, so it has no reason to close, and the call has
+    // nothing to race.
+    stream
+        .set_read_timeout(Some(READ_WAIT))
+        .map_err(|error| step("set_read_timeout(1s)", error))?;
     stream
         .write_all(bytes)
         .map_err(|error| step("write", error))?;
@@ -71,7 +84,7 @@ pub fn request(port: u16, bytes: &[u8]) -> io::Result<Response> {
         Err(error) if peer_is_gone(&error) => {}
         Err(error) => return Err(step("shutdown", error)),
     }
-    read_response(&mut stream).map_err(|error| step("read", error))
+    read_response_prepared(&mut stream).map_err(|error| step("read", error))
 }
 
 /// Whether an error means the connection is gone, under any of the names the
@@ -86,15 +99,33 @@ pub fn peer_is_gone(error: &io::Error) -> bool {
     )
 }
 
+/// The read loop's per-read wait. Whole seconds avoid the fractional-timeout
+/// EINVAL observed on the test host; the absolute deadline in the loop bounds
+/// all retries to under nine seconds.
+const READ_WAIT: Duration = Duration::from_secs(1);
+
+/// Read one response from a stream that has no read wait set yet.
+///
+/// Callers that built their own stream use this. `request` does not: it sets
+/// the wait before sending and calls the loop directly, so no socket option is
+/// ever set after bytes are on the wire.
+///
+/// This file is compiled into every test binary that includes it, and only
+/// `server_transport` calls this function directly — `apps/cli`'s binaries
+/// reach the loop through `request` alone, so there it is dead code.
+#[allow(dead_code)]
 pub fn read_response(stream: &mut TcpStream) -> io::Result<Response> {
+    stream
+        .set_read_timeout(Some(READ_WAIT))
+        .map_err(|error| step("set_read_timeout(1s)", error))?;
+    read_response_prepared(stream)
+}
+
+/// The read loop itself, for a stream whose wait was already set.
+fn read_response_prepared(stream: &mut TcpStream) -> io::Result<Response> {
     let deadline = Instant::now() + Duration::from_secs(8);
     let mut raw = Vec::new();
     let mut buf = [0; 4096];
-    // Whole-second socket waits avoid the fractional-timeout EINVAL observed
-    // on the test host. The absolute deadline bounds all retries to <9 seconds.
-    stream
-        .set_read_timeout(Some(Duration::from_secs(1)))
-        .map_err(|error| step("set_read_timeout(1s)", error))?;
     loop {
         if Instant::now() >= deadline {
             return Err(io::ErrorKind::TimedOut.into());
