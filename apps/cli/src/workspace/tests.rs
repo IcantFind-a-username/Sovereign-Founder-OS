@@ -786,6 +786,61 @@ fn command_center_guidance_reports_pending_and_all_clear() {
     assert_eq!(kinds, vec!["all_clear"]);
 }
 
+/// Consumed claims are kept so a replay is recognised as one, and they are
+/// only growth once the authority they record has expired. Nothing in the
+/// product had ever called `purge_expired`, so every claim a founder's
+/// machine ever made stayed on disk for the life of the install.
+///
+/// The horizon is a parameter so this can ask what happens after the claims
+/// age out, rather than waiting an hour; production passes `now()`, which
+/// touches nothing that has not expired.
+#[test]
+fn expired_authority_claims_are_purged_and_live_ones_are_not() {
+    let (dir, store) = store();
+    store.set_venture("Acme", "Landing pages").unwrap();
+    let workspace = store.add_customer("Dr. Tan", "", "expo").unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+        .unwrap();
+    let document_id = workspace.documents[0].id;
+    let workspace = store.request_send(document_id).unwrap();
+    store.decide(workspace.approvals[0].id, true).unwrap();
+
+    let authority = dir.path().join("authority");
+    let held = || -> usize {
+        ["tokens", "approvals", "idempotency", "bundles"]
+            .iter()
+            .map(|kind| {
+                std::fs::read_dir(authority.join(kind))
+                    .map(|entries| entries.count())
+                    .unwrap_or(0)
+            })
+            .sum()
+    };
+    let after_delivery = held();
+    assert!(
+        after_delivery >= 4,
+        "the delivery left no durable claims to purge: {after_delivery}"
+    );
+
+    let opened = sovereign_authority::AuthorityStore::open(&authority).unwrap();
+
+    // Now: the claims are live, so a purge must leave every one of them. A
+    // purge that took a live claim would delete the evidence that makes a
+    // replay recognisable.
+    assert_eq!(
+        super::kernel_exec::purge_authority_claims(&opened, super::util::now()),
+        0
+    );
+    assert_eq!(held(), after_delivery, "a live claim was purged");
+
+    // Well past their expiry: they go.
+    let purged = super::kernel_exec::purge_authority_claims(&opened, super::util::now() + 86_400);
+    assert!(purged >= 4, "only {purged} records purged");
+    assert_eq!(held(), 0, "expired claims survived the purge");
+}
+
 /// One hand-edited-vault scenario: the record forged into state, the signed
 /// event whose absence must be reported, and how to forge it.
 struct ForgedRecord {
