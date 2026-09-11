@@ -80,12 +80,35 @@ jobs:
         run: cargo test --manifest-path fixtures/owner-webauthn/Cargo.toml --locked
 
       # The isolation itself, checked rather than assumed.
+      #
+      # The ban is on the *fixture's* dependencies reaching the audited core,
+      # which is what this workflow exists to prevent. It is not a ban on
+      # OpenSSL as such: RFC 0005 Program 1A deliberately brings a vendored,
+      # version-pinned OpenSSL into the core through the vault engine,
+      # because the thing that encrypts founder data belongs inside the
+      # audited boundary rather than outside it. So the check asks the
+      # question it means — did anything arrive *through the fixture* — by
+      # naming the fixture's own crates and by requiring OpenSSL to be the
+      # reviewed vendored edge and nothing else.
       - name: The core lock file stays clean
         run: |
-          for crate in webauthn-rs openssl openssl-sys; do
+          for crate in webauthn-rs webauthn-rs-core webauthn-attestation-ca; do
             if grep -q "^name = \"$crate\"" Cargo.lock; then
               echo "FAIL  $crate entered the audited core lock file" >&2
               exit 1
             fi
           done
-          echo "ok    no webauthn or openssl in the core lock file"
+          echo "ok    no webauthn crate in the core lock file"
+
+          # OpenSSL may be present only as Program 1A's vendored build. A
+          # system-linked openssl, or a version other than the reviewed pin,
+          # is the thing this catches.
+          if grep -q '^name = "openssl-sys"$' Cargo.lock; then
+            if ! grep -q '^name = "openssl-src"$' Cargo.lock; then
+              echo "FAIL  openssl-sys is present without the vendored openssl-src build" >&2
+              exit 1
+            fi
+            echo "ok    openssl-sys is present as the reviewed vendored edge"
+          else
+            echo "ok    no openssl in the core lock file"
+          fi
