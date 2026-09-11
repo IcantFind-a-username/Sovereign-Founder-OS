@@ -148,5 +148,5 @@ fn an_export_past_the_general_cap_still_verifies() {
         .json();
     assert_eq!(verdict["ok"], true, "{verdict}");
     assert_eq!(verdict["report"]["audit_chain_verified"], true, "{verdict}");
-    assert_eq!(verdict["report"]["customers"], 48, "{verdict}");
+    assert_eq!(verdict["report"]["contents"]["customers"], 48, "{verdict}");
 }

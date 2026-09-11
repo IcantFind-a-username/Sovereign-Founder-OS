@@ -206,9 +206,29 @@ fn cmd_verify_export(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
         check(report.audit_chain_verified),
         report.audit_events
     );
+    // Labelled "contents", not "verified": the chain covers the events, so a
+    // bundle missing every project still verifies. These lines are how a
+    // reader sees whether the bundle is the one they expected.
+    let held = &report.contents;
     println!(
-        "  state             {} customers · {} documents · {} signed approvals",
-        report.customers, report.documents, report.signed_approvals
+        "  contents           {} · {} customers · {} documents · {} approvals ({} signed)",
+        if held.venture_present {
+            "company profile"
+        } else {
+            "no company profile"
+        },
+        held.customers,
+        held.documents,
+        held.approvals,
+        held.signed_approvals
+    );
+    println!(
+        "                     {} projects · {} tasks · {} follow-ups · {} payments",
+        held.projects, held.tasks, held.follow_ups, held.payments
+    );
+    println!(
+        "                     {} employees · {} decisions · {} compliance reports · {} model disclosures",
+        held.employees, held.decisions, held.compliance_reports, held.disclosures
     );
     for note in &report.notes {
         println!("  note: {note}");

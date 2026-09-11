@@ -356,18 +356,22 @@ function renderVerifyReport(r) {
     [t("ws_verify_row_format"), mark(r.format_ok)],
     [t("ws_verify_row_identity"), mark(r.identity_bound)],
     [t("ws_verify_row_chain"), chain],
-    [t("ws_verify_row_state"), el("span", null, t("ws_verify_state")(r))],
+    [t("ws_verify_row_state"), el("span", null, t("ws_verify_state")(r.contents))],
     [t("ws_verify_device"), el("span", "mono", r.device_id || "—")],
   ];
   const verdict = el("div");
   verdict.appendChild(badge(r.ok ? "good" : "bad", r.ok ? t("ws_verify_pass") : t("ws_verify_fail")));
   const children = [verdict];
+  // The contents line is an inventory, and says so: the chain verifies the
+  // events, so a bundle missing every project still passes every check above
+  // it. Reading it as "verified" is the mistake this note exists to prevent.
   rows.forEach(([label, node]) => {
     const row = el("div", "toolbar");
     row.appendChild(el("span", "status-line", label));
     row.appendChild(node);
     children.push(row);
   });
+  children.push(el("div", "status-line", t("ws_verify_contents_note")));
   (r.notes || []).forEach(note => children.push(el("div", "status-line", "• " + note)));
   box.replaceChildren(...children);
 }

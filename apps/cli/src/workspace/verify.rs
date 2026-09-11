@@ -79,8 +79,6 @@ pub fn verify_export(bundle: &serde_json::Value) -> Result<ExportVerification, W
             .map(|array| array.len())
             .unwrap_or(0)
     };
-    let customers = array_len("customers");
-    let documents = array_len("documents");
     let signed_approvals = workspace
         .and_then(|value| value.get("approvals"))
         .and_then(|value| value.as_array())
@@ -96,6 +94,24 @@ pub fn verify_export(bundle: &serde_json::Value) -> Result<ExportVerification, W
                 .count()
         })
         .unwrap_or(0);
+    let contents = ExportContents {
+        venture_present: workspace
+            .and_then(|value| value.get("venture"))
+            .map(|venture| !venture.is_null())
+            .unwrap_or(false),
+        customers: array_len("customers"),
+        documents: array_len("documents"),
+        signed_approvals,
+        approvals: array_len("approvals"),
+        disclosures: array_len("disclosures"),
+        projects: array_len("projects"),
+        tasks: array_len("tasks"),
+        follow_ups: array_len("follow_ups"),
+        payments: array_len("payments"),
+        employees: array_len("employees"),
+        decisions: array_len("decisions"),
+        compliance_reports: array_len("compliance_reports"),
+    };
 
     let ok = if audit_events == 0 {
         notes.push("no audit history in this bundle — nothing to cryptographically verify".into());
@@ -111,9 +127,7 @@ pub fn verify_export(bundle: &serde_json::Value) -> Result<ExportVerification, W
         identity_bound,
         audit_events,
         audit_chain_verified,
-        customers,
-        documents,
-        signed_approvals,
+        contents,
         ok,
         notes,
     })

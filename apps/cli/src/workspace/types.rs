@@ -445,14 +445,45 @@ pub struct ExportVerification {
     pub audit_events: usize,
     /// The full signed hash chain recomputes and every Ed25519 signature checks.
     pub audit_chain_verified: bool,
-    pub customers: usize,
-    pub documents: usize,
-    pub signed_approvals: usize,
+    /// What the bundle holds, by kind.
+    ///
+    /// An inventory, not a verification. The signed chain is the part that is
+    /// cryptographically checked, and it covers the *events* — so a bundle
+    /// with every project removed still verifies, because the chain never
+    /// claimed how many projects there are. These counts are how a reader
+    /// sees whether this is the bundle they expected. Reconciling state
+    /// against the chain is the integrity self-audit's job, not this one.
+    pub contents: ExportContents,
     /// Well-formed, identity-bound, and chain-verified. Anything less is
     /// surfaced in `notes`, never silently downgraded to a pass.
     pub ok: bool,
     /// Human-readable explanation of any check that did not pass.
     pub notes: Vec<String>,
+}
+
+/// Everything an exported workspace can hold, counted.
+///
+/// One field per collection in `Workspace`, so a new collection that is not
+/// counted here fails to compile rather than going quietly missing from what
+/// a founder is shown. The only things deliberately left out are `version`
+/// and `venture`, which are not collections; `venture_present` carries the
+/// second.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExportContents {
+    pub venture_present: bool,
+    pub customers: usize,
+    pub documents: usize,
+    /// Approvals carrying signed owner evidence, not every approval row.
+    pub signed_approvals: usize,
+    pub approvals: usize,
+    pub disclosures: usize,
+    pub projects: usize,
+    pub tasks: usize,
+    pub follow_ups: usize,
+    pub payments: usize,
+    pub employees: usize,
+    pub decisions: usize,
+    pub compliance_reports: usize,
 }
 
 /// The result of reconciling authoritative state against the signed audit
