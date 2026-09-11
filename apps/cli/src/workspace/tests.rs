@@ -1128,4 +1128,12 @@ fn command_center_aggregates_state_and_evidence_read_only() {
     // Approval added exactly its own events (granted, executed, effect);
     // the two command_center calls added none.
     assert_eq!(ledger_after, ledger_before + 3);
+
+    // Composed is not sent: only the founder's confirmation moves a
+    // document from "to send" to "delivered".
+    assert_eq!(cc.counts.delivered, 0);
+    store.confirm_delivery(document_id).unwrap();
+    let cc = store.command_center().unwrap();
+    assert_eq!(cc.counts.approved_pending_delivery, 0);
+    assert_eq!(cc.counts.delivered, 1);
 }

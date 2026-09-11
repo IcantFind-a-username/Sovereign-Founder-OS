@@ -184,7 +184,9 @@ main { padding: var(--s6) var(--s6) var(--s7); min-width: 0; }
 .page-head p { margin: 5px 0 0; color: var(--ink-3); font-size: var(--t-base); max-width: 68ch; }
 
 section { margin-top: var(--s6); }
-section:first-of-type { margin-top: 0; }
+/* Only a section that opens the page sits flush under its title; one that
+   follows a panel (the Today metrics, the company form) keeps its gap. */
+.page-head + section { margin-top: 0; }
 section > h2 {
   margin: 0 0 var(--s3);
   font: 600 var(--t-base)/1.4 var(--sans); letter-spacing: -.005em; color: var(--ink);
@@ -237,6 +239,8 @@ tbody tr:hover { background: var(--n25); }
 td.mono, .mono {
   font-family: var(--mono); font-size: var(--t-sm); color: var(--ink-2); overflow-wrap: anywhere;
 }
+/* Amounts never break between the currency code and the figure. */
+td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .empty { padding: var(--s5) var(--s4); color: var(--ink-3); font-size: var(--t-base); }
 
 /* ═══════════ Status: a dot and a word ═══════════ */
@@ -293,7 +297,9 @@ button.ghost:disabled, button.approve:disabled, button.reject:disabled { pointer
 .toolbar { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .toolbar + .toolbar { margin-top: var(--s3); }
 
-input[type=text], input[type=date], input[type=file], select, textarea {
+/* `input:not([type])`: inputs built in script carry no type attribute, and
+   without it they fell through to the browser's grey default. */
+input:not([type]), input[type=text], input[type=date], input[type=file], select, textarea {
   width: 100%; padding: 6px 9px; min-height: var(--tap);
   border: 1px solid var(--control-line); border-radius: var(--r1);
   background: var(--panel); color: var(--ink);
@@ -347,7 +353,9 @@ pre {
 .task-row .done { text-decoration: line-through; color: var(--ink-3); }
 .tasks { margin-top: var(--s2); }
 .tasks .toolbar { margin-top: var(--s2); }
-.tasks .toolbar input { flex: 1 1 150px; width: auto; }
+/* An input sharing a row with its button grows into the space and leaves
+   the button beside it, rather than taking the whole row. */
+.toolbar > input:not([type=checkbox]) { flex: 1 1 150px; width: auto; }
 ul.criteria { margin: var(--s2) 0 0; padding-left: 17px; color: var(--ink-2); font-size: var(--t-sm); }
 ul.criteria li { margin: 2px 0; }
 .change { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2) 0; }

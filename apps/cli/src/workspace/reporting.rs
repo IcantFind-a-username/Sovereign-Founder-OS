@@ -29,6 +29,7 @@ impl Store {
             drafts: count_status(DocumentStatus::Draft),
             pending_approval: count_status(DocumentStatus::PendingApproval),
             approved_pending_delivery: count_status(DocumentStatus::ApprovedPendingDelivery),
+            delivered: count_status(DocumentStatus::Delivered),
             rejected: count_status(DocumentStatus::Rejected),
             leads: workspace
                 .customers

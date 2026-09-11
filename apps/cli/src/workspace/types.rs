@@ -395,7 +395,11 @@ pub struct CommandCenterCounts {
     pub documents: usize,
     pub drafts: usize,
     pub pending_approval: usize,
+    /// Composed to the outbox and waiting for the founder to send — not
+    /// sent. The page once labelled this count "sent".
     pub approved_pending_delivery: usize,
+    /// The founder recorded that they sent it.
+    pub delivered: usize,
     pub rejected: usize,
     /// Contacts still at the lead stage.
     pub leads: usize,
