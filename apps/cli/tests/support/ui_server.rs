@@ -195,6 +195,11 @@ fn dechunk(mut raw: &[u8]) -> Vec<u8> {
 }
 
 /// Drive the shipped flow up to a pending approval and return its id.
+///
+/// Each test binary compiles this file separately, so a helper one of them
+/// does not call is dead code there: `ui_mvp_routes` builds its own named
+/// company and customer instead of using this one.
+#[allow(dead_code)]
 pub fn pending_approval(server: &UiServer) -> String {
     let venture = server.post(
         "/api/workspace/venture",
