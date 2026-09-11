@@ -2,6 +2,7 @@ mod business_demo;
 mod demo;
 mod gauntlet_report;
 mod ui;
+mod ui_gauntlet;
 mod ui_mvp;
 #[cfg(test)]
 #[path = "ui_tests.rs"]
