@@ -422,6 +422,52 @@ struct ReviewFindingOut {
 /// around it) and validate it into the exact change the founder will see.
 /// Any violation returns `None`: the deterministic draft is used instead and
 /// the decision says so.
+/// Why a model's answer was not used.
+///
+/// A category, never the text. Evidence records that something happened, not
+/// what it was, and a model's raw output is exactly the kind of unbounded
+/// content that rule exists to keep out of the chain — the same reasoning as
+/// RFC 0006's effect evidence, applied to the other direction.
+///
+/// The split between `Truncated`, `NotJson` and `WrongShape` is not cosmetic:
+/// all three were measured against qwen2.5:7b, and they call for different
+/// answers. A truncated answer is worth retrying, a wrong shape means the
+/// prompt and the parser disagree, and a rejected field means the model wrote
+/// something the product must not accept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Rejection {
+    /// Nothing that could be a JSON object.
+    NotJson,
+    /// The answer stopped part-way.
+    Truncated,
+    /// Valid JSON, but not the shape the schema asked for.
+    WrongShape,
+    /// The shape was right and this field was not usable.
+    Field(&'static str),
+    /// A list was empty where one entry is required, or past its cap.
+    ListSize(&'static str),
+    /// The facts needed to place the answer were not loaded.
+    MissingSubject(&'static str),
+    /// This role composes its answer elsewhere and has no parser here.
+    NoModelPath,
+}
+
+impl Rejection {
+    /// A stable code for storage and for the interface to translate. Keep
+    /// these strings stable: they are written into the owner's records.
+    pub(super) fn code(self) -> String {
+        match self {
+            Rejection::NotJson => "not_json".to_owned(),
+            Rejection::Truncated => "truncated".to_owned(),
+            Rejection::WrongShape => "wrong_shape".to_owned(),
+            Rejection::Field(name) => format!("field:{name}"),
+            Rejection::ListSize(name) => format!("list_size:{name}"),
+            Rejection::MissingSubject(name) => format!("missing_subject:{name}"),
+            Rejection::NoModelPath => "no_model_path".to_owned(),
+        }
+    }
+}
+
 /// The first complete JSON value at or after the first `{`, ignoring whatever
 /// follows it.
 ///
@@ -431,91 +477,131 @@ struct ReviewFindingOut {
 /// which is not valid JSON, and the whole answer was discarded for it. Taking
 /// the first value changes only which text reaches the checks below; every
 /// field is still validated, and the founder still approves the proposal.
-fn first_json_value<T: serde::de::DeserializeOwned>(json: &str) -> Option<T> {
-    serde_json::Deserializer::from_str(json)
+fn first_json_value<T: serde::de::DeserializeOwned>(json: &str) -> Result<T, Rejection> {
+    match serde_json::Deserializer::from_str(json)
         .into_iter::<T>()
-        .next()?
-        .ok()
+        .next()
+    {
+        None => Err(Rejection::NotJson),
+        Some(Ok(value)) => Ok(value),
+        // serde already knows which of the three it is; asking it beats
+        // guessing from the text, which would mean reading the content.
+        Some(Err(error)) => Err(match error.classify() {
+            serde_json::error::Category::Eof => Rejection::Truncated,
+            serde_json::error::Category::Data => Rejection::WrongShape,
+            _ => Rejection::NotJson,
+        }),
+    }
 }
 
-pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<ProposedChange> {
-    let start = text.find('{')?;
+pub(super) fn parse_model_change(
+    input: &RoleInput,
+    text: &str,
+) -> Result<ProposedChange, Rejection> {
+    let start = text.find('{').ok_or(Rejection::NotJson)?;
     let json = &text[start..];
     match input.role {
         RoleId::Analyst => {
             let out: AnalystOut = first_json_value(json)?;
-            let customer = input.customer.as_ref()?;
-            Some(ProposedChange::DiscoverySummary {
+            let customer = input
+                .customer
+                .as_ref()
+                .ok_or(Rejection::MissingSubject("customer"))?;
+            Ok(ProposedChange::DiscoverySummary {
                 customer_id: customer.id,
-                problems: clean_list(out.problems)?,
-                constraints: clean_list(out.constraints)?,
+                problems: clean_list(out.problems).ok_or(Rejection::Field("problems"))?,
+                constraints: clean_list(out.constraints).ok_or(Rejection::Field("constraints"))?,
                 budget: clean_item(&out.budget).unwrap_or_else(|| "not stated".to_owned()),
-                open_questions: clean_list(out.open_questions)?,
-                assumptions: clean_list(out.assumptions)?,
+                open_questions: clean_list(out.open_questions)
+                    .ok_or(Rejection::Field("open_questions"))?,
+                assumptions: clean_list(out.assumptions).ok_or(Rejection::Field("assumptions"))?,
             })
         }
         RoleId::ProposalWriter => {
             let out: ProposalOut = first_json_value(json)?;
-            let customer = input.customer.as_ref()?;
+            let customer = input
+                .customer
+                .as_ref()
+                .ok_or(Rejection::MissingSubject("customer"))?;
             let amount_cents = match out.amount.as_deref().map(str::trim) {
                 None | Some("") | Some("null") => None,
-                Some(text) => Some(parse_amount_cents(text).ok()?),
+                Some(text) => {
+                    Some(parse_amount_cents(text).map_err(|_| Rejection::Field("amount"))?)
+                }
             };
-            Some(ProposedChange::OfferDraft {
+            Ok(ProposedChange::OfferDraft {
                 customer_id: customer.id,
-                title: clean_item(&out.title)?,
-                body: clean_long(&out.body)?,
+                title: clean_item(&out.title).ok_or(Rejection::Field("title"))?,
+                body: clean_long(&out.body).ok_or(Rejection::Field("body"))?,
                 amount_cents,
-                assumptions: clean_list(out.assumptions)?,
+                assumptions: clean_list(out.assumptions).ok_or(Rejection::Field("assumptions"))?,
             })
         }
         RoleId::DeliveryPlanner => {
             let out: PlanOut = first_json_value(json)?;
-            let customer = input.customer.as_ref()?;
+            let customer = input
+                .customer
+                .as_ref()
+                .ok_or(Rejection::MissingSubject("customer"))?;
             if out.tasks.is_empty() || out.tasks.len() > MAX_LIST_ITEMS {
-                return None;
+                return Err(Rejection::ListSize("tasks"));
             }
             let mut tasks = Vec::new();
             for task in out.tasks {
                 if !(1..=365).contains(&task.due_in_days) {
-                    return None;
+                    return Err(Rejection::Field("due_in_days"));
                 }
                 tasks.push(PlannedTask {
-                    title: clean_item(&task.title)?,
+                    title: clean_item(&task.title).ok_or(Rejection::Field("task.title"))?,
                     due_in_days: task.due_in_days,
                 });
             }
-            Some(ProposedChange::DeliveryPlan {
+            Ok(ProposedChange::DeliveryPlan {
                 customer_id: customer.id,
                 offer_id: input.document.as_ref().map(|document| document.id),
                 project_id: input.project.as_ref().map(|project| project.id),
-                project_name: clean_item(&out.project_name)?,
+                project_name: clean_item(&out.project_name)
+                    .ok_or(Rejection::Field("project_name"))?,
                 tasks,
-                acceptance_criteria: clean_list(out.acceptance_criteria)?,
+                acceptance_criteria: clean_list(out.acceptance_criteria)
+                    .ok_or(Rejection::Field("acceptance_criteria"))?,
             })
         }
         RoleId::InvoiceClerk => {
             let out: InvoiceOut = first_json_value(json)?;
-            let customer = input.customer.as_ref()?;
-            let project = input.project.as_ref()?;
-            let amount_cents = parse_amount_cents(out.amount.trim()).ok()?;
-            if amount_cents == 0 || !(1..=365).contains(&out.due_in_days) {
-                return None;
+            let customer = input
+                .customer
+                .as_ref()
+                .ok_or(Rejection::MissingSubject("customer"))?;
+            let project = input
+                .project
+                .as_ref()
+                .ok_or(Rejection::MissingSubject("project"))?;
+            let amount_cents =
+                parse_amount_cents(out.amount.trim()).map_err(|_| Rejection::Field("amount"))?;
+            if amount_cents == 0 {
+                return Err(Rejection::Field("amount"));
             }
-            Some(ProposedChange::InvoiceDraft {
+            if !(1..=365).contains(&out.due_in_days) {
+                return Err(Rejection::Field("due_in_days"));
+            }
+            Ok(ProposedChange::InvoiceDraft {
                 customer_id: customer.id,
                 project_id: Some(project.id),
-                title: clean_item(&out.title)?,
-                body: clean_long(&out.body)?,
+                title: clean_item(&out.title).ok_or(Rejection::Field("title"))?,
+                body: clean_long(&out.body).ok_or(Rejection::Field("body"))?,
                 amount_cents,
                 due_in_days: out.due_in_days,
             })
         }
         RoleId::QualityChecker => {
             let out: ReviewOut = first_json_value(json)?;
-            let document = input.document.as_ref()?;
+            let document = input
+                .document
+                .as_ref()
+                .ok_or(Rejection::MissingSubject("document"))?;
             if out.findings.len() > MAX_LIST_ITEMS {
-                return None;
+                return Err(Rejection::ListSize("findings"));
             }
             let mut findings = Vec::new();
             for finding in out.findings {
@@ -524,19 +610,20 @@ pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<Propos
                     kind.as_str(),
                     "gap" | "contradiction" | "placeholder" | "risk"
                 ) {
-                    return None;
+                    return Err(Rejection::Field("finding.kind"));
                 }
                 findings.push(ReviewFinding {
                     kind,
-                    detail: clean_item(&finding.detail)?,
+                    detail: clean_item(&finding.detail)
+                        .ok_or(Rejection::Field("finding.detail"))?,
                 });
             }
-            Some(ProposedChange::ReviewFindings {
+            Ok(ProposedChange::ReviewFindings {
                 document_id: document.id,
                 findings,
             })
         }
-        RoleId::ComplianceChecker => None,
+        RoleId::ComplianceChecker => Err(Rejection::NoModelPath),
     }
 }
 

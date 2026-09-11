@@ -11,6 +11,7 @@ use super::store::AuditEntry;
 use super::util::now;
 use super::*;
 
+use super::crew_roles::Rejection;
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sovereign_contracts::{AutomationLevel, DataClass};
@@ -69,6 +70,10 @@ pub struct ComplianceReport {
     pub retrieved_rule_ids: Vec<String>,
     pub model_summary: Option<String>,
     pub model_backed: bool,
+    /// Why a model summary was refused, when one was received. A category,
+    /// never the model's text.
+    #[serde(default)]
+    pub rejection: Option<String>,
     pub provider_id: String,
     /// Digest of the facts snapshot, so a later report can show the facts
     /// changed and this one no longer applies.
@@ -831,27 +836,39 @@ struct SummaryOut {
 
 /// Keep a model summary only when every rule id it names was retrieved or
 /// checked; a summary citing a rule the founder cannot open is dropped.
-fn validate_summary(text: &str, allowed_ids: &[String]) -> Option<String> {
-    let start = text.find('{')?;
-    let end = text.rfind('}')?;
-    let out: SummaryOut = serde_json::from_str(&text[start..=end]).ok()?;
+fn validate_summary(text: &str, allowed_ids: &[String]) -> Result<String, Rejection> {
+    let start = text.find('{').ok_or(Rejection::NotJson)?;
+    let end = text.rfind('}').ok_or(Rejection::NotJson)?;
+    if end <= start {
+        return Err(Rejection::NotJson);
+    }
+    let out: SummaryOut =
+        serde_json::from_str(&text[start..=end]).map_err(|error| match error.classify() {
+            serde_json::error::Category::Eof => Rejection::Truncated,
+            serde_json::error::Category::Data => Rejection::WrongShape,
+            _ => Rejection::NotJson,
+        })?;
     let summary = out.summary.trim();
     if summary.is_empty()
         || summary.chars().count() > 2_000
         || summary.chars().any(|ch| ch.is_control() && ch != '\n')
     {
-        return None;
+        return Err(Rejection::Field("summary"));
     }
+    // The sharp one: a summary may only cite rules the retrieval actually
+    // returned. A model that invents a rule id is not making a formatting
+    // mistake — it is fabricating a citation in a compliance document, and
+    // the founder should be told that is what happened.
     let cited = summary
         .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
         .filter(|token| token.starts_with("SG-"))
         .map(str::to_owned);
     for id in cited {
         if !allowed_ids.contains(&id) {
-            return None;
+            return Err(Rejection::Field("citation"));
         }
     }
-    Some(summary.to_owned())
+    Ok(summary.to_owned())
 }
 
 impl Store {
@@ -1005,6 +1022,7 @@ impl Store {
         // A real model may summarise; it never changes a status.
         let mut model_summary = None;
         let mut model_backed = false;
+        let mut rejection: Option<String> = None;
         let mut provider_id = "none".to_owned();
         let mut disclosure_event = None;
         if coverage == "covered" && !findings.is_empty() {
@@ -1023,9 +1041,12 @@ impl Store {
             }) {
                 provider_id = response.provider_id.clone();
                 if response.provider_id.starts_with("ollama:") {
-                    if let Some(summary) = validate_summary(&response.text, &retrieved_rule_ids) {
-                        model_summary = Some(summary);
-                        model_backed = true;
+                    match validate_summary(&response.text, &retrieved_rule_ids) {
+                        Ok(summary) => {
+                            model_summary = Some(summary);
+                            model_backed = true;
+                        }
+                        Err(reason) => rejection = Some(reason.code()),
                     }
                 }
                 let provider_trust = format!("{:?}", disclosure.provider_trust).to_lowercase();
@@ -1075,6 +1096,7 @@ impl Store {
             retrieved_rule_ids,
             model_summary,
             model_backed,
+            rejection,
             provider_id,
             facts_digest,
         };
@@ -1168,11 +1190,22 @@ mod tests {
     fn model_summaries_may_only_cite_retrieved_rules() {
         let allowed = vec!["SG-GST-01".to_owned()];
         assert!(
-            validate_summary(r#"{"summary":"Register for GST (SG-GST-01)."}"#, &allowed).is_some()
+            validate_summary(r#"{"summary":"Register for GST (SG-GST-01)."}"#, &allowed).is_ok()
         );
-        assert!(validate_summary(r#"{"summary":"See SG-FAKE-99."}"#, &allowed).is_none());
-        assert!(validate_summary("no json", &allowed).is_none());
-        assert!(validate_summary(r#"{"summary":""}"#, &allowed).is_none());
+        // A fabricated citation is reported as one. In a compliance document
+        // that is not a formatting slip, and the founder is told which it was.
+        assert_eq!(
+            validate_summary(r#"{"summary":"See SG-FAKE-99."}"#, &allowed).unwrap_err(),
+            Rejection::Field("citation")
+        );
+        assert_eq!(
+            validate_summary("no json", &allowed).unwrap_err(),
+            Rejection::NotJson
+        );
+        assert_eq!(
+            validate_summary(r#"{"summary":""}"#, &allowed).unwrap_err(),
+            Rejection::Field("summary")
+        );
     }
 
     fn singapore_pack() -> RulePack {

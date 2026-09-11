@@ -1,4 +1,4 @@
-use super::crew_roles::{build_input, parse_model_change, prompt_for};
+use super::crew_roles::{build_input, parse_model_change, prompt_for, Rejection};
 use super::test_support::fake_ollama;
 use super::*;
 use sovereign_audit_ledger::AuditLedger;
@@ -507,19 +507,43 @@ fn model_output_is_validated_before_it_becomes_a_proposal() {
         "en",
     )
     .unwrap();
-    assert!(parse_model_change(&input, r#"{"title":"x","body":"y","amount":"abc"}"#).is_none());
+    // Each refusal names the field or the shape that caused it, so a founder
+    // is told which of these happened rather than only that one did.
+    assert_eq!(
+        parse_model_change(&input, r#"{"title":"x","body":"y","amount":"abc"}"#).unwrap_err(),
+        Rejection::Field("amount")
+    );
     assert!(parse_model_change(
         &input,
         "prose {\"title\":\"x\",\"body\":\"y\",\"amount\":null} more"
     )
-    .is_some());
-    assert!(parse_model_change(&input, r#"{"title":"","body":"y"}"#).is_none());
+    .is_ok());
+    assert_eq!(
+        parse_model_change(&input, r#"{"title":"","body":"y"}"#).unwrap_err(),
+        Rejection::Field("title")
+    );
     let too_many = format!(
         r#"{{"title":"x","body":"y","assumptions":[{}]}}"#,
         (0..13).map(|_| "\"a\"").collect::<Vec<_>>().join(",")
     );
-    assert!(parse_model_change(&input, &too_many).is_none());
-    assert!(parse_model_change(&input, "no json here").is_none());
+    assert_eq!(
+        parse_model_change(&input, &too_many).unwrap_err(),
+        Rejection::Field("assumptions")
+    );
+    assert_eq!(
+        parse_model_change(&input, "no json here").unwrap_err(),
+        Rejection::NotJson
+    );
+    // A truncated answer and a wrong shape are different problems and are
+    // reported as different problems: the first is worth retrying.
+    assert_eq!(
+        parse_model_change(&input, r#"{"title":"x","body":"y"#).unwrap_err(),
+        Rejection::Truncated
+    );
+    assert_eq!(
+        parse_model_change(&input, r#"{"title":5,"body":"y"}"#).unwrap_err(),
+        Rejection::WrongShape
+    );
 
     let plan_input = build_input(
         &workspace,
@@ -528,16 +552,23 @@ fn model_output_is_validated_before_it_becomes_a_proposal() {
         "en",
     )
     .unwrap();
-    assert!(parse_model_change(
-        &plan_input,
-        r#"{"project_name":"p","tasks":[{"title":"t","due_in_days":0}]}"#
-    )
-    .is_none());
+    assert_eq!(
+        parse_model_change(
+            &plan_input,
+            r#"{"project_name":"p","tasks":[{"title":"t","due_in_days":0}]}"#
+        )
+        .unwrap_err(),
+        Rejection::Field("due_in_days")
+    );
+    assert_eq!(
+        parse_model_change(&plan_input, r#"{"project_name":"p","tasks":[]}"#).unwrap_err(),
+        Rejection::ListSize("tasks")
+    );
     assert!(parse_model_change(
         &plan_input,
         r#"{"project_name":"p","tasks":[{"title":"t","due_in_days":3}]}"#
     )
-    .is_some());
+    .is_ok());
 
     let offer = store
         .create_document(DocumentKind::Offer, customer_id, None, "en")
@@ -556,16 +587,19 @@ fn model_output_is_validated_before_it_becomes_a_proposal() {
         "en",
     )
     .unwrap();
-    assert!(parse_model_change(
-        &review_input,
-        r#"{"findings":[{"kind":"silly","detail":"x"}]}"#
-    )
-    .is_none());
+    assert_eq!(
+        parse_model_change(
+            &review_input,
+            r#"{"findings":[{"kind":"silly","detail":"x"}]}"#
+        )
+        .unwrap_err(),
+        Rejection::Field("finding.kind")
+    );
     assert!(parse_model_change(
         &review_input,
         r#"{"findings":[{"kind":"GAP","detail":"no price"}]}"#
     )
-    .is_some());
+    .is_ok());
 }
 
 #[test]
@@ -621,6 +655,55 @@ fn a_real_model_answer_is_validated_and_marked_model_backed() {
     assert!(!decision.model_backed);
     assert_eq!(decision.provider_id, "ollama:test-model");
     assert!(decision.summary.contains("failed validation"));
+    // And it says which kind of wrong, because "the template was used" reads
+    // the same whether the model slipped once or has never worked at all.
+    assert_eq!(decision.rejection.as_deref(), Some("not_json"));
+    assert!(
+        decision.model_backed || decision.rejection.is_some(),
+        "a refused answer must always carry a reason"
+    );
+}
+
+/// A model answer that is well-formed JSON and still refused: the reason
+/// names the field, not the shape. Measured against qwen2.5:7b, which
+/// returned `"amount":"4.000.000"` for a 5,000.00 offer — a looser parser
+/// would have produced an invoice off by three orders of magnitude.
+#[test]
+fn a_refused_field_is_named_on_the_decision() {
+    let (_dir, store, customer_id) = seeded();
+    let answer = serde_json::json!({
+        "response": serde_json::json!({
+            "title": "Proposal",
+            "body": "Scope and timeline.",
+            "amount": "4.000.000",
+            "assumptions": ["one team"]
+        })
+        .to_string(),
+        "done": true
+    })
+    .to_string();
+    let port = fake_ollama(vec![r#"{"models":[]}"#.to_owned(), answer]);
+    std::fs::write(
+        _dir.path().join(MODEL_CONFIG_FILE),
+        format!(
+            r#"{{"ollama":{{"enabled":true,"base_url":"http://127.0.0.1:{port}","model":"test-model"}}}}"#
+        ),
+    )
+    .unwrap();
+
+    let employee_id = hired(&store, RoleId::ProposalWriter);
+    let decision = store
+        .run_employee(employee_id, customer_subject(customer_id), "en")
+        .unwrap();
+    assert!(!decision.model_backed);
+    assert_eq!(decision.rejection.as_deref(), Some("field:amount"));
+
+    // The category is a category: the model's text never reaches the record.
+    let stored = format!("{:?}", store.load().unwrap().decisions);
+    assert!(
+        !stored.contains("4.000.000"),
+        "the model's rejected text leaked into the stored record"
+    );
 }
 
 /// The schema a prompt shows is itself an instruction, and a model copies its
@@ -669,7 +752,10 @@ fn the_quality_checker_prompt_states_its_enum_in_prose_not_in_the_schema() {
 
     // And the parser still refuses the malformed shape, whatever the prompt
     // says — a prompt is a request, not a guarantee.
-    assert!(parse_model_change(&input, r#"{"findings":[{"placeholder","detail":"x"}]}"#).is_none());
+    assert_eq!(
+        parse_model_change(&input, r#"{"findings":[{"placeholder","detail":"x"}]}"#).unwrap_err(),
+        Rejection::NotJson
+    );
 }
 
 /// A model that answers, then repeats the same answer inside a code fence.
@@ -712,7 +798,10 @@ fn an_answer_repeated_after_itself_is_still_read() {
     // Reading only the first value must not soften any check: a first value
     // that fails validation is still refused, whatever follows it.
     let bad_then_good = format!(r#"{{"findings":[{{"kind":"not-a-kind","detail":"x"}}]}}{once}"#);
-    assert!(parse_model_change(&input, &bad_then_good).is_none());
+    assert_eq!(
+        parse_model_change(&input, &bad_then_good).unwrap_err(),
+        Rejection::Field("finding.kind")
+    );
 }
 
 /// The disclosure says why each provider was passed over, not just that it

@@ -5,7 +5,7 @@
 /**
  * @typedef {{id: string, title_en: string, title_zh: string, description_en: string, description_zh: string, reads: string, delivers: string, cannot: string}} RoleCard
  * @typedef {{id: string, role: string, name: string, status: string, hired_at: number, runs: number, last_run_at: number|null}} Employee
- * @typedef {{id: string, employee_id: string, role: string, title: string, summary: string, change: any, evidence: string[], provider_id: string, provider_trust: string, model_backed: boolean, status: string, created_at: number, decided_at: number|null, outcome: string|null}} Decision
+ * @typedef {{id: string, employee_id: string, role: string, title: string, summary: string, change: any, evidence: string[], provider_id: string, provider_trust: string, model_backed: boolean, rejection: string|null, status: string, created_at: number, decided_at: number|null, outcome: string|null}} Decision
  * @typedef {{employee_id: string, role: string, subject: {customer_id: string|null, document_id: string|null, project_id: string|null}, subject_name: string, reason: string}} WorkSuggestion
  */
 
@@ -195,6 +195,10 @@ function renderProposal(decision, showActions) {
   head.appendChild(badge(decision.status === "approved" ? "good" : decision.status === "rejected" ? "bad" : "warn", t("prop_status")(decision.status)));
   head.appendChild(badge(decision.model_backed ? "good" : "neutral", decision.model_backed ? t("prop_model") : t("prop_template")));
   head.appendChild(el("span", "status-line", t("prop_provider") + ": " + decision.provider_id));
+  // A model answered and was refused: say which kind of wrong it was. A
+  // template draft with no explanation reads the same whether the model
+  // slipped once or has never worked.
+  if (decision.rejection) head.appendChild(badge("warn", t("prop_rejected")(decision.rejection)));
   wrap.appendChild(head);
   wrap.appendChild(el("p", null, decision.summary));
   const details = el("details");

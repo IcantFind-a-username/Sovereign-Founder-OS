@@ -188,6 +188,13 @@ pub struct Decision {
     /// deterministic template did (the model was absent or its output failed
     /// validation). Shown to the founder, never hidden.
     pub model_backed: bool,
+    /// Why a model answer was not used, when one was received and refused.
+    /// A category, never the model's text — evidence records that something
+    /// happened, not what it was. `None` covers both "the model's answer was
+    /// used" and "no model answered at all"; `model_backed` and the
+    /// disclosure's skip reasons tell those apart.
+    #[serde(default)]
+    pub rejection: Option<String>,
     pub status: DecisionStatus,
     pub created_at: i64,
     #[serde(default)]
