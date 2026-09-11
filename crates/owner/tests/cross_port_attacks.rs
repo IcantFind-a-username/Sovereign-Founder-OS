@@ -91,6 +91,27 @@ impl Drop for Guarded {
 /// Parse one request and answer with the guard's verdict. Headers are kept in
 /// order with repeats, because that is what the guard needs to see.
 fn serve_one(mut stream: TcpStream) {
+    // An accepted socket inherits the listener's non-blocking flag on macOS
+    // and the BSDs, though not on Linux — measured on the macOS test host,
+    // where `read` on a freshly accepted socket with no data yet returns
+    // `WouldBlock`. The listener is non-blocking only so the accept loop can
+    // poll its shutdown flag. If the connection inherited that, `read_line`
+    // returned `WouldBlock` whenever the request had not landed yet, this
+    // function returned without reading it, and closing a socket with unread
+    // data sends a reset: the client saw `Connection reset by peer`. That was
+    // an intermittent macOS-only failure of this file (1 in 30 standalone),
+    // and why CI on Linux never saw it.
+    //
+    // The production broker already does exactly this after `accept`
+    // (`crates/authority/src/broker/listener.rs`). The timeout stops a caller
+    // that connects and never sends from wedging this single-threaded server.
+    if stream.set_nonblocking(false).is_err()
+        || stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .is_err()
+    {
+        return;
+    }
     let mut reader = BufReader::new(stream.try_clone().unwrap());
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
@@ -107,8 +128,13 @@ fn serve_one(mut stream: TcpStream) {
     let mut raw_headers = Vec::new();
     loop {
         let mut line = String::new();
-        if reader.read_line(&mut line).unwrap_or(0) == 0 {
-            break;
+        // A read error is not the end of the headers. Treating it as one would
+        // hand the guard a request it never fully received — and this file
+        // exists to attack that guard. Abandon the connection instead.
+        match reader.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(_) => return,
         }
         let line = line.trim_end().to_owned();
         if line.is_empty() {
