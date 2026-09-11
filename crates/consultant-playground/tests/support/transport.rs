@@ -109,6 +109,11 @@ const READ_WAIT: Duration = Duration::from_secs(1);
 /// Callers that built their own stream use this. `request` does not: it sets
 /// the wait before sending and calls the loop directly, so no socket option is
 /// ever set after bytes are on the wire.
+///
+/// This file is compiled into every test binary that includes it, and only
+/// `server_transport` calls this function directly — `apps/cli`'s binaries
+/// reach the loop through `request` alone, so there it is dead code.
+#[allow(dead_code)]
 pub fn read_response(stream: &mut TcpStream) -> io::Result<Response> {
     stream
         .set_read_timeout(Some(READ_WAIT))
