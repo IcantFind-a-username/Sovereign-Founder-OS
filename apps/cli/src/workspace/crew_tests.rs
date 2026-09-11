@@ -1,4 +1,4 @@
-use super::crew_roles::{build_input, parse_model_change};
+use super::crew_roles::{build_input, parse_model_change, prompt_for};
 use super::test_support::fake_ollama;
 use super::*;
 use sovereign_audit_ledger::AuditLedger;
@@ -621,4 +621,96 @@ fn a_real_model_answer_is_validated_and_marked_model_backed() {
     assert!(!decision.model_backed);
     assert_eq!(decision.provider_id, "ollama:test-model");
     assert!(decision.summary.contains("failed validation"));
+}
+
+/// The schema a prompt shows is itself an instruction, and a model copies its
+/// shape. Writing the allowed values as `"kind":"gap"|"contradiction"|…` read
+/// as a list of bare values: against qwen2.5:7b, four of six measured
+/// validation failures came back as `{"placeholder","detail":…}` with the key
+/// name dropped, and the whole finding list was refused for it.
+///
+/// So the enum belongs in the task text, and the schema shows one field of
+/// one type. This test pins that split — the shape that misled the model must
+/// not come back, and the four words must still be stated somewhere.
+#[test]
+fn the_quality_checker_prompt_states_its_enum_in_prose_not_in_the_schema() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Service").unwrap();
+    let workspace = store.add_customer("Acme Ltd", "", "notes").unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Offer, customer_id, None, "en")
+        .unwrap();
+    let document_id = workspace.documents[0].id;
+    let input = build_input(
+        &workspace,
+        RoleId::QualityChecker,
+        RunSubject {
+            customer_id: None,
+            document_id: Some(document_id),
+            project_id: None,
+        },
+        "en",
+    )
+    .unwrap();
+    let prompt = prompt_for(&input);
+
+    assert!(
+        prompt.contains(r#"{"findings":[{"kind":string,"detail":string}]}"#),
+        "the schema no longer shows one typed field per key: {prompt}"
+    );
+    assert!(
+        !prompt.contains(r#""kind":"gap""#),
+        "the alternation that misled the model is back in the schema"
+    );
+    for word in ["gap", "contradiction", "placeholder", "risk"] {
+        assert!(prompt.contains(word), "the prompt stopped naming {word}");
+    }
+
+    // And the parser still refuses the malformed shape, whatever the prompt
+    // says — a prompt is a request, not a guarantee.
+    assert!(parse_model_change(&input, r#"{"findings":[{"placeholder","detail":"x"}]}"#).is_none());
+}
+
+/// A model that answers, then repeats the same answer inside a code fence.
+/// Measured against qwen2.5:7b; the two objects are byte-identical and both
+/// valid, and spanning the first `{` to the last `}` produced a string that
+/// is neither. The answer was thrown away and the template used instead.
+#[test]
+fn an_answer_repeated_after_itself_is_still_read() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Service").unwrap();
+    let workspace = store.add_customer("Acme Ltd", "", "notes").unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Offer, customer_id, None, "en")
+        .unwrap();
+    let document_id = workspace.documents[0].id;
+    let input = build_input(
+        &workspace,
+        RoleId::QualityChecker,
+        RunSubject {
+            customer_id: None,
+            document_id: Some(document_id),
+            project_id: None,
+        },
+        "en",
+    )
+    .unwrap();
+
+    let once = r#"{"findings":[{"kind":"gap","detail":"no timeline"}]}"#;
+    let twice = format!("{once}```json\n{once}\n```");
+    let parsed = parse_model_change(&input, &twice).expect("the repeated answer was discarded");
+    match parsed {
+        ProposedChange::ReviewFindings { findings, .. } => {
+            assert_eq!(findings.len(), 1, "{findings:?}");
+            assert_eq!(findings[0].kind, "gap");
+        }
+        other => panic!("wrong change: {other:?}"),
+    }
+
+    // Reading only the first value must not soften any check: a first value
+    // that fails validation is still refused, whatever follows it.
+    let bad_then_good = format!(r#"{{"findings":[{{"kind":"not-a-kind","detail":"x"}}]}}{once}"#);
+    assert!(parse_model_change(&input, &bad_then_good).is_none());
 }
