@@ -1614,12 +1614,21 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   does not create fails the test, which walks the serialised report instead
   of naming fields.
 
-- [ ] **P2 | `apps/cli/src/workspace/reporting.rs` | Integrity self-audit covers the MVP events.**
-  Reconcile approved decisions (`decision.approved` must exist for every
-  approved decision), payments (`payment.record`), and compliance reports
-  (`compliance.checked`) against the chain, in both directions. Done when
-  `integrity_check` fails closed on a vault edited to add an approved
-  decision without its event.
+- [x] **P2 | `apps/cli/src/workspace/reporting.rs` | Integrity self-audit covers the MVP events.**
+  Landed 2026-09-11. Approved decisions (`decision.approved`), payments
+  (`payment.record`) and compliance reports (`compliance.checked`) reconcile
+  against the chain in both directions.
+  Payments and compliance reports are reconciled **by count, not existence**:
+  their signed event names the subject (the invoice, the venture) rather than
+  the record, so two payments against one invoice share a resource and the
+  second would otherwise hide behind the first one's evidence. The compliance
+  direction is one-way below the trim cap, because the store drops the oldest
+  report at `MAX_COMPLIANCE_REPORTS` while its event stays.
+  `integrity_check_covers_decisions_payments_and_compliance_reports` forges
+  each of the three in a saved vault and asserts a critical finding naming
+  the missing event, restoring to clean between cases so each is judged on
+  its own.
+
 - [ ] **P2 | `apps/cli/src/workspace/compliance_pack.rs` | Professional review pass over the Singapore pack.**
   Each rule's summary and check must be confirmed against its cited source
   by a person; rules that cannot be confirmed are demoted to `demo_rule` or
