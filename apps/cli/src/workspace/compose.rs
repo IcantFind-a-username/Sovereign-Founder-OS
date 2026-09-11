@@ -193,6 +193,83 @@ fn subject_line(document: &Document, zh: bool) -> String {
     }
 }
 
+/// The founder's own address is not recorded anywhere yet, so the composed
+/// message carries a reserved placeholder; the founder's mail client puts
+/// their real address on it when they send.
+const SENDER_PLACEHOLDER: &str = "founder@example.invalid";
+
+/// Who a message is from and to, and what it is called, as a person reads
+/// them. The composed headers encode exactly these values, and the preview
+/// shows exactly these values, so the two cannot drift apart.
+struct Envelope {
+    sender_name: String,
+    recipient_name: String,
+    recipient_addr: String,
+    subject: String,
+    zh: bool,
+}
+
+impl Envelope {
+    fn of(venture: Option<&Venture>, customer: Option<&Customer>, document: &Document) -> Self {
+        let zh = written_in_chinese(document);
+        Self {
+            sender_name: venture
+                .map(|venture| venture.name.clone())
+                .unwrap_or_else(|| "Sovereign Founder".to_owned()),
+            recipient_name: customer
+                .map(|customer| customer.name.clone())
+                .unwrap_or_else(|| "Customer".to_owned()),
+            recipient_addr: header_safe(
+                customer
+                    .map(|customer| customer.email.trim())
+                    .filter(|email| !email.is_empty())
+                    .unwrap_or("recipient@example.invalid"),
+            ),
+            subject: header_safe(&subject_line(document, zh)),
+            zh,
+        }
+    }
+}
+
+/// What the founder reads before approving a send: the message itself, and
+/// its envelope decoded for a person.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MessagePreview {
+    /// The message as it would be written, CRLF and encoded-words included.
+    pub message: String,
+    pub from: String,
+    pub to: String,
+    pub subject: String,
+    /// Everything after the headers, with the facts the system adds.
+    pub body: String,
+    /// The sender address is the reserved placeholder, not the founder's.
+    pub from_is_placeholder: bool,
+    /// No customer address is recorded; the recipient is a placeholder too.
+    pub to_is_placeholder: bool,
+}
+
+pub(super) fn preview_email(
+    venture: Option<&Venture>,
+    customer: Option<&Customer>,
+    document: &Document,
+) -> MessagePreview {
+    let envelope = Envelope::of(venture, customer, document);
+    let message = compose_email(venture, customer, document);
+    let body = message
+        .split_once("\r\n\r\n")
+        .map(|(_, body)| body.replace("\r\n", "\n"))
+        .unwrap_or_default();
+    MessagePreview {
+        from: format!("{} <{SENDER_PLACEHOLDER}>", envelope.sender_name),
+        to: format!("{} <{}>", envelope.recipient_name, envelope.recipient_addr),
+        subject: envelope.subject,
+        body,
+        from_is_placeholder: true,
+        to_is_placeholder: envelope.recipient_addr.ends_with(".invalid"),
+        message,
+    }
+}
+
 /// Compose a well-formed RFC 5322 message for an approved document. The result
 /// is written to the local outbox and never transmitted — an `X-Sovereign`
 /// header says so, and a missing recipient becomes an RFC 2606 `.invalid`
@@ -205,32 +282,22 @@ pub(super) fn compose_email(
     customer: Option<&Customer>,
     document: &Document,
 ) -> String {
-    let zh = written_in_chinese(document);
-    let sender_name = venture
-        .map(|venture| venture.name.as_str())
-        .unwrap_or("Sovereign Founder");
-    let recipient_name = customer
-        .map(|customer| customer.name.as_str())
-        .unwrap_or("Customer");
-    let recipient_addr = customer
-        .map(|customer| customer.email.trim())
-        .filter(|email| !email.is_empty())
-        .map(|email| email.to_owned())
-        .unwrap_or_else(|| "recipient@example.invalid".to_owned());
-    let placeholder = recipient_addr.ends_with(".invalid");
+    let envelope = Envelope::of(venture, customer, document);
+    let zh = envelope.zh;
+    let placeholder = envelope.recipient_addr.ends_with(".invalid");
 
     let mut message = String::new();
     message.push_str(&format!(
         "From: {}\r\n",
-        mailbox(sender_name, "founder@example.invalid")
+        mailbox(&envelope.sender_name, SENDER_PLACEHOLDER)
     ));
     message.push_str(&format!(
         "To: {}\r\n",
-        mailbox(recipient_name, &header_safe(&recipient_addr))
+        mailbox(&envelope.recipient_name, &envelope.recipient_addr)
     ));
     message.push_str(&format!(
         "Subject: {}\r\n",
-        encode_unstructured(&header_safe(&subject_line(document, zh)))
+        encode_unstructured(&envelope.subject)
     ));
     message.push_str(&format!("Date: {}\r\n", chrono::Utc::now().to_rfc2822()));
     message.push_str(&format!(
@@ -246,7 +313,7 @@ pub(super) fn compose_email(
     );
     if placeholder {
         message.push_str(
-            "X-Sovereign-Note: recipient address is a placeholder — set the customer's email before sending\r\n",
+            "X-Sovereign-Note: recipient address is a placeholder - set the customer's email before sending\r\n",
         );
     }
     message.push_str("\r\n");

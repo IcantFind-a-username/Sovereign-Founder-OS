@@ -473,6 +473,7 @@ function renderCommandDecisions(decisions, proposalsPending) {
     const row = el("div", "pad");
     row.appendChild(el("div", null, t("cc_decision_line")(d)));
     if (d.policy_reason) { const why = policyReason(d.action, d.policy_reason); why.className = "status-line"; row.appendChild(why); }
+    row.appendChild(messagePreview(d.document_id));
     const bar = el("div", "toolbar");
     const approve = el("button", "primary small", t("cc_approve"));
     approve.addEventListener("click", () => withBusy(approve, () => commandDecide(d.approval_id, true, d.document_title)));

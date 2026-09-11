@@ -1,4 +1,4 @@
-use super::compose::{draft_outreach_note, render_document};
+use super::compose::{draft_outreach_note, preview_email, render_document, MessagePreview};
 use super::store::AuditEntry;
 use super::util::{clean_email, clean_optional_text, clean_text, kernel, now};
 use super::*;
@@ -407,5 +407,54 @@ impl Store {
             }],
         )?;
         Ok(workspace)
+    }
+
+    /// The exact message approving this document's send would compose, so
+    /// the founder reads what goes out before deciding — headers, body and
+    /// the facts the system adds. Read-only: nothing is recorded or written,
+    /// and only the `Date` header differs from the approved file.
+    pub fn preview_message(&self, document_id: Uuid) -> Result<MessagePreview, WorkspaceError> {
+        let workspace = self.load()?;
+        let document = workspace.document(document_id)?;
+        let customer = workspace
+            .customers
+            .iter()
+            .find(|customer| customer.id == document.customer_id);
+        Ok(preview_email(
+            workspace.venture.as_ref(),
+            customer,
+            document,
+        ))
+    }
+
+    /// A composed message from the outbox, for the founder to open in their
+    /// own mail client — which is how anything this product composes is
+    /// actually sent. Only a file that an approval's signed evidence names,
+    /// and only while its bytes still hash to that evidence: a file changed
+    /// after approval is not what was approved, so it is refused rather than
+    /// handed over as if it were.
+    pub fn outbox_message(&self, relative_path: &str) -> Result<Vec<u8>, WorkspaceError> {
+        let workspace = self.load()?;
+        let evidence = workspace
+            .approvals
+            .iter()
+            .filter_map(|approval| approval.evidence.as_ref())
+            .filter_map(|evidence| evidence.outbox.as_ref())
+            .find(|outbox| outbox.relative_path == relative_path)
+            .ok_or_else(|| WorkspaceError::NotFound("outbox message".into()))?;
+        let broker =
+            sovereign_effects::OutboxBroker::open(self.root.join("outbox")).map_err(kernel)?;
+        let bytes = broker.read(relative_path).map_err(|error| match error {
+            sovereign_effects::EffectError::NotFound => {
+                WorkspaceError::NotFound("outbox message".into())
+            }
+            other => kernel(other),
+        })?;
+        if sovereign_audit_ledger::hash_bytes(&bytes) != evidence.content_sha256 {
+            return Err(WorkspaceError::Invalid(
+                "the outbox file no longer matches its signed evidence".into(),
+            ));
+        }
+        Ok(bytes)
     }
 }

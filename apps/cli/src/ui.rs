@@ -185,6 +185,9 @@ fn route(request: &mut tiny_http::Request, port: u16, root: &Path) -> UiResponse
         (Method::Get, "/api/workspace") => json_response(&workspace_get(root)),
         (Method::Get, "/api/export") => export_response(root),
         (Method::Get, "/api/model/status") => json_response(&crate::ui_mvp::model_status(root)),
+        (Method::Get, path) if path.starts_with("/api/outbox/") => {
+            outbox_response(root, &path["/api/outbox/".len()..])
+        }
         (Method::Post, "/api/gauntlet") => match read_json_body(request) {
             Ok(_) => json_response(&crate::ui_gauntlet::gauntlet_json()),
             Err(error) => bad_request(&error),
@@ -394,6 +397,39 @@ fn verify_export_json(body: &serde_json::Value) -> serde_json::Value {
     match workspace::verify_export(bundle) {
         Ok(report) => serde_json::json!({ "ok": true, "report": report }),
         Err(error) => serde_json::json!({ "ok": false, "error": error.to_string() }),
+    }
+}
+
+/// One composed `.eml` as a download, for the founder's own mail client.
+/// The store decides what may be served (see `Store::outbox_message`); the
+/// name reaches a header only after it has matched a signed receipt, which
+/// the broker wrote as `[A-Za-z0-9_-]+.eml`.
+fn outbox_response(root: &Path, name: &str) -> UiResponse {
+    let refused = |status: u16, error: String| {
+        json_response(&serde_json::json!({ "ok": false, "error": error })).with_status_code(status)
+    };
+    match workspace::Store::open(root).and_then(|store| store.outbox_message(name)) {
+        Ok(bytes) => Response::from_data(bytes)
+            .with_header(
+                Header::from_bytes(&b"Content-Type"[..], &b"message/rfc822"[..])
+                    .expect("static header"),
+            )
+            .with_header(
+                Header::from_bytes(
+                    &b"Content-Disposition"[..],
+                    format!("attachment; filename=\"{name}\"").as_bytes(),
+                )
+                .expect("a receipt name is a valid header value"),
+            )
+            .with_header(
+                Header::from_bytes(&b"X-Content-Type-Options"[..], &b"nosniff"[..])
+                    .expect("static header"),
+            ),
+        Err(workspace::WorkspaceError::NotFound(what)) => {
+            refused(404, format!("not found: {what}"))
+        }
+        Err(error @ workspace::WorkspaceError::Invalid(_)) => refused(409, error.to_string()),
+        Err(error) => refused(500, error.to_string()),
     }
 }
 
