@@ -1502,6 +1502,22 @@ while the controller routes eligible design/review cards to the strong role.
   runs a state-writing command with it set and asserts nothing was created
   under `dirs::data_local_dir()/sovereign-founder-os`.
 
+- [ ] **P2 | `crates/capability/`, `crates/consultant-playground/`, `apps/cli/src/workspace/` | Split four files before their next change fails the gate.**
+  Measured 2026-09-11 against the 1200-line ceiling:
+  `crates/capability/src/v2.rs` 1183 (**17 lines of room**),
+  `crates/consultant-playground/src/http.rs` 1158,
+  `apps/cli/src/workspace/compliance.rs` 1143,
+  `apps/cli/src/workspace/tests.rs` 1129.
+  Twice on 2026-09-11 a feature was finished in a file already near the
+  limit and the gate reported it after the work, not before it — the rule to
+  split first was already in `CLAUDE.md` and was not followed. `v2.rs` is the
+  urgent one: it is security code, and the next fix to it will not fit.
+  Each split is a pure move — the way `crew_template.rs` and `ui_gauntlet.rs`
+  were done that day: find the seam where the dependency runs one way, move
+  verbatim, confirm the test count is unchanged, and for anything that runs
+  (a route, a gauntlet) exercise it live rather than trusting the build. Done
+  when every file is under 1000 lines, so the next change has room.
+
 ## MVP product line
 
 Founder MVP — Consultant Core v1, built by the orchestrator session on

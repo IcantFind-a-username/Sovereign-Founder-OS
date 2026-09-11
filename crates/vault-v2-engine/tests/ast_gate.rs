@@ -24,6 +24,7 @@ const ROOTS: &[&str] = &[
     "tests/build_gate.rs",
     "tests/ast_gate.rs",
     "tests/public.rs",
+    "src/main.rs",
 ];
 
 /// The two `include!` edges that let the build script's gate logic be the
@@ -34,10 +35,11 @@ const ADMITTED_INCLUDES: &[(&str, &str)] = &[
     ("tests/build_gate.rs", "../build_gate.rs"),
 ];
 
-/// Empty until the queued FFI item lands `src/engine/ffi.rs` and
-/// `src/engine/process.rs`; the whole crate is unsafe-free today and
-/// `src/lib.rs` additionally carries `#![forbid(unsafe_code)]`.
-const FFI_BOUNDARY_FILES: &[&str] = &[];
+/// The files allowed to contain `unsafe` and `extern`. `src/engine/ffi.rs`
+/// joined with the SQLCipher key shim; `src/engine/process.rs` joins when the
+/// OpenSSL bootstrap lands, and the plan expects nothing else ever to. The
+/// library keeps `#![forbid(unsafe_code)]` regardless.
+const FFI_BOUNDARY_FILES: &[&str] = &["src/engine/ffi.rs"];
 
 const ALLOWED_MACROS: &[&str] = &[
     "assert",
@@ -61,6 +63,13 @@ const ALLOWED_MACROS: &[&str] = &[
     "unreachable",
     "unimplemented",
     "compile_error",
+    // The plan names both: "Add `static_assertions::assert_not_impl_any!` for
+    // both `DbKey` and `RawSqlcipherKey`" and "positively assert the intended
+    // zeroize-on-drop traits". Compile-time only; they generate no code that
+    // runs, and the single-segment rule below still forbids calling them —
+    // or anything — by a path that could alias past this list.
+    "assert_not_impl_any",
+    "assert_impl_all",
 ];
 
 const ALLOWED_ATTRIBUTES: &[&str] = &[
@@ -92,6 +101,11 @@ const ALLOWED_DERIVES: &[&str] = &[
     "Ord",
     "Hash",
     "Default",
+    // Key holders are zeroed on drop. The plan pins
+    // `zeroize = { version = "=1.9.0", features = ["derive"] }` — the derive
+    // feature is enabled for exactly these two.
+    "Zeroize",
+    "ZeroizeOnDrop",
 ];
 
 fn real_config() -> GateConfig<'static> {
@@ -119,7 +133,12 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
         vec![
             "build.rs",
             "build_gate.rs",
+            "src/engine/ffi.rs",
+            "src/engine/mod.rs",
+            "src/engine/secret.rs",
+            "src/engine/sqlcipher.rs",
             "src/lib.rs",
+            "src/main.rs",
             "tests/ast_gate.rs",
             "tests/build_gate.rs",
             "tests/gate.rs",
