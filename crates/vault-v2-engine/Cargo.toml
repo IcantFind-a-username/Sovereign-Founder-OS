@@ -21,6 +21,10 @@ name = "sovereign_vault_v2_engine"
 path = "src/lib.rs"
 
 [[test]]
+name = "public"
+path = "tests/public.rs"
+
+[[test]]
 name = "build_gate"
 path = "tests/build_gate.rs"
 
@@ -29,6 +33,13 @@ name = "ast_gate"
 path = "tests/ast_gate.rs"
 
 [dependencies]
+# Exact pins per the Program 1A plan. `bundled-sqlcipher-vendored-openssl`
+# builds both SQLCipher and OpenSSL from vendored source, so the encryption
+# this crate will rely on is the version reviewed here rather than whatever
+# the host happens to ship.
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled-sqlcipher-vendored-openssl", "hooks", "limits"] }
+openssl-sys = { version = "=0.9.117", default-features = false }
+zeroize = { version = "=1.9.0", features = ["derive"] }
 
 [dev-dependencies]
 # Exact pins per the Program 1A plan: the source-closure gate classifies

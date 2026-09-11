@@ -23,6 +23,7 @@ const ROOTS: &[&str] = &[
     "src/lib.rs",
     "tests/build_gate.rs",
     "tests/ast_gate.rs",
+    "tests/public.rs",
 ];
 
 /// The two `include!` edges that let the build script's gate logic be the
@@ -122,6 +123,7 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
             "tests/ast_gate.rs",
             "tests/build_gate.rs",
             "tests/gate.rs",
+            "tests/public.rs",
         ],
         "the source closure changed — a new file must be a declared target \
          root, a resolved module, or an admitted include, and this pin must \
