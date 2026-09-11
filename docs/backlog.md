@@ -1468,11 +1468,23 @@ while the controller routes eligible design/review cards to the strong role.
   the blob on failure, and a test with an unwritable quarantine dir asserts
   the failure surfaces.
 
-- [ ] **P3 | `apps/cli/src/` | Split `ui.rs` (1058 lines) along its three concerns.**
-  It currently mixes HTTP header plumbing/routing, static-asset serving, and
-  live policy evaluation. Done when: split into ~3 modules each well under
-  the limit, `cargo test -p sovereign-cli` passes, and behavior is unchanged
-  (same routes serve the same assets).
+- [x] **P3 | `apps/cli/src/` | Split `ui.rs` along its concerns.**
+  Landed 2026-09-11. The entry said 1058 lines; it had reached **1157**
+  against a 1200 ceiling — forty-three lines of room, which is the shape of
+  the failure hit twice earlier the same day: the gate reports it after the
+  work is done, not before it starts.
+  `ui_gauntlet.rs` takes the whole security gauntlet (647 and 527 lines). The
+  cut is there rather than at the entry's suggested three-way split because
+  the dependency runs one way — the gauntlet uses nothing from the HTTP
+  surface and the surface uses one function from it — and one clean seam
+  beats three argued ones. The remaining two concerns (header plumbing and
+  static assets) are 647 lines together and can stay until one of them has a
+  reason of its own to move.
+  A pure move: 90 workspace tests and 7 binaries unchanged, `cargo fix` chose
+  the imports. Verified through the running route, not only by compiling —
+  `POST /api/gauntlet` returns 11 results, all passing. That count corrected
+  a stale comment claiming "the seven attacks"; there are ten plus the
+  baseline, which is what the interface had said all along.
 
 - [ ] **P3 | `apps/cli/src/` | Add a `--root` flag so the app can run against a throwaway state directory.**
   `data_dir()` (main.rs:78-82) is the only root resolver —
