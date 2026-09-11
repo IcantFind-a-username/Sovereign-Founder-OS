@@ -20,6 +20,13 @@ build = "build.rs"
 name = "sovereign_vault_v2_engine"
 path = "src/lib.rs"
 
+# The dedicated process that will hold raw key material. Everything that
+# touches a key lives in modules compiled into this target only, so the
+# library target stays value-free and nothing downstream can name them.
+[[bin]]
+name = "sovereign-vault-v2-engine"
+path = "src/main.rs"
+
 [[test]]
 name = "public"
 path = "tests/public.rs"
@@ -48,3 +55,6 @@ zeroize = { version = "=1.9.0", features = ["derive"] }
 syn = { version = "=2.0.118", default-features = false, features = ["full", "parsing", "visit"] }
 proc-macro2 = { version = "=1.0.106", default-features = false }
 tempfile = "3"
+# Compile-time proof that key holders cannot be cloned, printed or
+# serialised. Exact pin per the Program 1A plan.
+static_assertions = "=1.1.0"
