@@ -799,6 +799,40 @@ fn verify_export_accepts_genuine_bundle_and_rejects_tampering() {
     let workspace = store.request_send(document_id).unwrap();
     store.decide(workspace.approvals[0].id, true).unwrap();
 
+    // One of everything else the workspace can hold, so the inventory below
+    // is checked against a bundle where no kind is missing.
+    let workspace = store
+        .add_project(customer_id, "Landing page sprint", None, Some(250_000))
+        .unwrap();
+    let project_id = workspace.projects[0].id;
+    store.add_task(project_id, "Draft the copy", None).unwrap();
+    store
+        .add_follow_up(customer_id, 1_800_000_000, "Ask about phase two")
+        .unwrap();
+    store
+        .record_payment(document_id, 250_000, 1_700_000_000, "bank transfer")
+        .unwrap();
+    let workspace = store.hire_employee(RoleId::Analyst, "Analyst").unwrap();
+    let employee_id = workspace.employees[0].id;
+    // Running an employee produces both a decision and a model disclosure,
+    // even with no model configured: the template drafter is a provider and
+    // the disclosure records that it saw the customer's data.
+    let decision = store
+        .run_employee(
+            employee_id,
+            RunSubject {
+                customer_id: Some(customer_id),
+                document_id: None,
+                project_id: None,
+            },
+            "en",
+        )
+        .unwrap();
+    store.decide_proposal(decision.id, true).unwrap();
+    store
+        .run_compliance_check(ComplianceSubject { document_id: None }, "en")
+        .unwrap();
+
     let bundle = store.export().unwrap();
 
     // A genuine export verifies end to end: format, identity binding, and
@@ -813,9 +847,32 @@ fn verify_export_accepts_genuine_bundle_and_rejects_tampering() {
     assert!(report.identity_bound);
     assert!(report.audit_chain_verified);
     assert!(report.audit_events >= 1);
-    assert_eq!(report.customers, 1);
-    assert_eq!(report.documents, 1);
-    assert_eq!(report.signed_approvals, 1);
+    assert_eq!(report.contents.customers, 1);
+    assert_eq!(report.contents.documents, 1);
+    assert_eq!(report.contents.signed_approvals, 1);
+
+    // Every kind the inventory knows about is present in this bundle, checked
+    // by walking the rendered report rather than by naming fields — so a new
+    // collection added to `ExportContents` that this test does not create
+    // fails here instead of quietly reporting zero to a founder forever.
+    let rendered = serde_json::to_value(&report.contents).unwrap();
+    let fields = rendered.as_object().expect("contents is an object");
+    assert!(fields.len() >= 12, "the inventory shrank: {fields:?}");
+    for (name, value) in fields {
+        match value {
+            serde_json::Value::Number(count) => assert!(
+                count.as_u64().unwrap_or(0) > 0,
+                "the bundle holds no {name}, so the count is untested"
+            ),
+            serde_json::Value::Bool(present) => {
+                assert!(
+                    *present,
+                    "the bundle has no {name}, so the flag is untested"
+                )
+            }
+            other => panic!("{name} is neither a count nor a flag: {other}"),
+        }
+    }
 
     // Tampering with a recorded action breaks the signed chain and is
     // caught — the verifier fails closed and says why.

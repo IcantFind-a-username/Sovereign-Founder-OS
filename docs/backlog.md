@@ -1597,12 +1597,23 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   above it — say "no earlier checks". Documents page: a long title pushes the
   second action button onto its own line. Done when both are gone in `zh`
   and `en`.
-- [ ] **P2 | `apps/cli/src/workspace/` | Export/verify-export learns the new entities.**
-  `verify_export` counts only customers/documents/approvals; extend the
-  report (and the UI) to projects, tasks, follow-ups, payments, employees,
-  decisions, and compliance reports, and document what stays excluded. Done
-  when `verify_export_accepts_genuine_bundle_and_rejects_tampering` covers a
-  bundle with every entity.
+- [x] **P2 | `apps/cli/src/workspace/` | Export/verify-export learns the new entities.**
+  Landed 2026-09-11. `ExportVerification.contents` is an `ExportContents`
+  with one field per collection in `Workspace` — projects, tasks,
+  follow-ups, payments, employees, decisions, compliance reports and model
+  disclosures alongside the original three, plus `venture_present`. Reported
+  by the CLI and the Company page.
+  Named an inventory rather than a verification, in the type, the CLI and the
+  UI: the signed chain covers the recorded *events*, so a bundle with every
+  project removed still verifies every cryptographic check. Reconciling state
+  against the chain is the integrity self-audit's job, queued separately
+  below. Nothing is excluded but `version` and `venture` itself, neither a
+  collection.
+  Two layers keep it from rotting: a new field in `ExportContents` that
+  `verify_export` does not fill fails the **build**, and one that the test
+  does not create fails the test, which walks the serialised report instead
+  of naming fields.
+
 - [ ] **P2 | `apps/cli/src/workspace/reporting.rs` | Integrity self-audit covers the MVP events.**
   Reconcile approved decisions (`decision.approved` must exist for every
   approved decision), payments (`payment.record`), and compliance reports
