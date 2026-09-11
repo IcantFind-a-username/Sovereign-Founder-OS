@@ -239,8 +239,72 @@ pub struct ModelDisclosure {
     pub stayed_local: bool,
     pub data_class: String,
     pub output_chars: usize,
-    /// Providers skipped before this one answered (health-aware failover).
-    pub failover_from: Vec<String>,
+    /// Providers skipped before this one answered, and why.
+    pub failover_from: Vec<SkippedProvider>,
+}
+
+/// A provider the gateway passed over on the way to the one that answered.
+///
+/// The reason is the point. A founder who configured a model and got a
+/// template draft cannot otherwise tell "the model was wrong this time" from
+/// "the model has never once worked" — and the second one hid a transport
+/// defect for the whole life of the Ollama adapter while every surface in the
+/// product reported the provider healthy.
+#[derive(Debug, Clone, Serialize)]
+pub struct SkippedProvider {
+    pub provider_id: String,
+    /// `None` on records written before the reason was kept. "No reason
+    /// given" and "the reason was never recorded" are different claims, and
+    /// an audit log that cannot tell them apart invites a reader to guess.
+    pub reason: Option<String>,
+}
+
+impl From<&sovereign_model::SkipReason> for SkippedProvider {
+    fn from(skip: &sovereign_model::SkipReason) -> Self {
+        // Matched exhaustively on purpose: a new cause in the gateway must
+        // break this build rather than reach the owner as a blank reason.
+        let reason = match skip.reason {
+            sovereign_model::SkipCause::RedDataConfidentiality => "red_data_confidentiality",
+            sovereign_model::SkipCause::Unhealthy => "unhealthy",
+            sovereign_model::SkipCause::Failed => "failed",
+            sovereign_model::SkipCause::RawRequestIsLocalOnly => "raw_request_is_local_only",
+        };
+        Self {
+            provider_id: skip.provider_id.clone(),
+            reason: Some(reason.to_owned()),
+        }
+    }
+}
+
+/// Accepts both shapes this field has had: a bare provider id, written before
+/// reasons were kept, and the object written since. A workspace on disk is
+/// the owner's record; a format change must not quietly drop what it holds.
+impl<'de> Deserialize<'de> for SkippedProvider {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Stored {
+            IdOnly(String),
+            WithReason {
+                provider_id: String,
+                #[serde(default)]
+                reason: Option<String>,
+            },
+        }
+        Ok(match Stored::deserialize(deserializer)? {
+            Stored::IdOnly(provider_id) => Self {
+                provider_id,
+                reason: None,
+            },
+            Stored::WithReason {
+                provider_id,
+                reason,
+            } => Self {
+                provider_id,
+                reason,
+            },
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

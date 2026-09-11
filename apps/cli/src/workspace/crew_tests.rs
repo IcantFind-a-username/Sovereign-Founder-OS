@@ -714,3 +714,78 @@ fn an_answer_repeated_after_itself_is_still_read() {
     let bad_then_good = format!(r#"{{"findings":[{{"kind":"not-a-kind","detail":"x"}}]}}{once}"#);
     assert!(parse_model_change(&input, &bad_then_good).is_none());
 }
+
+/// The disclosure says why each provider was passed over, not just that it
+/// was. This is the shape of the failure that hid the Ollama chunked-transfer
+/// defect for the whole life of that adapter: configured, reported healthy on
+/// every surface, and skipped on every real request.
+#[test]
+fn a_skipped_provider_is_recorded_with_the_reason_it_was_skipped() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Service").unwrap();
+    let workspace = store.add_customer("Acme Ltd", "", "notes").unwrap();
+    let customer_id = workspace.customers[0].id;
+
+    // A port nothing is listening on: the health probe fails, so the gateway
+    // skips it and the template drafter answers.
+    let dead = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = dead.local_addr().unwrap().port();
+    drop(dead);
+    std::fs::write(
+        _dir.path().join(MODEL_CONFIG_FILE),
+        format!(
+            r#"{{"ollama":{{"enabled":true,"base_url":"http://127.0.0.1:{port}","model":"test-model"}}}}"#
+        ),
+    )
+    .unwrap();
+
+    let employee_id = hired(&store, RoleId::Analyst);
+    let decision = store
+        .run_employee(employee_id, customer_subject(customer_id), "en")
+        .unwrap();
+    assert!(!decision.model_backed, "nothing answered but the template");
+
+    let disclosure = store.load().unwrap().disclosures.pop().unwrap();
+    let skipped = &disclosure.failover_from;
+    assert_eq!(skipped.len(), 1, "{skipped:?}");
+    assert_eq!(skipped[0].provider_id, "ollama:test-model");
+    assert_eq!(
+        skipped[0].reason.as_deref(),
+        Some("unhealthy"),
+        "the owner is told the provider was skipped but not why: {skipped:?}"
+    );
+}
+
+/// A workspace on disk is the owner's record, and this field has had two
+/// shapes: a bare provider id, and the object that carries the reason. Both
+/// must load, and a record written before reasons existed must say so rather
+/// than claim one.
+#[test]
+fn a_disclosure_written_before_reasons_existed_still_loads() {
+    let base = serde_json::json!({
+        "id": Uuid::new_v4(),
+        "at": 1_700_000_000,
+        "customer_id": Uuid::new_v4(),
+        "task": "crew.analyst",
+        "provider_id": "local-drafter",
+        "provider_trust": "local",
+        "stayed_local": true,
+        "data_class": "amber",
+        "output_chars": 12,
+    });
+
+    let mut old = base.clone();
+    old["failover_from"] = serde_json::json!(["ollama:gone"]);
+    let old: ModelDisclosure = serde_json::from_value(old).expect("the old shape must still load");
+    assert_eq!(old.failover_from[0].provider_id, "ollama:gone");
+    assert!(
+        old.failover_from[0].reason.is_none(),
+        "a record with no reason must not be given one"
+    );
+
+    let mut new = base;
+    new["failover_from"] =
+        serde_json::json!([{ "provider_id": "ollama:gone", "reason": "unhealthy" }]);
+    let new: ModelDisclosure = serde_json::from_value(new).expect("the current shape must load");
+    assert_eq!(new.failover_from[0].reason.as_deref(), Some("unhealthy"));
+}

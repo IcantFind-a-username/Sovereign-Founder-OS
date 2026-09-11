@@ -132,10 +132,10 @@ impl Store {
             .map_err(|error| WorkspaceError::Invalid(format!("drafting assistant: {error}")))?;
 
         let provider_trust = format!("{:?}", disclosure.provider_trust).to_lowercase();
-        let failover_from: Vec<String> = disclosure
+        let failover_from: Vec<SkippedProvider> = disclosure
             .skipped
             .iter()
-            .map(|entry| entry.provider_id.clone())
+            .map(SkippedProvider::from)
             .collect();
 
         // Persist the disclosure to the owner-visible log — never the

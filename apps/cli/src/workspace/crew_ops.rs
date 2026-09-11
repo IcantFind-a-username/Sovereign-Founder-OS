@@ -186,7 +186,7 @@ impl Store {
                     disclosure
                         .skipped
                         .iter()
-                        .map(|entry| entry.provider_id.clone())
+                        .map(SkippedProvider::from)
                         .collect::<Vec<_>>(),
                 )
             }
