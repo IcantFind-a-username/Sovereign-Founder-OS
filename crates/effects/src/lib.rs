@@ -175,6 +175,54 @@ impl OutboxBroker {
         }
     }
 
+    /// Read back a file previously written to the outbox, addressed by the
+    /// exact relative path from its receipt. Same name discipline as
+    /// [`revoke`](Self::revoke): the name is re-derived and must match, so no
+    /// caller can reach outside the outbox; only a regular file is read, never
+    /// through a symlink; and the read is capped at the write ceiling, so a
+    /// file swapped in behind the broker's back cannot be arbitrarily large.
+    pub fn read(&self, relative_path: &str) -> Result<Vec<u8>, EffectError> {
+        use std::io::Read;
+        let (key, extension) = relative_path
+            .rsplit_once('.')
+            .ok_or(EffectError::UnsafeName)?;
+        let file_name = safe_file_name(key, extension)?;
+        if file_name != relative_path {
+            return Err(EffectError::UnsafeName);
+        }
+        let target = self.root.join(&file_name);
+        let checked = match std::fs::symlink_metadata(&target) {
+            Ok(metadata) if metadata.file_type().is_file() => metadata,
+            Ok(_) => return Err(EffectError::UnsafeExistingTarget),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(EffectError::NotFound)
+            }
+            Err(error) => return Err(io(error)),
+        };
+        let file = std::fs::File::open(&target).map_err(io)?;
+        // The entry checked above and the file opened must be one and the
+        // same: a symlink swapped in between the two would otherwise be
+        // followed after the check had passed.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            let opened = file.metadata().map_err(io)?;
+            if (opened.dev(), opened.ino()) != (checked.dev(), checked.ino()) {
+                return Err(EffectError::UnsafeExistingTarget);
+            }
+        }
+        #[cfg(not(unix))]
+        let _ = checked;
+        let mut contents = Vec::new();
+        file.take(MAX_OUTBOX_BYTES as u64 + 1)
+            .read_to_end(&mut contents)
+            .map_err(io)?;
+        if contents.len() > MAX_OUTBOX_BYTES {
+            return Err(EffectError::ContentTooLarge);
+        }
+        Ok(contents)
+    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }
@@ -338,6 +386,51 @@ mod tests {
         for bad in ["../secret.txt", "a/b.txt", "noext", "sub/../x.eml"] {
             assert_eq!(broker.revoke(bad), Err(EffectError::UnsafeName), "{bad}");
         }
+    }
+
+    /// Reading back is how the founder gets the composed message into their
+    /// own mail client. It answers only for a file the broker could have
+    /// written, and never follows a link out of the outbox.
+    #[test]
+    fn read_returns_the_written_bytes_and_refuses_everything_else() {
+        let dir = tempdir().unwrap();
+        let outbox = dir.path().join("outbox");
+        let broker = OutboxBroker::open(&outbox).unwrap();
+        let receipt = broker
+            .write_message("doc-7", EffectDataClass::Amber, b"Subject: hi\r\n\r\nbody")
+            .unwrap();
+        assert_eq!(
+            broker.read(&receipt.relative_path).unwrap(),
+            b"Subject: hi\r\n\r\nbody"
+        );
+
+        for bad in [
+            "../secret.txt",
+            "a/b.eml",
+            "noext",
+            "sub/../x.eml",
+            "doc-7.eml/",
+        ] {
+            assert_eq!(broker.read(bad), Err(EffectError::UnsafeName), "{bad}");
+        }
+        assert_eq!(broker.read("absent.eml"), Err(EffectError::NotFound));
+
+        // A symlink planted in the outbox is not followed out of it.
+        std::fs::write(dir.path().join("outside.txt"), b"not yours").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(dir.path().join("outside.txt"), outbox.join("link.eml"))
+            .unwrap();
+        #[cfg(not(unix))]
+        return;
+        assert_eq!(
+            broker.read("link.eml"),
+            Err(EffectError::UnsafeExistingTarget)
+        );
+
+        // A file grown past the ceiling behind the broker's back is refused
+        // rather than read whole.
+        std::fs::write(outbox.join("big.eml"), vec![b'x'; MAX_OUTBOX_BYTES + 1]).unwrap();
+        assert_eq!(broker.read("big.eml"), Err(EffectError::ContentTooLarge));
     }
 
     #[test]

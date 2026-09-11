@@ -220,6 +220,21 @@ fn non_ascii_headers_are_encoded_words_that_round_trip() {
     );
 }
 
+/// The placeholder note for a customer with no address is a header too,
+/// and it must be ASCII like every other header line.
+#[test]
+fn a_placeholder_recipient_keeps_the_header_block_ascii() {
+    let offer = document(DocumentKind::Offer, "报价", "说明", Some(100));
+    let message = compose_email(
+        Some(&venture("晓岸咨询", "SGD", "")),
+        Some(&customer("翠林", "")),
+        &offer,
+    );
+    let (headers, _) = split(&message);
+    assert!(headers.contains("X-Sovereign-Note: recipient address is a placeholder"));
+    assert!(headers.is_ascii(), "{headers}");
+}
+
 #[test]
 fn money_uses_the_company_currency_and_groups_digits() {
     assert_eq!(format_money("SGD", 0), "SGD 0.00");

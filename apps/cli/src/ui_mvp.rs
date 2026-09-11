@@ -114,6 +114,11 @@ pub(crate) fn workspace_post(path: &str, body: &Body, root: &Path) -> Option<Bod
                 .receivables()
                 .map(|rows| serde_json::json!({ "ok": true, "receivables": rows }))
         }),
+        "/api/workspace/message-preview" => read(root, |store| {
+            store
+                .preview_message(uuid_field(body, "document_id")?)
+                .map(|preview| serde_json::json!({ "ok": true, "preview": preview }))
+        }),
         "/api/workspace/timeline" => read(root, |store| {
             store
                 .customer_timeline(uuid_field(body, "customer_id")?)

@@ -358,7 +358,23 @@ function renderDocumentCard(d) {
   const approvalWithEvidence = ws.approvals.find(a => a.document_id === d.id && a.evidence);
   if (approvalWithEvidence) {
     wrap.appendChild(el("div", "mono", t("ws_evidence")(approvalWithEvidence.evidence)));
-    if (approvalWithEvidence.evidence.outbox) wrap.appendChild(el("div", "mono", t("ws_outbox")(approvalWithEvidence.evidence.outbox)));
+    const outbox = approvalWithEvidence.evidence.outbox;
+    if (outbox) {
+      wrap.appendChild(el("div", "mono", t("ws_outbox")(outbox)));
+      // Composing is not sending: the founder sends it. Hand them the file
+      // rather than a path into a hidden folder.
+      if (d.status === "approved_pending_delivery" || d.status === "delivered") {
+        const bar = el("div", "toolbar");
+        // Same shape as the export link on the Company page.
+        const link = /** @type {HTMLAnchorElement} */ (el("a"));
+        link.href = "/api/outbox/" + encodeURIComponent(outbox.relative_path);
+        link.setAttribute("download", outbox.relative_path);
+        link.appendChild(el("button", "ghost small", t("msg_download")));
+        bar.appendChild(link);
+        if (d.status === "approved_pending_delivery") bar.appendChild(el("span", "status-line", t("msg_download_hint")));
+        wrap.appendChild(bar);
+      }
+    }
   }
   if (editingDocumentId === d.id && editable) {
     const form = el("div", "form-grid");
@@ -386,6 +402,39 @@ function renderDocumentCard(d) {
   return wrap;
 }
 
+/** The exact message a send will compose, fetched when opened: what the
+ *  founder approves is what they have read, headers and added facts too. */
+function messagePreview(documentId) {
+  const details = /** @type {HTMLDetailsElement} */ (el("details", "message-preview"));
+  details.appendChild(el("summary", null, t("msg_preview")));
+  const pre = el("pre", null, "…");
+  details.appendChild(pre);
+  details.addEventListener("toggle", async () => {
+    if (!details.open || details.dataset.loaded) return;
+    const result = await api("/api/workspace/message-preview", { document_id: documentId });
+    if (!result.ok) { pre.textContent = result.error; return; }
+    const p = result.preview;
+    details.dataset.loaded = "1";
+    // The envelope as a person reads it; the encoded original is one more
+    // click away for anyone who wants the exact bytes.
+    const envelope = el("dl", "role-facts");
+    [["msg_from", p.from], ["msg_to", p.to], ["msg_subject", p.subject]].forEach(([key, value]) => {
+      envelope.appendChild(el("dt", null, t(key)));
+      envelope.appendChild(el("dd", null, value));
+    });
+    details.insertBefore(envelope, pre);
+    pre.textContent = p.body;
+    if (p.from_is_placeholder) details.appendChild(el("div", "status-line", t("msg_from_note")));
+    if (p.to_is_placeholder) details.appendChild(el("div", "status-line", t("msg_to_note")));
+    const raw = el("details");
+    raw.appendChild(el("summary", null, t("msg_raw")));
+    raw.appendChild(el("pre", null, p.message.replace(/\r\n/g, "\n")));
+    details.appendChild(raw);
+    details.appendChild(el("div", "status-line", t("msg_preview_note")));
+  });
+  return details;
+}
+
 /** Why a send waits for the founder, in their words; the engine's own
  *  wording stays one hover away rather than being the headline. */
 function policyReason(action, reason) {
@@ -405,6 +454,7 @@ function renderApprovals() {
     const info = el("div");
     info.appendChild(el("div", null, t("ws_approval_for") + (doc ? doc.title : a.document_id)));
     info.appendChild(policyReason(a.action, a.policy_reason));
+    info.appendChild(messagePreview(a.document_id));
     row.appendChild(info);
     const actions = el("div", "actions");
     const approve = el("button", "approve", "✓ " + t("ws_approve"));

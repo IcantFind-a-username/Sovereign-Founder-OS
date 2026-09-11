@@ -33,11 +33,25 @@ pub struct UiServer {
 pub struct Response {
     pub status: u16,
     pub body: Vec<u8>,
+    /// Read only by the binaries that check a download's headers; the
+    /// others compile this file too, where it would be dead code.
+    #[allow(dead_code)]
+    headers: Vec<(String, String)>,
 }
 
 impl Response {
     pub fn json(&self) -> serde_json::Value {
         serde_json::from_slice(&self.body).expect("response body is JSON")
+    }
+
+    /// One response header, by case-insensitive name. Dead code in the
+    /// binaries that only check status and body.
+    #[allow(dead_code)]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(field, _)| field.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
     }
 }
 
@@ -67,6 +81,28 @@ impl UiServer {
     #[allow(dead_code)]
     pub fn port(&self) -> u16 {
         self.port
+    }
+
+    /// Find a file the server wrote under its home, by name. The data
+    /// directory differs per OS (`Library/Application Support` on macOS,
+    /// `XDG_DATA_HOME` elsewhere), so this searches rather than guessing.
+    /// Dead code in the binaries that never look at disk.
+    #[allow(dead_code)]
+    pub fn find_file(&self, name: &str) -> Option<std::path::PathBuf> {
+        fn walk(dir: &std::path::Path, name: &str) -> Option<std::path::PathBuf> {
+            for entry in std::fs::read_dir(dir).ok()?.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(found) = walk(&path, name) {
+                        return Some(found);
+                    }
+                } else if path.file_name().and_then(|n| n.to_str()) == Some(name) {
+                    return Some(path);
+                }
+            }
+            None
+        }
+        walk(self._home.path(), name)
     }
 
     /// A GET with the app's own `Host`, no body, no credential.
@@ -167,9 +203,20 @@ fn parse(raw: &[u8]) -> Response {
     } else {
         raw[body_at..].to_vec()
     };
+    let headers = response
+        .headers
+        .iter()
+        .map(|header| {
+            (
+                header.name.to_owned(),
+                String::from_utf8_lossy(header.value).into_owned(),
+            )
+        })
+        .collect();
     Response {
         status: response.code.expect("status code"),
         body,
+        headers,
     }
 }
 

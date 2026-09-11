@@ -38,6 +38,7 @@ const POST_ROUTES: &[&str] = &[
     "/api/workspace/follow-up",
     "/api/workspace/follow-up/done",
     "/api/workspace/invoice",
+    "/api/workspace/message-preview",
     "/api/workspace/offer",
     "/api/workspace/offer/accepted",
     "/api/workspace/payment",
@@ -74,6 +75,10 @@ const NOT_ROUTES: &[(&str, &str)] = &[
     (
         "/api/privacy/",
         "the prefix guard that dispatches to the privacy handlers",
+    ),
+    (
+        "/api/outbox/",
+        "the prefix guard for composed-message downloads; every answer it gives is pinned in ui_outbox.rs",
     ),
     (
         "/api/workspace/nope",
