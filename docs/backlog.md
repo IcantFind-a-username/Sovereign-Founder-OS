@@ -1517,25 +1517,31 @@ while the controller routes eligible design/review cards to the strong role.
   verbatim, confirm the test count is unchanged, and for anything that runs
   (a route, a gauntlet) exercise it live rather than trusting the build. Done
   when every file is under 1000 lines, so the next change has room.
-- [ ] **P2 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.**
-  Found 2026-09-11 when a change passed the local gate and failed CI. The gate
-  maps each changed path to the package that *owns* it, so an edit to
-  `crates/consultant-playground/tests/support/transport.rs` scopes clippy and
-  tests to `sovereign-consultant-playground` alone. But `apps/cli` compiles
-  that file into two of its own test binaries by `#[path]`, with no Cargo
-  edge between them, so the breakage (a helper left dead in those binaries,
-  refused by `-D warnings`) was invisible until CI's workspace-wide clippy.
-  Three such includes exist today, all from `apps/cli/tests/`:
-  `consultant-playground/tests/support/transport.rs` (twice) and
-  `consultant-playground/src/{catalog,domain}.rs` — so a change to the
-  playground's *source*, not only its test support, has the same blind spot.
-  Fix: after mapping paths to packages, resolve every `#[path = "…"]` in the
-  workspace against its including file, and when the target is in the change
-  set add the *including* file's package too. Bash 3.2 has no `realpath -m`,
-  so resolve by joining and normalising in the script or fall back to FULL for
-  any changed file that is a `#[path]` target. Done when a self-test in
-  `scripts/tests/` changes an included file and asserts the including
-  package lands in scope — and a mutation that drops the new mapping fails it.
+- [ ] **P3 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.**
+  Re-scoped from P2 on 2026-09-11, the same day it was filed: the first
+  version missed that the gap is a **documented, deliberate** trade-off. The
+  script's own header says scoped runs do not rebuild reverse dependencies
+  and that "CI runs the full workspace on every push and is the backstop for
+  cross-crate breakage". This case was caught by exactly that backstop, at
+  the cost of one CI round-trip and one fix commit.
+  What makes `#[path]` still worth closing, and distinct from the accepted
+  reverse-dependency gap: an included file has **no Cargo edge** to its
+  includer, so even a future reverse-dependency scan would not see it; and
+  there are only three, all from `apps/cli/tests/` into
+  `crates/consultant-playground/` (`tests/support/transport.rs` twice,
+  `src/{catalog,domain}.rs` once) — including the playground's *source*, not
+  only its test support.
+  How, when it is done: the scope must be observable without running cargo,
+  and the obvious way — an env var that prints the scope and exits 0 — is the
+  premature-success path the gate's own self-test #5 exists to forbid. So
+  extract the path-to-package mapping into a sourced `scripts/lib/` function
+  that both the gate and `gate_portability_test.sh` call, keeping the
+  `# ---- map paths to scopes` anchor in `test_changed.sh` for self-test #5.
+  Then resolve every `#[path = "…"]` against its including file (bash 3.2:
+  `cd "$(dirname …)" && pwd -P`, no `realpath -m`) and add the includer's
+  package when the target is in the change set. Done when the self-test
+  feeds a changed include target and asserts the includer's package is in
+  scope, and a mutation that drops the new mapping fails it.
 
 ## MVP product line
 
