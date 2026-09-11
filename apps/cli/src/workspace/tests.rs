@@ -559,7 +559,9 @@ fn compose_email_is_wellformed_and_injection_safe() {
     let message = compose_email(Some(&venture), Some(&with_email), &document);
     assert!(message.contains("From: Acme <founder@example.invalid>"));
     assert!(message.contains("To: \"Dr. Tan\" <dr.tan@example.com>"));
-    assert!(message.contains("Subject: Offer — Acme"));
+    // The em dash makes the subject non-ASCII: it travels as an RFC 2047
+    // word (`compose_tests.rs` decodes these), never as raw UTF-8.
+    assert!(message.contains("Subject: =?UTF-8?B?T2ZmZXIg4oCUIEFjbWU=?=\r\n"));
     assert!(message.contains("Message-ID: <"));
     assert!(message.contains("X-Sovereign-Composed:"));
     assert!(!message.contains("placeholder"));

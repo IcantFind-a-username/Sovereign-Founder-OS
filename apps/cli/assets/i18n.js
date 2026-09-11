@@ -118,6 +118,7 @@ const STRINGS = {
     sec_disclosures: "Data disclosures — every time a model saw your customer data",
     sec_disclosures_note: "Your right to know who processed your data. Each row is one call to the drafting assistant: which provider answered, whether the provider claims the data never left this device — its own report, which this app does not verify — and which providers were skipped on the way. The suggestion itself is never stored — only the disclosure.",
     disclosures_empty: "No model has been shown customer data yet.",
+    disclosure_company: "Company profile (no customer)",
     th_provider: "Provider", th_where: "Where", th_class: "Data class", th_failover: "Skipped",
     skip_reason: (r) => ({
       unhealthy: "not answering",
@@ -267,6 +268,7 @@ const STRINGS = {
     sec_disclosures: "数据披露 —— 每一次模型接触你的客户数据",
     sec_disclosures_note: "你有权知道谁处理了你的数据。每一行对应一次调用起草助手:哪个提供方作出应答、提供方自称数据是否留在本机(这是它自己的说法,本应用不做验证)、以及沿途跳过了哪些提供方。建议内容本身从不存储 —— 只记录披露事实。",
     disclosures_empty: "尚无模型接触过客户数据。",
+    disclosure_company: "公司资料(不涉及客户)",
     th_provider: "提供方", th_where: "位置", th_class: "数据分级", th_failover: "已跳过",
     skip_reason: (r) => ({
       unhealthy: "没有应答",

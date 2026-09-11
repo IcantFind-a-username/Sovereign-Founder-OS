@@ -188,6 +188,37 @@ fn analyst_run_creates_a_pending_decision_with_a_disclosure_and_no_state_change(
         .any(|g| g.kind == "decide_proposals" && g.count == 1));
 }
 
+/// The summary lands in the founder's own notes, so it is written in the
+/// language the notes are in — not English headings around Chinese items.
+#[test]
+fn a_chinese_discovery_summary_gets_chinese_headings() {
+    let (_dir, store, customer_id) = seeded();
+    store
+        .update_customer(
+            customer_id,
+            CustomerInput {
+                name: "Acme Ltd".into(),
+                email: "alex@example.com".into(),
+                discovery_notes: "目前订单靠 Excel 对账,每月漏单约 5%。预算大约 8000 新元。".into(),
+                jurisdiction: "SG".into(),
+                personal_data_consent: true,
+                ..CustomerInput::default()
+            },
+        )
+        .unwrap();
+    let employee_id = hired(&store, RoleId::Analyst);
+    let decision = store
+        .run_employee(employee_id, customer_subject(customer_id), "zh")
+        .unwrap();
+    let workspace = store.decide_proposal(decision.id, true).unwrap();
+    let notes = &workspace.customers[0].discovery_notes;
+    assert!(notes.contains("--- 需求整理(AI 需求分析员,"), "{notes}");
+    for heading in ["问题:\n", "约束:\n", "待澄清:\n", "假设:\n", "预算:"] {
+        assert!(notes.contains(heading), "missing {heading:?} in {notes}");
+    }
+    assert!(!notes.contains("Budget: ") && !notes.contains("Problems:"));
+}
+
 #[test]
 fn approving_a_discovery_summary_appends_notes_and_is_audited() {
     let (dir, store, customer_id) = seeded();

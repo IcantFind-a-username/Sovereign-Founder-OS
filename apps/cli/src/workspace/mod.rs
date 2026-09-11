@@ -49,6 +49,8 @@ mod verify;
 #[cfg(test)]
 mod compliance_tests;
 #[cfg(test)]
+mod compose_tests;
+#[cfg(test)]
 mod crew_tests;
 #[cfg(test)]
 mod erp_tests;

@@ -1050,11 +1050,16 @@ impl Store {
                     }
                 }
                 let provider_trust = format!("{:?}", disclosure.provider_trust).to_lowercase();
+                // The findings shown to the model are about one invoice's
+                // customer, or about the company alone. Name that subject:
+                // a nil customer on the chain says "a customer" and names no
+                // one, which is not what happened in either case.
+                let disclosed_customer = document.map(|document| document.customer_id);
                 disclosure_event = Some((
                     ModelDisclosure {
                         id: Uuid::new_v4(),
                         at: now_unix,
-                        customer_id: Uuid::nil(),
+                        customer_id: disclosed_customer.unwrap_or(Uuid::nil()),
                         task: "crew.compliance_checker".into(),
                         provider_id: provider_id.clone(),
                         stayed_local: provider_trust == "local",
@@ -1069,7 +1074,9 @@ impl Store {
                     },
                     AuditEntry {
                         action: "model.drafted".into(),
-                        resource: format!("customer:{}", Uuid::nil()),
+                        resource: disclosed_customer
+                            .map(|id| format!("customer:{id}"))
+                            .unwrap_or_else(|| "venture:profile".to_owned()),
                         payload: serde_json::json!({
                             "task": "crew.compliance_checker",
                             "provider": provider_id,

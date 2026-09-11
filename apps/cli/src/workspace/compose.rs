@@ -1,4 +1,4 @@
-use super::util::now;
+use super::util::{has_chinese, local_date, now};
 use super::*;
 
 use uuid::Uuid;
@@ -54,7 +54,7 @@ pub(super) fn render_document(
                 "INVOICE (DRAFT)\n\nFrom: {}\nBill to: {}\nAmount: {}\n\nPayment terms to be confirmed.\nThis draft was generated locally by Sovereign Founder OS and has not been issued.",
                 venture.name,
                 customer.name,
-                format_amount(amount_cents.unwrap_or(0)),
+                format_money(&venture.currency, amount_cents.unwrap_or(0)),
             ),
         ),
         (DocumentKind::Invoice, true) => (
@@ -63,7 +63,7 @@ pub(super) fn render_document(
                 "发票(草稿)\n\n开票方:{}\n客户:{}\n金额:{}\n\n付款条款待确认。\n本草稿由 Sovereign Founder OS 在本地生成,尚未开具。",
                 venture.name,
                 customer.name,
-                format_amount(amount_cents.unwrap_or(0)),
+                format_money(&venture.currency, amount_cents.unwrap_or(0)),
             ),
         ),
     };
@@ -84,8 +84,113 @@ pub(super) fn render_document(
     }
 }
 
-fn format_amount(cents: u64) -> String {
-    format!("$ {}.{:02}", cents / 100, cents % 100)
+/// `SGD 8,000.00`: the company's own currency code and grouped digits. The
+/// code comes from the profile rather than a symbol, because `$` alone is
+/// five different currencies in the markets this product covers.
+pub(super) fn format_money(currency: &str, cents: u64) -> String {
+    let whole = (cents / 100).to_string();
+    let mut grouped = String::with_capacity(whole.len() + whole.len() / 3);
+    for (index, digit) in whole.chars().enumerate() {
+        if index > 0 && (whole.len() - index).is_multiple_of(3) {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    let code = currency.trim();
+    if code.is_empty() {
+        format!("{grouped}.{:02}", cents % 100)
+    } else {
+        format!("{code} {grouped}.{:02}", cents % 100)
+    }
+}
+
+/// Whether a document is written in Chinese. The composed message has no
+/// language field to consult, and the right language for the lines the
+/// system adds is the one the founder wrote (or approved) the document in.
+fn written_in_chinese(document: &Document) -> bool {
+    has_chinese(&document.title) || has_chinese(&document.body)
+}
+
+/// The facts a customer needs to act on, stated by the system from the
+/// approved record rather than left to the body text.
+///
+/// A drafted body is prose — an AI employee's, or the founder's own edit —
+/// and nothing guarantees it repeats the amount, still matches it after the
+/// amount field was edited, or says when payment is due. These lines are
+/// rendered from the fields the founder saw on the card and approved, so the
+/// message cannot ask for a number the record does not hold.
+fn outgoing_facts(venture: Option<&Venture>, document: &Document, zh: bool) -> Vec<String> {
+    if document.amount_cents.is_none() && document.due_at.is_none() {
+        return Vec::new();
+    }
+    let invoice = document.kind == DocumentKind::Invoice;
+    let currency = venture
+        .map(|venture| venture.currency.as_str())
+        .unwrap_or("");
+    let mut lines = Vec::new();
+    if let Some(cents) = document.amount_cents {
+        let label = match (invoice, zh) {
+            (true, true) => "应付金额",
+            (true, false) => "Amount due",
+            (false, true) => "报价金额",
+            (false, false) => "Quoted amount",
+        };
+        lines.push(format!(
+            "{label}{}{}",
+            if zh { ":" } else { ": " },
+            format_money(currency, cents)
+        ));
+    }
+    if let (true, Some(due_at)) = (invoice, document.due_at) {
+        let date = local_date(due_at);
+        lines.push(if zh {
+            format!("付款期限:{date}")
+        } else {
+            format!("Payment due: {date}")
+        });
+    }
+    if let Some(venture) = venture {
+        let issuer = if venture.uen.trim().is_empty() {
+            venture.name.clone()
+        } else if zh {
+            format!("{}(UEN {})", venture.name, venture.uen.trim())
+        } else {
+            format!("{} (UEN {})", venture.name, venture.uen.trim())
+        };
+        lines.push(match (invoice, zh) {
+            (true, true) => format!("开票方:{issuer}"),
+            (true, false) => format!("Issued by: {issuer}"),
+            (false, true) => format!("报价方:{issuer}"),
+            (false, false) => format!("From: {issuer}"),
+        });
+    }
+    let reference = document.id.simple().to_string()[..8].to_ascii_uppercase();
+    lines.push(if zh {
+        format!("参考编号:{reference}")
+    } else {
+        format!("Reference: {reference}")
+    });
+    lines
+}
+
+/// The subject names the document's kind, so an invoice titled after its
+/// project still reads as an invoice in the customer's inbox — unless the
+/// title already says so.
+fn subject_line(document: &Document, zh: bool) -> String {
+    let (label, words): (&str, &[&str]) = match (document.kind, zh) {
+        (DocumentKind::Invoice, true) => ("发票", &["发票", "invoice"]),
+        (DocumentKind::Invoice, false) => ("Invoice", &["invoice", "发票"]),
+        (DocumentKind::Offer, true) => ("报价", &["报价", "方案", "提案", "offer", "proposal"]),
+        (DocumentKind::Offer, false) => ("Offer", &["offer", "proposal", "quote", "报价"]),
+    };
+    let lowered = document.title.to_lowercase();
+    if words.iter().any(|word| lowered.contains(word)) {
+        document.title.clone()
+    } else if zh {
+        format!("{label}:{}", document.title)
+    } else {
+        format!("{label}: {}", document.title)
+    }
 }
 
 /// Compose a well-formed RFC 5322 message for an approved document. The result
@@ -94,11 +199,13 @@ fn format_amount(cents: u64) -> String {
 /// placeholder the founder must replace before sending. Header values come from
 /// validated fields (names carry no control characters, emails no CR/LF or
 /// separators), and are re-sanitized here, so no field can inject a header.
+/// Non-ASCII header text is carried as RFC 2047 encoded-words.
 pub(super) fn compose_email(
     venture: Option<&Venture>,
     customer: Option<&Customer>,
     document: &Document,
 ) -> String {
+    let zh = written_in_chinese(document);
     let sender_name = venture
         .map(|venture| venture.name.as_str())
         .unwrap_or("Sovereign Founder");
@@ -114,15 +221,17 @@ pub(super) fn compose_email(
 
     let mut message = String::new();
     message.push_str(&format!(
-        "From: {} <founder@example.invalid>\r\n",
-        encode_display_name(sender_name)
+        "From: {}\r\n",
+        mailbox(sender_name, "founder@example.invalid")
     ));
     message.push_str(&format!(
-        "To: {} <{}>\r\n",
-        encode_display_name(recipient_name),
-        header_safe(&recipient_addr)
+        "To: {}\r\n",
+        mailbox(recipient_name, &header_safe(&recipient_addr))
     ));
-    message.push_str(&format!("Subject: {}\r\n", header_safe(&document.title)));
+    message.push_str(&format!(
+        "Subject: {}\r\n",
+        encode_unstructured(&header_safe(&subject_line(document, zh)))
+    ));
     message.push_str(&format!("Date: {}\r\n", chrono::Utc::now().to_rfc2822()));
     message.push_str(&format!(
         "Message-ID: <{}@sovereign-founder-os.invalid>\r\n",
@@ -130,6 +239,8 @@ pub(super) fn compose_email(
     ));
     message.push_str("MIME-Version: 1.0\r\n");
     message.push_str("Content-Type: text/plain; charset=utf-8\r\n");
+    // The body is raw UTF-8; without this line MIME reads it as 7-bit.
+    message.push_str("Content-Transfer-Encoding: 8bit\r\n");
     message.push_str(
         "X-Sovereign-Composed: composed locally by Sovereign Founder OS; not transmitted\r\n",
     );
@@ -139,20 +250,89 @@ pub(super) fn compose_email(
         );
     }
     message.push_str("\r\n");
-    for line in document.body.split('\n') {
+    for line in document.body.trim_end().split('\n') {
         message.push_str(line.trim_end_matches('\r'));
         message.push_str("\r\n");
+    }
+    let facts = outgoing_facts(venture, document, zh);
+    if !facts.is_empty() {
+        message.push_str("\r\n--\r\n");
+        for line in facts {
+            message.push_str(&line);
+            message.push_str("\r\n");
+        }
     }
     message
 }
 
-/// Render an RFC 5322 display-name: kept bare when it is a safe atom, otherwise
-/// a quoted-string with `\\` and `"` escaped. CR/LF are stripped defensively.
+/// Longest encoded-word written here, delimiters included. RFC 2047 caps a
+/// word at 75 and any line holding one at 76; 60 leaves room on the first
+/// line for the longest header name this module writes (`Subject: `).
+const MAX_ENCODED_WORD: usize = 60;
+
+/// Carry non-ASCII header text as RFC 2047 `B` (base64) encoded-words,
+/// folded one word per line. Plain ASCII passes through untouched. Each word
+/// holds whole characters — the RFC forbids splitting one across words.
+///
+/// `B` rather than `Q`: a Chinese character costs 4 characters here and 9 in
+/// `Q`, so a company or customer name fits in one word. That matters beyond
+/// length. The RFC says the space between two adjacent words is ignored, and
+/// not every reader honours it — Python's parser, measured, renders a name
+/// split across two words with a space in the middle.
+fn encode_unstructured(text: &str) -> String {
+    use base64::Engine as _;
+    if text.is_ascii() {
+        return text.to_owned();
+    }
+    const PREFIX: &str = "=?UTF-8?B?";
+    const SUFFIX: &str = "?=";
+    // Base64 turns every 3 bytes into 4 characters.
+    let byte_budget = (MAX_ENCODED_WORD - PREFIX.len() - SUFFIX.len()) / 4 * 3;
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for ch in text.chars() {
+        if current.len() + ch.len_utf8() > byte_budget {
+            chunks.push(std::mem::take(&mut current));
+        }
+        current.push(ch);
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
+        .iter()
+        .map(|chunk| {
+            let encoded = base64::engine::general_purpose::STANDARD.encode(chunk.as_bytes());
+            format!("{PREFIX}{encoded}{SUFFIX}")
+        })
+        .collect::<Vec<_>>()
+        .join("\r\n ")
+}
+
+/// `name <address>`. An encoded name folds before the address, so the line
+/// holding the encoded-words stays within RFC 2047's limit however long the
+/// address is.
+fn mailbox(name: &str, address: &str) -> String {
+    let display = encode_display_name(name);
+    if !name.is_ascii() {
+        format!("{display}\r\n <{address}>")
+    } else {
+        format!("{display} <{address}>")
+    }
+}
+
+/// Render an RFC 5322 display-name: kept bare when it is a safe atom, a
+/// quoted-string with `\\` and `"` escaped when it is other ASCII, and
+/// encoded-words when it is not ASCII (an encoded-word may not sit inside a
+/// quoted-string). CR/LF are stripped defensively.
 fn encode_display_name(name: &str) -> String {
     let sanitized: String = name
         .chars()
         .filter(|ch| *ch != '\r' && *ch != '\n')
         .collect();
+    if !sanitized.is_ascii() {
+        return encode_unstructured(&sanitized);
+    }
     let needs_quoting = sanitized.is_empty()
         || sanitized
             .chars()

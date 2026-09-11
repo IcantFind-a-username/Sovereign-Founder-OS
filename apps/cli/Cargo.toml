@@ -36,6 +36,7 @@ sovereign-privacy = { workspace = true }
 sovereign-sandbox = { workspace = true }
 sovereign-vault = { workspace = true }
 sovereign-workflow = { workspace = true }
+base64 = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 hex = { workspace = true }
