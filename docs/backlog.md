@@ -1529,6 +1529,17 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   shows it in both languages. The category is never the model's text: a test
   asserts the rejected text does not reach the stored record.
 
+- [ ] **P3 | `apps/cli/src/workspace/compliance.rs` | Split it before the next change hits the ceiling.**
+  1143 lines against a 1200 limit, with its unit tests already moved out to
+  `compliance/tests.rs` — that relief is spent. The next feature in there
+  fails the gate after the work is done, which is the wrong time to find out.
+  The natural cut is the same one `crew_roles`/`crew_template` took: rule
+  evaluation (`run_compliance_check` and the finding builders) apart from
+  retrieval and the model summary (`tokens`, `retrieval`, `validate_summary`).
+  Check the dependency direction first and cut where it runs one way.
+  Done when: no file in `apps/cli/src/workspace/` is over 1000 lines and
+  `cargo test -p sovereign-cli` is unchanged by the move.
+
 - [ ] **P2 | `apps/cli/src/` | HTTP-layer tests for the MVP routes.**
   Extend the loopback HTTP boundary (HO-002) to cover `/api/workspace/profile`,
   `customer/update`, `document/update`, `project`, `task`, `follow-up`,

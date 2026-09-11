@@ -5,9 +5,8 @@
 //! change nothing until the founder approves.
 
 use super::compliance::{ComplianceSubject, FindingStatus};
-use super::crew_roles::{
-    build_input, deterministic_change, parse_model_change, prompt_for, role_card, summarize_change,
-};
+use super::crew_roles::{build_input, parse_model_change, prompt_for, role_card};
+use super::crew_template::{deterministic_change, summarize_change};
 use super::crew_types::*;
 use super::model_config::providers_for;
 use super::store::AuditEntry;

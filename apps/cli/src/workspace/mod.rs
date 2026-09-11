@@ -31,6 +31,7 @@ mod compliance_pack;
 mod compose;
 mod crew_ops;
 mod crew_roles;
+mod crew_template;
 mod crew_types;
 mod erp_ops;
 mod erp_types;
