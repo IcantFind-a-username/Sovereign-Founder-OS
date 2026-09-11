@@ -882,18 +882,31 @@ while the controller routes eligible design/review cards to the strong role.
   in `cargo test -p sovereign-cli`, reusing the existing workspace fixtures
   rather than inventing new state.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Tie delivery revocation to authority revocation and purge expired claims on open.**
-  Blocked on the `crates/capability` entry above. Today `revoke_delivery`
-  (ops.rs:336) removes the outbox file while the underlying capability and
-  approval stay consumable, and `purge_expired` is never called in product
-  code. Wire: revoking a delivery also revokes its capability fingerprint and
-  approval id in the workspace authority store (attached at
-  kernel_exec.rs:281-284) and appends an audit event; workspace open calls
-  `purge_expired` under the amendment's retention rules. Done when: a test
-  revokes a pending delivery and a subsequent dispatch attempt through
-  `execute_in_sandbox` fails closed with the revocation error, a test proves
-  expired records are purged on open, and `cargo test -p sovereign-cli`
-  passes.
+- [x] **P2 | `apps/cli/src/workspace/` | Purge expired authority claims. (Was: also tie delivery revocation to authority revocation.)**
+  Landed 2026-09-11, half implemented and half withdrawn on evidence.
+  **Purging is done.** `purge_expired` had never been called from product
+  code — every claim a founder's machine ever made was still on disk — and
+  the delivery path now purges when it opens the authority store. There
+  rather than on workspace open because `Store::open` runs on every request
+  and a directory scan per request to tidy records that age in hours is the
+  wrong trade; a delivery is rare and already pays for crypto and a sandbox.
+  A failed purge does not fail the delivery: housekeeping is not a gate.
+  `expired_authority_claims_are_purged_and_live_ones_are_not` checks both
+  directions — a purge at `now()` must remove nothing, because deleting a
+  live claim would delete the evidence that makes a replay recognisable.
+  **The revocation half was withdrawn: its premise no longer holds.** The
+  entry says "the underlying capability and approval stay consumable". They
+  do not, since the bundle transaction landed (#90). Probed on a real
+  delivery: the authority store afterwards holds 1 token, 1 approval, 1
+  idempotency and 2 bundle records — all consumed — so a replay already
+  fails as `Replay`/`AlreadyConsumed`, and revoking them after the fact
+  would protect nothing. Revoking the approval would also be the wrong
+  gesture now that a revoked document reopens as a new draft (#93): the
+  founder is withdrawing one send, not their ability to authorise another.
+  The one case where revocation would still bite — a dispatch interrupted
+  between minting the bundle and committing it, resumed after the founder
+  revoked the delivery — belongs with the execution-journal entry below,
+  which is where Indeterminate records are reconciled.
 
 - [ ] **P2 | `tests/adversarial/` | Pin the transactional/revocation security invariants cross-crate.**
   Blocked on everything above. Two invariants as adversarial tests, driven

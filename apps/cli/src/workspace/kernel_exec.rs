@@ -278,10 +278,26 @@ impl Store {
         .map_err(kernel)?
         .with_approval_trust(approval_trust, OWNER_APPROVAL_ISSUER)
         .map_err(kernel)?
-        .with_authority_store(
-            sovereign_authority::AuthorityStore::open(self.root.join("authority"))
-                .map_err(kernel)?,
-        );
+        .with_authority_store({
+            let store = sovereign_authority::AuthorityStore::open(self.root.join("authority"))
+                .map_err(kernel)?;
+            // Consumed claims are kept so a replay is recognised as one, and
+            // they stop being useful the moment the authority they record
+            // has expired — after that they are only growth. Nothing in the
+            // product had ever called this, so every claim a founder's
+            // machine ever made was still on disk.
+            //
+            // Here rather than on workspace open: `Store::open` runs on
+            // every request, and a directory scan per request to tidy
+            // records that age in hours is the wrong trade. A delivery is
+            // rare and already pays for crypto and a sandbox.
+            //
+            // A failed purge does not fail the delivery. Housekeeping is not
+            // a gate, and a store too unhealthy to purge will fail the claims
+            // below on its own — which is the check that matters.
+            let _ = purge_authority_claims(&store, now());
+            store
+        });
         let mut executor = VerifiedSandboxExecutor::new(vec![selector], validator)
             .map_err(kernel)?
             .with_execution_journal(
@@ -442,6 +458,17 @@ fn evaluate_delivery_policy(
         ));
     }
     Ok(decision)
+}
+
+/// Drop claim records whose authority has expired, returning how many went.
+///
+/// Separate from its caller so a test can ask for a horizon: in production
+/// the horizon is simply now, and nothing that has not expired is touched.
+pub(super) fn purge_authority_claims(
+    store: &sovereign_authority::AuthorityStore,
+    now_unix: i64,
+) -> usize {
+    store.purge_expired(now_unix).unwrap_or(0)
 }
 
 /// Assemble the evidence record persisted onto the approval: everything the
