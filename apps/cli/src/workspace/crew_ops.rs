@@ -10,7 +10,7 @@ use super::crew_template::{deterministic_change, summarize_change};
 use super::crew_types::*;
 use super::model_config::providers_for;
 use super::store::AuditEntry;
-use super::util::{clean_text, now};
+use super::util::{clean_text, has_chinese, local_date, now};
 use super::*;
 
 use sovereign_contracts::{AutomationLevel, DataClass};
@@ -614,20 +614,41 @@ fn apply_change(
             open_questions,
             assumptions,
         } => {
-            let date = chrono::DateTime::from_timestamp(at, 0)
-                .map(|stamp| stamp.format("%Y-%m-%d").to_string())
-                .unwrap_or_default();
-            let mut section = format!("\n\n--- Discovery summary (AI Analyst, {date}) ---\n");
-            for (heading, items) in [
-                ("Problems", problems),
-                ("Constraints", constraints),
-                ("Open questions", open_questions),
-                ("Assumptions", assumptions),
-            ] {
+            let date = local_date(at);
+            // The summary lands in the founder's own notes, so its headings
+            // follow the language the content came back in.
+            let zh = [problems, constraints, open_questions, assumptions]
+                .into_iter()
+                .flatten()
+                .chain(std::iter::once(budget))
+                .any(|text| has_chinese(text));
+            let (title, headings, none, budget_label) = if zh {
+                (
+                    format!("需求整理(AI 需求分析员,{date})"),
+                    ["问题", "约束", "待澄清", "假设"],
+                    "(无)",
+                    "预算",
+                )
+            } else {
+                (
+                    format!("Discovery summary (AI Analyst, {date})"),
+                    ["Problems", "Constraints", "Open questions", "Assumptions"],
+                    "(none)",
+                    "Budget",
+                )
+            };
+            let mut section = format!("\n\n--- {title} ---\n");
+            for (heading, items) in
+                headings
+                    .into_iter()
+                    .zip([problems, constraints, open_questions, assumptions])
+            {
                 section.push_str(heading);
                 section.push_str(":\n");
                 if items.is_empty() {
-                    section.push_str("- (none)\n");
+                    section.push_str("- ");
+                    section.push_str(none);
+                    section.push('\n');
                 }
                 for item in items {
                     section.push_str("- ");
@@ -635,7 +656,8 @@ fn apply_change(
                     section.push('\n');
                 }
             }
-            section.push_str("Budget: ");
+            section.push_str(budget_label);
+            section.push_str(if zh { ":" } else { ": " });
             section.push_str(budget);
             section.push('\n');
             let customer = workspace.customer_mut(*customer_id)?;

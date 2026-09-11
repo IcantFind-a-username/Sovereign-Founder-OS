@@ -19,6 +19,20 @@ fn actions(dir: &tempfile::TempDir) -> Vec<String> {
     ledger.events().iter().map(|e| e.action.clone()).collect()
 }
 
+/// The subject the chain names for the latest model call.
+fn last_model_resource(dir: &tempfile::TempDir) -> String {
+    let device = DeviceIdentity::load(&dir.path().join("device.json")).unwrap();
+    let ledger =
+        AuditLedger::load(&dir.path().join("ledger.json"), device.public_key_b64()).unwrap();
+    ledger
+        .events()
+        .iter()
+        .rev()
+        .find(|e| e.action == "model.drafted")
+        .map(|e| e.resource.clone())
+        .unwrap()
+}
+
 fn profile(
     jurisdiction: &str,
     gst: bool,
@@ -186,6 +200,10 @@ fn a_singapore_company_report_checks_gst_pdpa_contracts_and_deadlines() {
         &events[events.len() - 2..],
         ["model.drafted", "compliance.checked"]
     );
+    // A company check shows the model the company's findings, not any one
+    // customer's record: the chain says so instead of naming a nil customer.
+    assert_eq!(last_model_resource(&dir), "venture:profile");
+    assert!(workspace.disclosures.last().unwrap().customer_id.is_nil());
 
     // Recording consent and registering for GST changes the facts and the
     // verdicts; the digest changes with them.
@@ -214,7 +232,7 @@ fn a_singapore_company_report_checks_gst_pdpa_contracts_and_deadlines() {
 
 #[test]
 fn an_invoice_subject_checks_essentials_and_gst_particulars() {
-    let (_dir, store) = store();
+    let (dir, store) = store();
     store
         .update_venture_profile(profile("SG", true, None, Some(1_705_276_800)))
         .unwrap();
@@ -236,6 +254,19 @@ fn an_invoice_subject_checks_essentials_and_gst_particulars() {
         )
         .unwrap();
     assert_eq!(report.subject, format!("document:{invoice_id}"));
+    // The model saw this invoice's findings: the disclosure names its
+    // customer, on the chain and in the founder's log.
+    assert_eq!(last_model_resource(&dir), format!("customer:{customer_id}"));
+    assert_eq!(
+        store
+            .load()
+            .unwrap()
+            .disclosures
+            .last()
+            .unwrap()
+            .customer_id,
+        customer_id
+    );
     // Document reports carry only document-level rules.
     let ids: Vec<&str> = report.findings.iter().map(|f| f.rule_id.as_str()).collect();
     assert!(ids.contains(&"SG-INV-01") && ids.contains(&"SG-GST-02"));

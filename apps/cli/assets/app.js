@@ -223,7 +223,7 @@ function renderState() {
       [t("th_time"), t("th_customer"), t("th_provider"), t("th_where"), t("th_class"), t("th_failover")],
       dl.map(d => [
         new Date(d.at * 1000).toLocaleString(locale()),
-        d.customer,
+        d.customer == null ? t("disclosure_company") : d.customer,
         d.provider + " (" + d.provider_trust + ")",
         d.stayed_local ? badge("good", t("stayed_local")) : badge("warn", t("left_device")),
         d.data_class,

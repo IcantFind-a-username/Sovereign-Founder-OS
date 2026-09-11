@@ -86,6 +86,28 @@ pub(super) fn now() -> i64 {
     chrono::Utc::now().timestamp()
 }
 
+/// Whether text contains Chinese characters. Used where the system writes
+/// lines into content that has no language field of its own, so those lines
+/// match the language the content is already in.
+pub(super) fn has_chinese(text: &str) -> bool {
+    text.chars()
+        .any(|ch| ('\u{4e00}'..='\u{9fff}').contains(&ch))
+}
+
+/// A unix time as the founder's calendar date. This is a local-first app:
+/// the machine's own time zone is the founder's, and a UTC date written into
+/// their notes reads as yesterday for half the world after midnight.
+pub(super) fn local_date(unix: i64) -> String {
+    chrono::DateTime::from_timestamp(unix, 0)
+        .map(|stamp| {
+            stamp
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d")
+                .to_string()
+        })
+        .unwrap_or_default()
+}
+
 pub(super) fn storage(error: impl std::fmt::Display) -> WorkspaceError {
     WorkspaceError::Storage(error.to_string())
 }

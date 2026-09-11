@@ -536,13 +536,21 @@ fn disclosures_json(root: &Path) -> serde_json::Value {
         Ok(workspace) => workspace,
         Err(_) => return serde_json::json!([]),
     };
-    let named = |id| {
-        workspace
-            .customers
-            .iter()
-            .find(|customer| customer.id == id)
-            .map(|customer| customer.name.clone())
-            .unwrap_or_else(|| "(unknown)".into())
+    // A nil customer is a company-level call (a compliance check of the
+    // profile): `null`, which the page names in the founder's language. A
+    // customer that has since been removed stays "(unknown)".
+    let named = |id: uuid::Uuid| {
+        if id.is_nil() {
+            return serde_json::Value::Null;
+        }
+        serde_json::Value::String(
+            workspace
+                .customers
+                .iter()
+                .find(|customer| customer.id == id)
+                .map(|customer| customer.name.clone())
+                .unwrap_or_else(|| "(unknown)".into()),
+        )
     };
     let mut entries: Vec<serde_json::Value> = workspace
         .disclosures
