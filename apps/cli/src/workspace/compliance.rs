@@ -1043,7 +1043,7 @@ impl Store {
                         failover_from: disclosure
                             .skipped
                             .iter()
-                            .map(|s| s.provider_id.clone())
+                            .map(SkippedProvider::from)
                             .collect(),
                     },
                     AuditEntry {

@@ -227,7 +227,7 @@ function renderState() {
         d.provider + " (" + d.provider_trust + ")",
         d.stayed_local ? badge("good", t("stayed_local")) : badge("warn", t("left_device")),
         d.data_class,
-        d.failover_from.length ? d.failover_from.join(", ") : "—",
+        d.failover_from.length ? d.failover_from.map(skipLabel).join("; ") : "—",
       ])));
     disclosures.classList.remove("empty");
   }
@@ -332,6 +332,17 @@ async function verifyBackup() {
   } catch (error) {
     status.textContent = t("request_failed") + error;
   }
+}
+
+/**
+ * One skipped provider, with why the gateway passed it over. A bare id here
+ * would leave the founder unable to tell a model that was wrong once from a
+ * model that has never worked — which is what a silent fallback looks like
+ * from the outside.
+ * @param {{provider_id: string, reason: string|null}} skip
+ */
+function skipLabel(skip) {
+  return skip.provider_id + " (" + (skip.reason ? t("skip_reason")(skip.reason) : t("skip_not_recorded")) + ")";
 }
 
 function renderVerifyReport(r) {
