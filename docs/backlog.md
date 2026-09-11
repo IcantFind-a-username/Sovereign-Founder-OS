@@ -1558,6 +1558,37 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   acceptance records which version, a change after acceptance produces a new version
   that must be reviewed again, and the timeline shows all of it.
 
+- [ ] **P2 | `apps/cli/src/workspace/`, `apps/cli/assets/` | Backend refusals reach a Chinese-speaking founder in English.**
+  Found 2026-09-12 using the workbench in Chinese from an empty workspace to a paid
+  invoice (report: `docs/handoff/reports/2026-09-12-founder-walkthrough.md`). Every
+  `WorkspaceError` message is an English sentence the page shows verbatim —
+  "payment exceeds the invoice amount" on an overpayment, "finish every task before
+  closing the project". There are 50 distinct ones. #111 stopped offering the two
+  controls that could only fail; the rest remain. Done when: every refusal a founder
+  can reach carries a stable code, the frontend renders it from a catalogue in both
+  languages with the English sentence as fallback, and a test enumerates the codes
+  against the catalogue so a new refusal without an entry fails.
+
+- [ ] **P2 | `apps/cli/src/workspace/` | The founder's own address is not recorded; every composed message is From: `founder@example.invalid`.**
+  Found 2026-09-12. The company profile has no sender email, so `compose.rs` writes a
+  reserved placeholder and the preview (#112) has to say so. Done when: the profile
+  has an optional sender address validated like a customer's, `compose_email` uses it
+  when set, `MessagePreview.from_is_placeholder` follows it, and tests cover set and
+  unset.
+
+- [ ] **P3 | `apps/cli/src/workspace/compose.rs` | A template draft sent unedited tells the customer it is a draft.**
+  Found 2026-09-12. The deterministic offer and invoice templates write "(草稿)/(DRAFT)"
+  and "尚未开具/has not been issued" into the *body*, and the title of a template invoice
+  is "发票草稿 — …". Approve without editing and the customer receives an invoice that
+  calls itself unissued. Done when one of: the templates stop writing status into the
+  body (status lives on the card), or the approval warns when the body still carries a
+  template's draft markers — decided, and tested either way.
+
+- [ ] **P3 | `apps/cli/src/workspace/compliance_pack.rs` | The pack's review-status note is English-only and shown verbatim in Chinese reports.**
+  Found 2026-09-12. `review_status` is one English sentence stored into every report.
+  Done when the pack declares it in both languages and a report stores the one for the
+  language the check ran in.
+
 - [x] **P1 | `apps/cli/src/workspace/` | Business graph: stages, discovery, editing, projects, tasks, follow-ups, payments, receivables, timeline (workspace v2).** Landed 2026-09-10 (`erp_types.rs`, `erp_ops.rs`, `erp_tests.rs`).
 - [x] **P1 | `crates/model/`, `apps/cli/src/workspace/` | Experimental loopback Ollama provider and per-device `model.json`.** Landed 2026-09-10.
 - [x] **P1 | `apps/cli/src/workspace/` | Six hireable AI employees that propose; founder decisions apply the exact change.** Landed 2026-09-10 (`crew_*`).
