@@ -1509,19 +1509,28 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 - [x] **P1 | `apps/cli/src/workspace/` | Singapore demo rule pack, keyword retrieval, deterministic compliance checks, reports.** Landed 2026-09-10 (`compliance*`).
 - [x] **P1 | `apps/cli/assets/`, `apps/cli/src/ui_mvp.rs` | Seven-tab bilingual MVP pages.** Landed 2026-09-10; verified by hand in the in-app browser.
 
-- [ ] **P1 | `docs/`, `apps/cli/` | Live verification with a real Ollama model and the five-consultant usability protocol.**
-  2026-09-10: the half that needs no model ran — every route and page on a
-  fresh workspace, report at
-  `docs/handoff/reports/2026-09-10-mvp-walkthrough-without-a-model.md`, two
-  defects fixed in #91. The model half is blocked on Ollama being
-  installed on the founder's machine; nothing about model quality is known.
-  Run every role against a real local model (`ollama serve`, a pulled model,
-  `model.json` enabled) and record which proposals validated, which fell back
-  to the template, and why; then run the five-consultant usability protocol
-  from the superseded playground plan (Task 8) on the MVP. Done when: a
-  report under `docs/handoff/reports/` records model, prompts' pass/fail per
-  role, and the usability observations, with follow-up entries queued for
-  every failure.
+- [ ] **P1 | `docs/` | The five-consultant usability protocol on the MVP.**
+  The model half of this item is done and reported
+  (`docs/handoff/reports/2026-09-11-live-model-verification.md`, 2026-09-11):
+  `qwen2.5:7b` through Ollama, every role five times per language against
+  fixed facts, 27/30 → 30/30 (en) and 27/30 → 29/30 (zh) after one transport
+  fix (#94) and two prompt/parsing fixes. What remains needs five people, not
+  a script: run the five-consultant usability protocol from the superseded
+  playground plan (Task 8) on the MVP and record the observations, with
+  follow-up entries queued for every failure.
+
+- [ ] **P2 | `crates/model/`, `apps/cli/src/workspace/` | Say why a model answer was not used.**
+  A silent fallback is only honest if someone can see it. The proposal card
+  says `model_backed: false` without a reason, and the disclosure record lists
+  skipped providers without one — `SkipReason.reason` exists in
+  `crates/model` and the workspace disclosure drops it. A founder cannot tell
+  "the model was wrong this time" from "the model has never once worked",
+  which is exactly what the chunked-transfer defect (#94) hid behind for its
+  whole life. Done when: the disclosure carries each skip's reason, a rejected
+  model answer carries a category (not the text — evidence records occurrence,
+  not content), both surface in the UI, and a test covers a skipped provider
+  and a rejected answer.
+
 - [ ] **P2 | `apps/cli/src/` | HTTP-layer tests for the MVP routes.**
   Extend the loopback HTTP boundary (HO-002) to cover `/api/workspace/profile`,
   `customer/update`, `document/update`, `project`, `task`, `follow-up`,

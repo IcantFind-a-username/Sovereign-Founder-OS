@@ -328,7 +328,13 @@ pub(super) fn prompt_for(input: &RoleInput) -> String {
             r#"{"title":string,"body":string,"amount":string,"due_in_days":integer}"#
         }
         RoleId::QualityChecker => {
-            r#"{"findings":[{"kind":"gap"|"contradiction"|"placeholder"|"risk","detail":string}]}"#
+            // `"kind":"gap"|"contradiction"|…` reads to a model as a list of
+            // bare values rather than one field with four allowed words, and
+            // it copied that shape back: four of six validation failures
+            // measured against qwen2.5:7b were `{"placeholder","detail":…}`
+            // with the key name dropped. The allowed words moved into the
+            // task text, where they cannot be mistaken for syntax.
+            r#"{"findings":[{"kind":string,"detail":string}]}"#
         }
         RoleId::ComplianceChecker => r#"{"summary":string}"#,
     };
@@ -336,8 +342,8 @@ pub(super) fn prompt_for(input: &RoleInput) -> String {
         RoleId::Analyst => "You are the Requirements Analyst for a one-person consulting company. From the customer facts below, extract concrete problems, constraints, the stated budget (or \"not stated\"), open questions to ask the customer, and assumptions you are making. Never present a guess as a confirmed fact; put guesses under assumptions.",
         RoleId::ProposalWriter => "You are the Proposal Writer for a one-person consulting company. Draft a proposal for this customer: title, a body with sections Context, Scope, Deliverables, Timeline, Investment, Assumptions, Next step; an amount as a decimal string in the company currency if the facts support one, otherwise null. Do not promise anything the facts do not support.",
         RoleId::DeliveryPlanner => "You are the Delivery Planner for a one-person consulting company. Turn the offer into a project name, 4–8 dated tasks (due_in_days counted from today, 1–120) and 2–5 acceptance criteria that can be checked. Do not change the agreed scope.",
-        RoleId::InvoiceClerk => "You are the Invoice Clerk for a one-person consulting company. Draft an invoice for the finished project: title, body listing what was delivered, the amount as a decimal string (use the offer amount or the project budget; never invent one), and due_in_days (typically 30). If the company is GST registered, say that GST applies per the local rules; do not compute tax.",
-        RoleId::QualityChecker => "You are the Quality Checker for a one-person consulting company. Read the draft and list findings: gaps (missing scope, timeline, price, recipient), contradictions, placeholders left in the text, and risks. Be specific and quote the passage. Return an empty list only if you found nothing.",
+        RoleId::InvoiceClerk => "You are the Invoice Clerk for a one-person consulting company. Draft an invoice for the finished project: title, body listing what was delivered, the amount as a decimal string of digits with at most one decimal point and no thousands separators, currency symbol or spaces (use the offer amount or the project budget; never invent one), and due_in_days (typically 30). If the company is GST registered, say that GST applies per the local rules; do not compute tax.",
+        RoleId::QualityChecker => "You are the Quality Checker for a one-person consulting company. Read the draft and list findings: gaps (missing scope, timeline, price, recipient), contradictions, placeholders left in the text, and risks. Every finding needs both fields, and its \"kind\" must be exactly one of these four words: gap, contradiction, placeholder, risk. Be specific and quote the passage. Return an empty list only if you found nothing.",
         RoleId::ComplianceChecker => "Summarise the compliance findings in plain language for the founder.",
     };
     format!(
@@ -416,16 +422,28 @@ struct ReviewFindingOut {
 /// around it) and validate it into the exact change the founder will see.
 /// Any violation returns `None`: the deterministic draft is used instead and
 /// the decision says so.
+/// The first complete JSON value at or after the first `{`, ignoring whatever
+/// follows it.
+///
+/// Spanning the first `{` to the *last* `}` looks equivalent and is not: a
+/// model that answers once and then repeats itself inside a code fence — two
+/// valid objects, measured against qwen2.5:7b — produces a span holding both,
+/// which is not valid JSON, and the whole answer was discarded for it. Taking
+/// the first value changes only which text reaches the checks below; every
+/// field is still validated, and the founder still approves the proposal.
+fn first_json_value<T: serde::de::DeserializeOwned>(json: &str) -> Option<T> {
+    serde_json::Deserializer::from_str(json)
+        .into_iter::<T>()
+        .next()?
+        .ok()
+}
+
 pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<ProposedChange> {
     let start = text.find('{')?;
-    let end = text.rfind('}')?;
-    if end <= start {
-        return None;
-    }
-    let json = &text[start..=end];
+    let json = &text[start..];
     match input.role {
         RoleId::Analyst => {
-            let out: AnalystOut = serde_json::from_str(json).ok()?;
+            let out: AnalystOut = first_json_value(json)?;
             let customer = input.customer.as_ref()?;
             Some(ProposedChange::DiscoverySummary {
                 customer_id: customer.id,
@@ -437,7 +455,7 @@ pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<Propos
             })
         }
         RoleId::ProposalWriter => {
-            let out: ProposalOut = serde_json::from_str(json).ok()?;
+            let out: ProposalOut = first_json_value(json)?;
             let customer = input.customer.as_ref()?;
             let amount_cents = match out.amount.as_deref().map(str::trim) {
                 None | Some("") | Some("null") => None,
@@ -452,7 +470,7 @@ pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<Propos
             })
         }
         RoleId::DeliveryPlanner => {
-            let out: PlanOut = serde_json::from_str(json).ok()?;
+            let out: PlanOut = first_json_value(json)?;
             let customer = input.customer.as_ref()?;
             if out.tasks.is_empty() || out.tasks.len() > MAX_LIST_ITEMS {
                 return None;
@@ -477,7 +495,7 @@ pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<Propos
             })
         }
         RoleId::InvoiceClerk => {
-            let out: InvoiceOut = serde_json::from_str(json).ok()?;
+            let out: InvoiceOut = first_json_value(json)?;
             let customer = input.customer.as_ref()?;
             let project = input.project.as_ref()?;
             let amount_cents = parse_amount_cents(out.amount.trim()).ok()?;
@@ -494,7 +512,7 @@ pub(super) fn parse_model_change(input: &RoleInput, text: &str) -> Option<Propos
             })
         }
         RoleId::QualityChecker => {
-            let out: ReviewOut = serde_json::from_str(json).ok()?;
+            let out: ReviewOut = first_json_value(json)?;
             let document = input.document.as_ref()?;
             if out.findings.len() > MAX_LIST_ITEMS {
                 return None;
