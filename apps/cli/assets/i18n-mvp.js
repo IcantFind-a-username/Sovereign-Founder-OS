@@ -71,6 +71,20 @@ Object.assign(STRINGS.en, {
   }[r] || r),
   // Proposals
   prop_model: "real model", prop_template: "template", prop_approve: "Approve", prop_reject: "Reject",
+  prop_rejected: (code) => {
+    const known = {
+      not_json: "the model's answer was not JSON",
+      truncated: "the model's answer stopped part-way",
+      wrong_shape: "the model's answer had the wrong shape",
+      no_model_path: "this role does not take a model answer here",
+    };
+    if (known[code]) return known[code];
+    const [kind, name] = code.split(":");
+    if (kind === "field") return "the model's “" + name + "” was not usable";
+    if (kind === "list_size") return "the model's “" + name + "” list was empty or too long";
+    if (kind === "missing_subject") return "no " + name + " to attach the answer to";
+    return code;
+  },
   prop_evidence: "Facts used", prop_provider: "Produced by", prop_outcome: "Outcome",
   prop_status: (s) => ({ pending: "pending", approved: "approved", rejected: "rejected" }[s] || s),
   prop_change_heading: "What will happen",
@@ -225,6 +239,20 @@ Object.assign(STRINGS.zh, {
     check_draft: "检查草稿", run_compliance: "运行合规检查",
   }[r] || r),
   prop_model: "真实模型", prop_template: "模板", prop_approve: "批准", prop_reject: "拒绝",
+  prop_rejected: (code) => {
+    const known = {
+      not_json: "模型输出不是 JSON",
+      truncated: "模型输出中途截断",
+      wrong_shape: "模型输出结构不符",
+      no_model_path: "该岗位在此不接受模型输出",
+    };
+    if (known[code]) return known[code];
+    const [kind, name] = code.split(":");
+    if (kind === "field") return "模型的“" + name + "”字段不可用";
+    if (kind === "list_size") return "模型的“" + name + "”列表为空或过长";
+    if (kind === "missing_subject") return "没有可挂载的" + name;
+    return code;
+  },
   prop_evidence: "使用的事实", prop_provider: "产出方", prop_outcome: "结果",
   prop_status: (s) => ({ pending: "待决定", approved: "已批准", rejected: "已拒绝" }[s] || s),
   prop_change_heading: "将会发生什么",

@@ -1519,17 +1519,26 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   playground plan (Task 8) on the MVP and record the observations, with
   follow-up entries queued for every failure.
 
-- [ ] **P2 | `crates/model/`, `apps/cli/src/workspace/` | Say why a model answer was not used.**
-  A silent fallback is only honest if someone can see it. The proposal card
-  says `model_backed: false` without a reason, and the disclosure record lists
-  skipped providers without one — `SkipReason.reason` exists in
-  `crates/model` and the workspace disclosure drops it. A founder cannot tell
-  "the model was wrong this time" from "the model has never once worked",
-  which is exactly what the chunked-transfer defect (#94) hid behind for its
-  whole life. Done when: the disclosure carries each skip's reason, a rejected
-  model answer carries a category (not the text — evidence records occurrence,
-  not content), both surface in the UI, and a test covers a skipped provider
-  and a rejected answer.
+- [x] **P2 | `crates/model/`, `apps/cli/src/workspace/` | Say why a model answer was not used.**
+  Landed 2026-09-11 in two parts. The disclosure carries each skipped
+  provider's reason (`{provider_id, reason}`, exhaustively mapped from
+  `SkipCause`, hashed into the audit chain, old records still load). A
+  refused model answer carries a category — `not_json`, `truncated`,
+  `wrong_shape`, `field:<name>`, `list_size:<name>`, `missing_subject:<name>`
+  — on the decision and in the `employee.ran` payload, and the proposal card
+  shows it in both languages. The category is never the model's text: a test
+  asserts the rejected text does not reach the stored record.
+
+- [ ] **P3 | `apps/cli/src/workspace/compliance.rs` | Split it before the next change hits the ceiling.**
+  1143 lines against a 1200 limit, with its unit tests already moved out to
+  `compliance/tests.rs` — that relief is spent. The next feature in there
+  fails the gate after the work is done, which is the wrong time to find out.
+  The natural cut is the same one `crew_roles`/`crew_template` took: rule
+  evaluation (`run_compliance_check` and the finding builders) apart from
+  retrieval and the model summary (`tokens`, `retrieval`, `validate_summary`).
+  Check the dependency direction first and cut where it runs one way.
+  Done when: no file in `apps/cli/src/workspace/` is over 1000 lines and
+  `cargo test -p sovereign-cli` is unchanged by the move.
 
 - [ ] **P2 | `apps/cli/src/` | HTTP-layer tests for the MVP routes.**
   Extend the loopback HTTP boundary (HO-002) to cover `/api/workspace/profile`,

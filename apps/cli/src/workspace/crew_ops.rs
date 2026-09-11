@@ -5,9 +5,8 @@
 //! change nothing until the founder approves.
 
 use super::compliance::{ComplianceSubject, FindingStatus};
-use super::crew_roles::{
-    build_input, deterministic_change, parse_model_change, prompt_for, role_card, summarize_change,
-};
+use super::crew_roles::{build_input, parse_model_change, prompt_for, role_card};
+use super::crew_template::{deterministic_change, summarize_change};
 use super::crew_types::*;
 use super::model_config::providers_for;
 use super::store::AuditEntry;
@@ -151,6 +150,7 @@ impl Store {
 
         let (mut change, mut summary) = deterministic_change(&input)?;
         let mut model_backed = false;
+        let mut rejection: Option<String> = None;
 
         // Consult the device's providers. A real model may replace the
         // template only when its output validates; stand-ins (which echo
@@ -167,16 +167,19 @@ impl Store {
             Some((response, disclosure)) => {
                 if response.provider_id.starts_with("ollama:") {
                     match parse_model_change(&input, &response.text) {
-                        Some(parsed) => {
+                        Ok(parsed) => {
                             summary = summarize_change(&parsed, zh);
                             change = parsed;
                             model_backed = true;
                         }
-                        None => summary.push_str(if zh {
-                            " 模型输出未通过校验,改用模板草稿。"
-                        } else {
-                            " The model's output failed validation, so the template draft is used."
-                        }),
+                        Err(reason) => {
+                            rejection = Some(reason.code());
+                            summary.push_str(if zh {
+                                " 模型输出未通过校验,改用模板草稿。"
+                            } else {
+                                " The model's output failed validation, so the template draft is used."
+                            });
+                        }
                     }
                 }
                 (
@@ -258,6 +261,7 @@ impl Store {
             provider_id,
             provider_trust,
             model_backed,
+            rejection: rejection.clone(),
             status: DecisionStatus::Pending,
             created_at: at,
             decided_at: None,
@@ -278,6 +282,7 @@ impl Store {
                 "task": request.task,
                 "provider": decision.provider_id,
                 "model_backed": model_backed,
+                "rejection": rejection,
             }),
         });
         events.push(AuditEntry {
@@ -370,6 +375,7 @@ impl Store {
                 "local".into()
             },
             model_backed: report.model_backed,
+            rejection: report.rejection.clone(),
             status: DecisionStatus::Pending,
             created_at: at,
             decided_at: None,
