@@ -13,6 +13,7 @@
 //! owns the key material.
 
 use super::ffi::{self, HardeningFailure};
+use super::process::CryptoProcessOwner;
 use super::secret::DbKey;
 use rusqlite::config::DbConfig;
 use rusqlite::limits::Limit;
@@ -124,21 +125,21 @@ pub(crate) struct HardenedConnection {
 
 /// Open a SQLCipher database under the fixed profile.
 pub(crate) fn open_sqlcipher(
+    owner: &CryptoProcessOwner,
     path: &Path,
     key: &DbKey,
     mode: ConnectionMode,
 ) -> Result<HardenedConnection, OpenError> {
     // Open, key first, and switch off native-code loading — one audited
     // unsafe entry point. The raw token lives only for this call.
-    let connection =
-        ffi::open_keyed_hardened(path, mode.flags().bits(), &key.raw()).map_err(|failure| {
-            match failure {
-                HardeningFailure::PathNotRepresentable | HardeningFailure::Unopenable => {
-                    OpenError::Unopenable
-                }
-                HardeningFailure::KeyRejected => OpenError::KeyRejected,
-                HardeningFailure::ExtensionLoadingNotDisabled => OpenError::ProfileNotApplied,
+    let connection = ffi::open_keyed_hardened(owner, path, mode.flags().bits(), &key.raw())
+        .map_err(|failure| match failure {
+            HardeningFailure::PathNotRepresentable | HardeningFailure::Unopenable => {
+                OpenError::Unopenable
             }
+            HardeningFailure::KeyRejected => OpenError::KeyRejected,
+            HardeningFailure::ExtensionLoadingNotDisabled
+            | HardeningFailure::ThreadingModeNotAdmitted => OpenError::ProfileNotApplied,
         })?;
 
     // The remaining no-page settings, each confirmed by what SQLite reports
@@ -208,6 +209,12 @@ mod tests {
 
     assert_not_impl_any!(HardenedConnection: Send, Sync);
 
+    /// Every open needs the process bootstrap; the tests run in one process,
+    /// which is exactly what the owner represents.
+    fn owner() -> &'static CryptoProcessOwner {
+        super::super::process::bootstrap_crypto_process().expect("OpenSSL initialises")
+    }
+
     /// Distinctive enough that finding it anywhere is proof of a leak, and
     /// not a string SQLite or SQLCipher would ever produce on its own.
     const CANARY: &str = "SFO-PLAINTEXT-CANARY-7f3a9c41";
@@ -250,8 +257,13 @@ mod tests {
     /// it. Tests reach the inner connection directly because they sit in this
     /// module; production code has no method that runs arbitrary SQL.
     fn create_with_canary(db: &Path, fill: u8) {
-        let opened = open_sqlcipher(db, &key(fill), ConnectionMode::ReadWriteCreateInternal)
-            .expect("create an encrypted container");
+        let opened = open_sqlcipher(
+            owner(),
+            db,
+            &key(fill),
+            ConnectionMode::ReadWriteCreateInternal,
+        )
+        .expect("create an encrypted container");
         opened
             .connection
             .execute_batch(&format!(
@@ -294,7 +306,8 @@ mod tests {
         // Mid-transaction: the rollback journal holds the page being replaced,
         // which is exactly where an old value would leak if the journal were
         // not encrypted too.
-        let opened = open_sqlcipher(&db, &key(0xab), ConnectionMode::ReadWrite).expect("reopen");
+        let opened =
+            open_sqlcipher(owner(), &db, &key(0xab), ConnectionMode::ReadWrite).expect("reopen");
         opened
             .connection
             .execute_batch(&format!(
@@ -354,7 +367,7 @@ mod tests {
         create_with_canary(&db, 0x11);
         let before = fs::read(&db).expect("read before");
 
-        let result = open_sqlcipher(&db, &key(0x22), ConnectionMode::ReadWrite);
+        let result = open_sqlcipher(owner(), &db, &key(0x22), ConnectionMode::ReadWrite);
         assert!(
             matches!(result, Err(OpenError::WrongKeyOrNotADatabase)),
             "a wrong key opened the database"
@@ -381,7 +394,7 @@ mod tests {
 
         // And the right key still works, so the failure was the key and not
         // a database the wrong-key attempt had damaged.
-        assert!(open_sqlcipher(&db, &key(0x11), ConnectionMode::ReadWrite).is_ok());
+        assert!(open_sqlcipher(owner(), &db, &key(0x11), ConnectionMode::ReadWrite).is_ok());
     }
 
     /// One flipped bit in page 2 is caught by the cipher's authentication,
@@ -394,8 +407,13 @@ mod tests {
         let (_dir, root) = canonical_tempdir();
         let db = root.join("vault.db");
         {
-            let opened = open_sqlcipher(&db, &key(0x5a), ConnectionMode::ReadWriteCreateInternal)
-                .expect("create");
+            let opened = open_sqlcipher(
+                owner(),
+                &db,
+                &key(0x5a),
+                ConnectionMode::ReadWriteCreateInternal,
+            )
+            .expect("create");
             // Enough rows to occupy well past page 2.
             opened
                 .connection
@@ -416,7 +434,7 @@ mod tests {
         );
 
         // Untouched, it passes — so a failure below is the flip, not the setup.
-        let intact = open_sqlcipher(&db, &key(0x5a), ConnectionMode::ReadOnlyRecovery)
+        let intact = open_sqlcipher(owner(), &db, &key(0x5a), ConnectionMode::ReadOnlyRecovery)
             .expect("reopen the intact file");
         assert_eq!(
             intact.cipher_integrity_check(),
@@ -430,7 +448,7 @@ mod tests {
 
         // The key is right and page 1 is untouched, so the open succeeds; the
         // damage is on page 2 and must be found there.
-        let opened = open_sqlcipher(&db, &key(0x5a), ConnectionMode::ReadOnlyRecovery)
+        let opened = open_sqlcipher(owner(), &db, &key(0x5a), ConnectionMode::ReadOnlyRecovery)
             .expect("page 1 is intact, so opening still succeeds");
         assert!(
             matches!(opened.cipher_integrity_check(), Err(IntegrityFailure::Pages(n)) if n > 0),
@@ -452,6 +470,7 @@ mod tests {
         std::os::unix::fs::symlink(&real, &link).expect("symlink");
 
         let result = open_sqlcipher(
+            owner(),
             &link.join("vault.db"),
             &key(0x33),
             ConnectionMode::ReadWriteCreateInternal,
@@ -468,6 +487,7 @@ mod tests {
         // The same directory, addressed without the link, is fine: the refusal
         // was the link and not the location.
         assert!(open_sqlcipher(
+            owner(),
             &real.join("vault.db"),
             &key(0x33),
             ConnectionMode::ReadWriteCreateInternal
@@ -514,6 +534,7 @@ mod tests {
     fn oversized_values_and_sql_fail_at_fixed_limits() {
         let (_dir, root) = canonical_tempdir();
         let opened = open_sqlcipher(
+            owner(),
             &root.join("vault.db"),
             &key(0x44),
             ConnectionMode::ReadWriteCreateInternal,
@@ -632,6 +653,7 @@ mod tests {
     fn extensions_attach_writable_schema_and_dynamic_sql_are_denied() {
         let (_dir, root) = canonical_tempdir();
         let opened = open_sqlcipher(
+            owner(),
             &root.join("vault.db"),
             &key(0x55),
             ConnectionMode::ReadWriteCreateInternal,

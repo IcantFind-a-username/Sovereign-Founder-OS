@@ -25,10 +25,11 @@
 //! SQLCipher's key functions are not declared. Everything else comes from the
 //! bindings.
 
+use super::process::CryptoProcessOwner;
 use super::secret::RawSqlcipherKey;
 use rusqlite::ffi::{
     sqlite3, sqlite3_close, sqlite3_db_config, sqlite3_enable_load_extension, sqlite3_open_v2,
-    SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, SQLITE_OK,
+    sqlite3_threadsafe, SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION, SQLITE_OK,
 };
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_void};
@@ -59,6 +60,8 @@ pub(crate) enum HardeningFailure {
     KeyRejected,
     /// A native-code loading route could not be shown to be off.
     ExtensionLoadingNotDisabled,
+    /// The linked SQLite was not built in the admitted threading mode.
+    ThreadingModeNotAdmitted,
 }
 
 /// Open, key, and disable native-code loading, in that order, and hand back a
@@ -67,7 +70,16 @@ pub(crate) enum HardeningFailure {
 /// Nothing touches a page here: the key is set before any statement exists,
 /// and the extension switches are connection configuration. The caller
 /// applies the remaining no-page settings and only then reads a page.
+///
+/// `_owner` is read by the compiler, not at runtime: it carries no data, and
+/// the only way a caller can name one is to have gone through
+/// [`bootstrap_crypto_process`](super::process::bootstrap_crypto_process). A
+/// database opened in a process that never initialised OpenSSL itself — and so
+/// might be running on providers an `OPENSSL_CONF` file chose — therefore does
+/// not compile, which is a stronger guarantee than a flag this function could
+/// have checked.
 pub(crate) fn open_keyed_hardened(
+    _owner: &CryptoProcessOwner,
     path: &Path,
     flags: c_int,
     key: &RawSqlcipherKey,
@@ -94,6 +106,15 @@ pub(crate) fn open_keyed_hardened(
     // `from_handle_owned`, which closes it on drop, so it is never closed
     // here after that point.
     unsafe {
+        // Compile-time property of the linked library, so it is checked before
+        // a handle exists: this process opens connections with `NO_MUTEX` and
+        // keeps each one on its own thread, which is only sound if the library
+        // itself was built thread-safe. A library built single-threaded would
+        // accept the same calls and corrupt state instead of refusing.
+        if sqlite3_threadsafe() != 1 {
+            return Err(HardeningFailure::ThreadingModeNotAdmitted);
+        }
+
         if sqlite3_open_v2(c_path.as_ptr(), &mut db, flags, ptr::null()) != SQLITE_OK {
             // `sqlite3_open_v2` can allocate a handle even when it fails, and
             // that handle still has to be released.
