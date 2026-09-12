@@ -6,5 +6,6 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
 pub(crate) mod ffi;
+pub(crate) mod process;
 pub(crate) mod secret;
 pub(crate) mod sqlcipher;

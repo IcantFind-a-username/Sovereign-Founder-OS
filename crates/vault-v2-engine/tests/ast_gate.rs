@@ -6,9 +6,8 @@
 //!
 //! - a new explicit Cargo target must join `ROOTS` in the same change that
 //!   declares it in `Cargo.toml`;
-//! - the queued FFI item adds exactly `src/engine/ffi.rs` and
-//!   `src/engine/process.rs` to `FFI_BOUNDARY_FILES` when it creates them —
-//!   nothing else is expected to ever join that list;
+//! - `FFI_BOUNDARY_FILES` holds exactly `src/engine/ffi.rs` and
+//!   `src/engine/process.rs`; nothing else is expected to ever join it;
 //! - the exactly-two-entry-points proof and the five `tests/ui/` compile-fail
 //!   fixtures are a separate queued item that tightens this gate once the
 //!   engine API exists.
@@ -36,10 +35,10 @@ const ADMITTED_INCLUDES: &[(&str, &str)] = &[
 ];
 
 /// The files allowed to contain `unsafe` and `extern`. `src/engine/ffi.rs`
-/// joined with the SQLCipher key shim; `src/engine/process.rs` joins when the
-/// OpenSSL bootstrap lands, and the plan expects nothing else ever to. The
-/// library keeps `#![forbid(unsafe_code)]` regardless.
-const FFI_BOUNDARY_FILES: &[&str] = &["src/engine/ffi.rs"];
+/// joined with the SQLCipher key shim and `src/engine/process.rs` with the
+/// OpenSSL bootstrap. That is the pair the plan names, and it expects nothing
+/// else ever to join. The library keeps `#![forbid(unsafe_code)]` regardless.
+const FFI_BOUNDARY_FILES: &[&str] = &["src/engine/ffi.rs", "src/engine/process.rs"];
 
 const ALLOWED_MACROS: &[&str] = &[
     "assert",
@@ -135,6 +134,7 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
             "build_gate.rs",
             "src/engine/ffi.rs",
             "src/engine/mod.rs",
+            "src/engine/process.rs",
             "src/engine/secret.rs",
             "src/engine/sqlcipher.rs",
             "src/lib.rs",
@@ -490,6 +490,191 @@ fn extension_loading_route_one_is_switched_off_in_source() {
         vec![Some(0)],
         "sqlite3_enable_load_extension must be called exactly once, with the literal 0 \
          (None means the argument is not an integer literal): found {:?}",
+        calls.0
+    );
+}
+
+/// The bootstrap is one call, and it is the one that switches configuration
+/// loading off.
+///
+/// Like the extension switch above, this cannot be proven by running the
+/// program: `OPENSSL_init_crypto` returns 1 either way, and a process that
+/// loaded a hostile `OPENSSL_CONF` looks identical from the inside until
+/// something asks the provider what it is. The fresh-process qualification
+/// that asks is a separate queued item; the constant itself stays structural
+/// evidence even after it lands.
+#[test]
+fn the_openssl_bootstrap_is_one_call_with_config_loading_off() {
+    use syn::visit::Visit;
+
+    struct Calls(Vec<Option<String>>);
+    impl<'ast> Visit<'ast> for Calls {
+        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+            let named = matches!(
+                &*call.func,
+                syn::Expr::Path(path)
+                    if path.path.segments.last().is_some_and(|segment| {
+                        segment.ident == "OPENSSL_init_crypto"
+                    })
+            );
+            if named {
+                let first = call.args.iter().next().and_then(|argument| match argument {
+                    syn::Expr::Path(path) => path
+                        .path
+                        .segments
+                        .last()
+                        .map(|segment| segment.ident.to_string()),
+                    _ => None,
+                });
+                self.0.push(first);
+            }
+            syn::visit::visit_expr_call(self, call);
+        }
+    }
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/engine/process.rs");
+    let source = std::fs::read_to_string(&path).expect("read process.rs");
+    let file = syn::parse_file(&source).expect("parse process.rs");
+    let mut calls = Calls(Vec::new());
+    calls.visit_file(&file);
+
+    assert_eq!(
+        calls.0,
+        vec![Some("OPENSSL_INIT_NO_LOAD_CONFIG".to_owned())],
+        "OPENSSL_init_crypto must be called exactly once, with the pinned \
+         no-load-config constant (None means the argument is not a plain \
+         constant): found {:?}",
+        calls.0
+    );
+
+    // And that constant holds the value the vendored header gives, so the
+    // call cannot be pointed at a differently-named constant holding 0.
+    let mut pinned = None;
+    for item in &file.items {
+        if let syn::Item::Const(constant) = item {
+            assert_ne!(
+                constant.ident, "OPENSSL_INIT_LOAD_CONFIG",
+                "the config-loading constant may not be declared in production source"
+            );
+            if constant.ident == "OPENSSL_INIT_NO_LOAD_CONFIG" {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Int(value),
+                    ..
+                }) = &*constant.expr
+                {
+                    pinned = value.base10_parse::<u64>().ok();
+                }
+            }
+        }
+    }
+    assert_eq!(
+        pinned,
+        Some(0x0000_0080),
+        "OPENSSL_INIT_NO_LOAD_CONFIG must be the vendored header's 0x00000080"
+    );
+}
+
+/// The linked SQLite's threading mode is checked once, against the value the
+/// plan admits. Unfalsifiable at runtime for the same reason: this build
+/// answers 1, so deleting the check changes no test's outcome.
+#[test]
+fn the_threading_mode_is_checked_against_the_admitted_value() {
+    use syn::visit::Visit;
+
+    fn operator(op: &syn::BinOp) -> &'static str {
+        match op {
+            syn::BinOp::Ne(_) => "!=",
+            syn::BinOp::Eq(_) => "==",
+            _ => "other",
+        }
+    }
+
+    struct Comparisons(Vec<(String, Option<u64>)>);
+    impl<'ast> Visit<'ast> for Comparisons {
+        fn visit_expr_binary(&mut self, binary: &'ast syn::ExprBinary) {
+            let calls_threadsafe = matches!(
+                &*binary.left,
+                syn::Expr::Call(call) if matches!(
+                    &*call.func,
+                    syn::Expr::Path(path)
+                        if path.path.segments.last().is_some_and(|segment| {
+                            segment.ident == "sqlite3_threadsafe"
+                        })
+                )
+            );
+            if calls_threadsafe {
+                let against = match &*binary.right {
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Int(value),
+                        ..
+                    }) => value.base10_parse::<u64>().ok(),
+                    _ => None,
+                };
+                self.0.push((operator(&binary.op).to_owned(), against));
+            }
+            syn::visit::visit_expr_binary(self, binary);
+        }
+    }
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/engine/ffi.rs");
+    let source = std::fs::read_to_string(&path).expect("read ffi.rs");
+    let file = syn::parse_file(&source).expect("parse ffi.rs");
+    let mut comparisons = Comparisons(Vec::new());
+    comparisons.visit_file(&file);
+
+    assert_eq!(
+        comparisons.0,
+        vec![("!=".to_owned(), Some(1))],
+        "sqlite3_threadsafe must be compared exactly once, against the literal 1: found {:?}",
+        comparisons.0
+    );
+}
+
+/// `main` bootstraps before it does anything else.
+///
+/// The plan's wording is "immediately obtains a private, non-constructible
+/// `CryptoProcessOwner` from the sole unsafe bootstrap **before dispatching
+/// any command**". Today `main` has nothing else in it, so nothing would
+/// notice if the call moved; the dispatcher this file is waiting for is
+/// exactly when that stops being true.
+#[test]
+fn main_bootstraps_the_crypto_process_first() {
+    use syn::visit::Visit;
+
+    struct Calls(Vec<String>);
+    impl<'ast> Visit<'ast> for Calls {
+        fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+            if let syn::Expr::Path(path) = &*call.func {
+                if let Some(segment) = path.path.segments.last() {
+                    self.0.push(segment.ident.to_string());
+                }
+            }
+            syn::visit::visit_expr_call(self, call);
+        }
+    }
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/main.rs");
+    let source = std::fs::read_to_string(&path).expect("read main.rs");
+    let file = syn::parse_file(&source).expect("parse main.rs");
+
+    let main = file
+        .items
+        .iter()
+        .find_map(|item| match item {
+            syn::Item::Fn(function) if function.sig.ident == "main" => Some(function),
+            _ => None,
+        })
+        .expect("the binary declares fn main");
+
+    let first = main.block.stmts.first().expect("fn main is not empty");
+    let mut calls = Calls(Vec::new());
+    calls.visit_stmt(first);
+    assert!(
+        calls
+            .0
+            .iter()
+            .any(|call| call == "bootstrap_crypto_process"),
+        "the first statement of main must be the crypto bootstrap; its calls are {:?}",
         calls.0
     );
 }

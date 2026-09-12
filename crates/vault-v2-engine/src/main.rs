@@ -14,6 +14,15 @@
 mod engine;
 
 fn main() {
-    // Deliberately inert: a process that holds keys should not do anything
-    // until the dispatcher that authorises each request exists.
+    // The first project-controlled crypto action in this process: initialise
+    // OpenSSL with configuration loading switched off, before anything can
+    // ask for a database. A process that cannot do that stops here rather
+    // than continuing on whatever configuration its environment chose.
+    if engine::process::bootstrap_crypto_process().is_err() {
+        eprintln!("vault-v2-engine: OpenSSL refused to initialise; not continuing");
+        std::process::exit(1);
+    }
+
+    // Otherwise deliberately inert: a process that holds keys should not do
+    // anything until the dispatcher that authorises each request exists.
 }
