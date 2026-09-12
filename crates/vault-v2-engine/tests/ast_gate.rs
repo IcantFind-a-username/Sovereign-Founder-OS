@@ -495,14 +495,13 @@ fn extension_loading_route_one_is_switched_off_in_source() {
 }
 
 /// The bootstrap is one call, and it is the one that switches configuration
-/// loading off.
+/// loading off. The negative control is one call, and it is the only other
+/// one — inside `#[cfg(test)]`, which is what keeps it out of the binary.
 ///
-/// Like the extension switch above, this cannot be proven by running the
-/// program: `OPENSSL_init_crypto` returns 1 either way, and a process that
-/// loaded a hostile `OPENSSL_CONF` looks identical from the inside until
-/// something asks the provider what it is. The fresh-process qualification
-/// that asks is a separate queued item; the constant itself stays structural
-/// evidence even after it lands.
+/// The constant itself cannot be checked by running this build: OpenSSL
+/// answers 1 to either option, and the fresh-process qualification beside it
+/// proves the *behaviour*. This proves the value the plan pins and that
+/// production code has exactly one way in.
 #[test]
 fn the_openssl_bootstrap_is_one_call_with_config_loading_off() {
     use syn::visit::Visit;
@@ -532,29 +531,55 @@ fn the_openssl_bootstrap_is_one_call_with_config_loading_off() {
         }
     }
 
+    fn is_cfg_test(attribute: &syn::Attribute) -> bool {
+        attribute.path().is_ident("cfg")
+            && attribute
+                .parse_args::<syn::Path>()
+                .is_ok_and(|path| path.is_ident("test"))
+    }
+
+    fn calls_in<'a>(items: impl Iterator<Item = &'a syn::Item>) -> Vec<Option<String>> {
+        let mut calls = Calls(Vec::new());
+        for item in items {
+            calls.visit_item(item);
+        }
+        calls.0
+    }
+
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/engine/process.rs");
     let source = std::fs::read_to_string(&path).expect("read process.rs");
     let file = syn::parse_file(&source).expect("parse process.rs");
-    let mut calls = Calls(Vec::new());
-    calls.visit_file(&file);
+
+    // Anything carrying `#[cfg(test)]` is compiled out of the binary; the
+    // rest is what the process actually runs.
+    let (test_only, production): (Vec<&syn::Item>, Vec<&syn::Item>) =
+        file.items.iter().partition(|item| match item {
+            syn::Item::Mod(module) => module.attrs.iter().any(is_cfg_test),
+            syn::Item::Fn(function) => function.attrs.iter().any(is_cfg_test),
+            _ => false,
+        });
 
     assert_eq!(
-        calls.0,
+        calls_in(production.into_iter()),
         vec![Some("OPENSSL_INIT_NO_LOAD_CONFIG".to_owned())],
-        "OPENSSL_init_crypto must be called exactly once, with the pinned \
-         no-load-config constant (None means the argument is not a plain \
-         constant): found {:?}",
-        calls.0
+        "production code must call OPENSSL_init_crypto exactly once, with the pinned \
+         no-load-config constant (None means the argument is not a plain constant)"
+    );
+    assert_eq!(
+        calls_in(test_only.into_iter()),
+        vec![Some("OPENSSL_INIT_LOAD_CONFIG".to_owned())],
+        "the test-only negative control is exactly one call, loading the configuration \
+         the bootstrap refuses to"
     );
 
-    // And that constant holds the value the vendored header gives, so the
-    // call cannot be pointed at a differently-named constant holding 0.
+    // And the pinned constant holds the value the vendored header gives, so
+    // the production call cannot be pointed at a differently-named constant.
     let mut pinned = None;
     for item in &file.items {
         if let syn::Item::Const(constant) = item {
             assert_ne!(
                 constant.ident, "OPENSSL_INIT_LOAD_CONFIG",
-                "the config-loading constant may not be declared in production source"
+                "the config-loading constant may not be declared outside `#[cfg(test)]`"
             );
             if constant.ident == "OPENSSL_INIT_NO_LOAD_CONFIG" {
                 if let syn::Expr::Lit(syn::ExprLit {
