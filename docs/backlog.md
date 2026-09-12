@@ -493,6 +493,19 @@ while the controller routes eligible design/review cards to the strong role.
   Resolve real-egress/Exact Effect and actual owner/authority dependencies
   before releasing bounded Keychain, dispatch and connection-acceptance cards.
   Reuse existing core tasks; synthetic input does not waive real-effect gates.
+  2026-09-12, still open: the owner froze four direction decisions and the
+  wiring was audited against §7.1 — written up in
+  [S3-M00](handoff/codex/cards/S3-M00.md). The card does **not** freeze the
+  protocol and does **not** release S3-M01/M02/M03, because the audit found
+  the prerequisites deeper than the stage assumed: no egress broker exists
+  (`crates/effects`), the model path bypasses the mediated chain entirely
+  (`crates/model` depends on none of effects/capability/authority; safe today
+  only because the Ollama adapter structurally refuses non-loopback hosts),
+  Program 1C0 does not exist and RFC 0004:498 says the application-created
+  signer cannot satisfy that gate, and RFC 0004:183 requires a real-egress RFC
+  to fix canonical encoding and coordinator storage *before any adapter is
+  enabled* — that RFC does not exist. The card lists the ordered dependencies
+  and the exact release condition.
 
 - [ ] **P2 | `docs/product/, docs/handoff/codex/, rfcs/` | S3-L00 — Freeze legal RAG, jurisdiction facts, assistance outputs, and synthetic rule enforcement.** `lane:codex` `needs:fable`
   Definition and done criteria: [S3 legal extension](handoff/codex/milestones.md#legal-extension).
