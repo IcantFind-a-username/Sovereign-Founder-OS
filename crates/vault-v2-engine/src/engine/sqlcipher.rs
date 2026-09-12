@@ -181,6 +181,27 @@ pub(crate) fn open_sqlcipher(
 }
 
 impl HardenedConnection {
+    /// Which crypto provider SQLCipher is actually using on this connection,
+    /// and its version — read from the library rather than inferred from the
+    /// build features.
+    ///
+    /// SQLCipher answers these only once a connection is keyed, which is why
+    /// this is a method on an opened connection. Both values are the
+    /// library's own strings; neither is derived from the key.
+    pub(crate) fn cipher_profile(&self) -> Option<(String, String)> {
+        let provider = self
+            .connection
+            .query_row("PRAGMA cipher_provider", [], |row| row.get::<_, String>(0))
+            .ok()?;
+        let version = self
+            .connection
+            .query_row("PRAGMA cipher_provider_version", [], |row| {
+                row.get::<_, String>(0)
+            })
+            .ok()?;
+        Some((provider, version))
+    }
+
     /// Authenticate every page against its HMAC. Returns only whether they
     /// all passed and, if not, how many did not.
     pub(crate) fn cipher_integrity_check(&self) -> Result<(), IntegrityFailure> {
