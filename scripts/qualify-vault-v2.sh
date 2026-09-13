@@ -257,13 +257,24 @@ resolve_tools() {
   fi
 }
 
+admitted_engine_target() {
+  echo "${SFO_VAULT_PLATFORM_ADMITTED_TARGET:-x86_64-unknown-linux-gnu}"
+}
+
 verify_host_triple() {
-  local host_line host
+  local host_line host admitted
   host_line=$(rustc -vV 2>/dev/null | grep '^host:' || true)
   host=${host_line#host: }
   host=$(echo "$host" | tr -d '[:space:]')
-  if [ "$host" != "x86_64-unknown-linux-gnu" ]; then
-    die "engine gate admits only x86_64-unknown-linux-gnu; host is ${host:-unknown}"
+  admitted=$(admitted_engine_target)
+  case "$admitted" in
+  x86_64-unknown-linux-gnu | aarch64-apple-darwin | x86_64-pc-windows-msvc) ;;
+  *)
+    die "unknown admitted engine target: $admitted"
+    ;;
+  esac
+  if [ "$host" != "$admitted" ]; then
+    die "host ($host) must match admitted target ($admitted)"
   fi
 }
 
@@ -275,7 +286,7 @@ write_manifest_header() {
     echo "# generated: $(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u)"
     echo "# repository: $ROOT"
     echo "# cargo_target_dir: $TARGET_DIR"
-    echo "# admitted_target: x86_64-unknown-linux-gnu"
+    echo "# admitted_target: $(admitted_engine_target)"
     echo
     echo "## reviewed tools"
   } >>"$path"
@@ -321,6 +332,8 @@ run_child() {
   local log_label="$1"
   shift
   local -a cmd=("$@")
+  local admitted
+  admitted=$(admitted_engine_target)
   note_step "$log_label"
   echo "==== [$log_label] ${cmd[*]}" >>"$QUALIFY_LOG"
   env -i \
@@ -336,9 +349,13 @@ run_child() {
     RUSTDOC="$ABS_RUSTDOC" \
     SOVEREIGN_CARGO_CLIPPY="$ABS_CARGO_CLIPPY" \
     SOVEREIGN_CLIPPY_DRIVER="$ABS_CLIPPY_DRIVER" \
-    CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu \
+    CARGO_BUILD_TARGET="$admitted" \
     CARGO_NET_OFFLINE=true \
     CARGO_TARGET_DIR="$TARGET_DIR" \
+    SFO_VAULT_PLATFORM_NAMESPACE="${SFO_VAULT_PLATFORM_NAMESPACE:-}" \
+    SFO_VAULT_PLATFORM_ADMITTED_TARGET="${SFO_VAULT_PLATFORM_ADMITTED_TARGET:-}" \
+    DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
+    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
     PATH="$CHILD_PATH" \
     "${cmd[@]}" >>"$QUALIFY_LOG" 2>&1 || die "$log_label failed (see $QUALIFY_LOG)"
 }

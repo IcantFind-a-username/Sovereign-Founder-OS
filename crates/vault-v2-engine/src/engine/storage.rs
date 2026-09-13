@@ -1,4 +1,6 @@
 //! Staging directory I/O and the sole durable publisher for `vault.slots` (RFC 0005 Task 4).
+//! Linux durability evidence for publication fault stages is exercised in the
+//! `vault-platform.yml` job via `engine::storage::tests` (Task 5).
 
 use crate::engine::key_slots::{parse_vault_slots, VaultSlotsRecord};
 use crate::engine::process::CryptoProcessOwner;

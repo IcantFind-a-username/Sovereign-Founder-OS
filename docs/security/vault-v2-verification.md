@@ -37,8 +37,12 @@ assurance.
 **Bare `cargo` is not evidence** for this crate: ambient variables can reshape
 the vendored SQLCipher/OpenSSL build (`crates/vault-v2-engine/build_gate.rs`).
 The checked-in wrapper constructs a positive-allowlist child environment, pins
-`x86_64-unknown-linux-gnu`, records tool digests, and runs `--frozen
---offline` after lock acquisition.
+the admitted host triple, records tool digests, and runs `--frozen --offline`
+after lock acquisition.
+
+**Platform jobs prove `OsProtected` software integration only** (Task 5). Passing
+`.github/workflows/vault-platform.yml` does not enroll a workspace, write
+`vault.format`, or link the engine into `sovereign-cli`.
 
 ## Maturity label (current slice)
 
@@ -48,8 +52,11 @@ The checked-in wrapper constructs a positive-allowlist child environment, pins
 | SQLCipher 4.14.0 runtime pin | **Experimental** | `tests/public.rs` readback; not a connection factory yet |
 | Source-closure / AST gate (partial) | **Experimental** | `tests/ast_gate.rs`; FFI exactness still queued |
 | Build-time ambient override gate | **Experimental** | `build.rs` + `tests/build_gate.rs`; wrapper is the real gate |
+| Native key-store roundtrip (isolated CI namespace) | **Experimental** | `vault-platform.yml` + `platform-qualifier` feature; not product enrollment |
+| Linux staging durability (storage tests) | **Experimental** | `engine::storage::tests` via platform Linux job |
+| Non-activation guards (`publish = false`, no CLI edge) | **Experimental** | `tests/non_activation.rs`, `check-vault-v2-non-activation.sh` |
 | Product Vault v2 / `ActiveV2` | **Target** | RFC 0005 |
-| Whole-workspace persistence ledger | **Target** | Task 6 |
+| Whole-workspace persistence ledger | **Target** | Task 6 (partial row coverage only) |
 | Filtered backup / 1B1 restore qualification | **Target** | Separate program |
 | Identity / role-key handoff (1C) | **Target** | RFC 0005 conjunctive gates |
 
@@ -73,8 +80,10 @@ the focused `cargo` passthrough commands named in the Program 1A plan).
 - Recovery completeness or dual-root activation.
 - Adversarial cross-crate invariants beyond what is already listed in
   `tests/adversarial` (vault-specific adversarial rows are later tasks).
-- macOS, Windows, musl, wasm, or cross-compiled engine builds (Linux
-  `x86_64-unknown-linux-gnu` only until amended).
+- musl, wasm, embedded, or cross-compiled engine builds (only the three Task 5
+  native triples are admitted: `x86_64-unknown-linux-gnu`,
+  `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`).
+- Hardware-backed key custody (TPM / Secure Enclave / measured boot).
 
 ## Operator notes
 
@@ -86,6 +95,16 @@ the focused `cargo` passthrough commands named in the Program 1A plan).
    at a shared cache and treat the result as reproducible evidence.
 4. Ordinary workspace CI may exclude this package; engine evidence must come
    from the wrapper job, not a bare `cargo test --workspace`.
+5. Platform evidence: set `SFO_VAULT_PLATFORM_NAMESPACE=sfo-ci:<run>:<attempt>`
+   and run `./scripts/run-vault-platform-qualifier.sh <host-triple>` on a native
+   runner matching that triple.
+
+## Merge / stack notes (v01-22)
+
+- **PR #139** (`cursor/closed-kinds-legacy-importer-v01-21-5071`): importer and
+  closed schema this ticket builds on.
+- **PR #133** (`cursor/qualify-vault-v2-a4ac`): `qualify-vault-v2.sh` and Task 1
+  evidence ledger — merged into this branch when absent on the base.
 
 ## Evidence manifest
 

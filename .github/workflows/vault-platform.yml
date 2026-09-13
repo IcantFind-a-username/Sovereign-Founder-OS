@@ -1,0 +1,62 @@
+name: Vault platform (Program 1A Task 5)
+
+# Mandatory native key-store and Linux durability evidence for sovereign-vault-v2-engine.
+# Each job is a named, non-skippable check on an exact host triple — not a cross-compile.
+# Stacks on PR #139 (v01-21 importer); qualification wrapper from PR #133 (v01-18).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-native-store-durability:
+    name: vault-v2 linux native store + durability
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SFO_VAULT_PLATFORM_NAMESPACE: sfo-ci:${{ github.run_id }}:${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@1a3a6d54512beeaffd394f8d516ca16f2c506a20 # 1.97.0
+      - name: Acquire locked dependencies
+        run: cargo fetch --locked
+      - name: Native store and durability qualification
+        run: ./scripts/run-vault-platform-qualifier.sh x86_64-unknown-linux-gnu
+
+  macos-native-store:
+    name: vault-v2 macos native store
+    runs-on: macos-14
+    permissions:
+      contents: read
+    env:
+      SFO_VAULT_PLATFORM_NAMESPACE: sfo-ci:${{ github.run_id }}:${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@1a3a6d54512beeaffd394f8d516ca16f2c506a20 # 1.97.0
+      - name: Acquire locked dependencies
+        run: cargo fetch --locked
+      - name: Native store qualification
+        run: ./scripts/run-vault-platform-qualifier.sh aarch64-apple-darwin
+
+  windows-native-store:
+    name: vault-v2 windows native store
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      SFO_VAULT_PLATFORM_NAMESPACE: sfo-ci:${{ github.run_id }}:${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@1a3a6d54512beeaffd394f8d516ca16f2c506a20 # 1.97.0
+      - name: Acquire locked dependencies
+        run: cargo fetch --locked
+      - name: Native store qualification
+        run: bash ./scripts/run-vault-platform-qualifier.sh x86_64-pc-windows-msvc

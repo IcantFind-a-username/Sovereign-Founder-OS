@@ -58,6 +58,8 @@ jobs:
         run: cargo fetch --locked
       - name: Qualify vault-v2 engine (sanitized wrapper)
         run: ./scripts/qualify-vault-v2.sh full
+      - name: Vault-v2 non-activation evidence (Task 6)
+        run: ./scripts/check-vault-v2-non-activation.sh
 
   frontend-types:
     runs-on: ubuntu-latest
