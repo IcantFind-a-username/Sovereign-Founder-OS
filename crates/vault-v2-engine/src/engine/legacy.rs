@@ -257,7 +257,8 @@ fn verify_manifest_listing(
     if listed_set.len() != listed.len() {
         return Err(LegacyImportError::Rejected);
     }
-    if &listed_set != &on_disk.iter().map(String::as_str).collect() {
+    let on_disk_set: BTreeSet<&str> = on_disk.iter().map(String::as_str).collect();
+    if listed_set != on_disk_set {
         return Err(LegacyImportError::Rejected);
     }
     Ok(())

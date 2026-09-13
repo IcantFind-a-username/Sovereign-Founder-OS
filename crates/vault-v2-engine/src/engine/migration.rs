@@ -231,7 +231,6 @@ mod tests {
     use super::*;
     use crate::engine::process::bootstrap_crypto_process;
     use sovereign_vault::Vault;
-    use std::fs;
     use tempfile::tempdir;
 
     fn owner() -> &'static CryptoProcessOwner {

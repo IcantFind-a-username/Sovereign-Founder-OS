@@ -119,12 +119,9 @@ pub(crate) fn publish_initial_slots(
         device_kek,
         recovery_password,
     )?;
-    parse_vault_slots(
-        &std::fs::read(&staging.slots_path()).map_err(|_| StorageError::Rejected)?,
-        workspace_id,
-        database_id,
-    )
-    .map_err(|_| StorageError::Rejected)
+    let slots_bytes =
+        std::fs::read(staging.slots_path()).map_err(|_| StorageError::Rejected)?;
+    parse_vault_slots(&slots_bytes, workspace_id, database_id).map_err(|_| StorageError::Rejected)
 }
 
 /// Sole consumer of `PreparedWrapperRotation`.
@@ -163,12 +160,9 @@ pub(crate) fn publish_wrapper_rotation(
         device_kek,
         recovery_password,
     )?;
-    parse_vault_slots(
-        &std::fs::read(&staging.slots_path()).map_err(|_| StorageError::Rejected)?,
-        workspace_id,
-        database_id,
-    )
-    .map_err(|_| StorageError::Rejected)
+    let slots_bytes =
+        std::fs::read(staging.slots_path()).map_err(|_| StorageError::Rejected)?;
+    parse_vault_slots(&slots_bytes, workspace_id, database_id).map_err(|_| StorageError::Rejected)
 }
 
 fn verify_expected_sidecar(path: &Path, expected: &ExpectedSidecar) -> Result<(), StorageError> {
@@ -256,13 +250,12 @@ fn verify_published_slots(
 mod tests {
     use super::*;
     use crate::engine::key_slots::build_test_canonical_slots;
-    use crate::engine::platform::TestOnlyDeviceStore;
     use crate::engine::process::bootstrap_crypto_process;
     use crate::engine::recovery::{derive_pwk_for_tests, prepare_fixture_initial_slots};
     use crate::engine::schema::{initialize_vault_schema, VaultSchemaBinding};
     use crate::engine::secret::DbKey;
     use crate::engine::sqlcipher::{open_sqlcipher, ConnectionMode};
-    use crate::engine::wrappers::{DeviceKek, Pwk, RecoveryKek};
+    use crate::engine::wrappers::{DeviceKek, RecoveryKek};
     use tempfile::tempdir;
 
     fn owner() -> &'static CryptoProcessOwner {
