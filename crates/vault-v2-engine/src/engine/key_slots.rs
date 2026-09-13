@@ -1,7 +1,7 @@
 //! Fixed `vault.slots` sidecar parsing and recovery-slot commitment (RFC 0005).
 
 use crate::engine::wrappers::{
-    ARGON_PROFILE_TAG_V1, ProtocolId, WRAPPED_RECORD_LEN, XCHACHA_NONCE_LEN,
+    ProtocolId, ARGON_PROFILE_TAG_V1, WRAPPED_RECORD_LEN, XCHACHA_NONCE_LEN,
 };
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -77,7 +77,9 @@ pub(crate) struct VaultSlotsRecord {
 }
 
 /// Recompute `recovery_slot_commitment` from the parsed recovery subrecord.
-pub(crate) fn recovery_slot_commitment(recovery: &RecoverySubrecord) -> Result<[u8; 32], SlotsParseError> {
+pub(crate) fn recovery_slot_commitment(
+    recovery: &RecoverySubrecord,
+) -> Result<[u8; 32], SlotsParseError> {
     let jcs = recovery_subrecord_jcs(recovery)?;
     let mut hasher = Sha256::new();
     hasher.update(RECOVERY_COMMITMENT_DOMAIN);
@@ -163,7 +165,9 @@ fn recovery_subrecord_jcs(recovery: &RecoverySubrecord) -> Result<Vec<u8>, Slots
     serde_json_canonicalizer::to_vec(&value).map_err(|_| SlotsParseError)
 }
 
-fn recovery_subrecord_value(recovery: &RecoverySubrecord) -> Result<serde_json::Value, SlotsParseError> {
+fn recovery_subrecord_value(
+    recovery: &RecoverySubrecord,
+) -> Result<serde_json::Value, SlotsParseError> {
     let mut object = serde_json::Map::new();
     object.insert(
         "argon_profile_tag".into(),
@@ -330,8 +334,8 @@ fn decode_u16_decimal(value: &serde_json::Value) -> Result<u16, SlotsParseError>
 mod test_support {
     use super::*;
     use crate::engine::wrappers::{
-        wrap_device_dbk, wrap_recovery_dbk, wrap_recovery_kek_with_pwk, DeviceDbkAad,
-        DeviceKek, Pwk, PwkRecoveryKekAad, RecoveryDbkAad, RecoveryKek,
+        wrap_device_dbk, wrap_recovery_dbk, wrap_recovery_kek_with_pwk, DeviceDbkAad, DeviceKek,
+        Pwk, PwkRecoveryKekAad, RecoveryDbkAad, RecoveryKek,
     };
 
     fn id(byte: u8) -> ProtocolId {
@@ -418,9 +422,15 @@ mod test_support {
         );
         top.insert("db_key_epoch".into(), serde_json::Value::String("1".into()));
         top.insert("device".into(), serde_json::Value::Object(device_object));
-        top.insert("format_version".into(), serde_json::Value::String("2".into()));
+        top.insert(
+            "format_version".into(),
+            serde_json::Value::String("2".into()),
+        );
         top.insert("recovery".into(), recovery_value);
-        top.insert("suite_version".into(), serde_json::Value::String("1".into()));
+        top.insert(
+            "suite_version".into(),
+            serde_json::Value::String("1".into()),
+        );
         top.insert(
             "workspace_id".into(),
             serde_json::Value::String(URL_SAFE_NO_PAD.encode(workspace)),
@@ -432,8 +442,8 @@ mod test_support {
     pub(crate) fn build_wrapper_golden_v1_slots() -> (ProtocolId, ProtocolId, Vec<u8>, [u8; 32]) {
         use crate::engine::wrapper_golden_v1::{
             GOLDEN_ARGON_SALT_V1, GOLDEN_DATABASE_ID_V1, GOLDEN_DBK_PLAINTEXT_V1,
-            GOLDEN_DEVICE_DBK_NONCE_V1, GOLDEN_DEVICE_KEK_V1,
-            GOLDEN_PWK_KEK_CIPHERTEXT_V1, GOLDEN_PWK_KEK_NONCE_V1, GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
+            GOLDEN_DEVICE_DBK_NONCE_V1, GOLDEN_DEVICE_KEK_V1, GOLDEN_PWK_KEK_CIPHERTEXT_V1,
+            GOLDEN_PWK_KEK_NONCE_V1, GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
             GOLDEN_RECOVERY_DBK_NONCE_V1, GOLDEN_WORKSPACE_ID_V1,
         };
         use crate::engine::wrappers::{DeviceDbkAad, DeviceKek, WRAPPED_RECORD_LEN};
@@ -500,9 +510,15 @@ mod test_support {
         );
         top.insert("db_key_epoch".into(), serde_json::Value::String("1".into()));
         top.insert("device".into(), serde_json::Value::Object(device_object));
-        top.insert("format_version".into(), serde_json::Value::String("2".into()));
+        top.insert(
+            "format_version".into(),
+            serde_json::Value::String("2".into()),
+        );
         top.insert("recovery".into(), recovery_value);
-        top.insert("suite_version".into(), serde_json::Value::String("1".into()));
+        top.insert(
+            "suite_version".into(),
+            serde_json::Value::String("1".into()),
+        );
         top.insert(
             "workspace_id".into(),
             serde_json::Value::String(URL_SAFE_NO_PAD.encode(GOLDEN_WORKSPACE_ID_V1)),
@@ -545,7 +561,10 @@ mod tests {
         let mut value: serde_json::Value =
             serde_json::from_slice(&bytes).expect("parse fixture json");
         if let Some(object) = value.as_object_mut() {
-            object.insert("extra".to_string(), serde_json::Value::String("x".to_string()));
+            object.insert(
+                "extra".to_string(),
+                serde_json::Value::String("x".to_string()),
+            );
         }
         let bad = serde_json_canonicalizer::to_vec(&value).expect("canonical bad");
         assert!(parse_vault_slots(&bad, &workspace, &database).is_err());

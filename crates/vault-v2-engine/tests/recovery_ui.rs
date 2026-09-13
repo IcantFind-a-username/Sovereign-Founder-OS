@@ -28,7 +28,10 @@ fn rustc_diagnostic(stderr: &str) -> &str {
 fn normalize_stderr(stderr: &str, manifest: &std::path::Path) -> String {
     let manifest = manifest.to_string_lossy().into_owned();
     let mut normalized = rustc_diagnostic(stderr).replace(&manifest, "$DIR");
-    normalized = normalized.replace("../../recovery_ui/recovery_read_only.rs", &format!("$DIR/{FIXTURE}"));
+    normalized = normalized.replace(
+        "../../recovery_ui/recovery_read_only.rs",
+        &format!("$DIR/{FIXTURE}"),
+    );
     normalized = normalized.replace(
         &format!("../{}", FIXTURE.rsplit('/').next().expect("name")),
         &format!("$DIR/{FIXTURE}"),
@@ -54,7 +57,9 @@ fn cargo_check(bin: &str) -> std::process::Output {
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    command.output().expect("run cargo check for recovery UI fixture")
+    command
+        .output()
+        .expect("run cargo check for recovery UI fixture")
 }
 
 #[test]

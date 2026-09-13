@@ -1,17 +1,15 @@
 //! Recovery read-only session and dual-root unlock orchestration (Task 2).
 
-use crate::engine::key_slots::{
-    parse_vault_slots, AdmissionCounters, VaultSlotsRecord,
-};
-use crate::engine::recovery_authorizer;
+use crate::engine::key_slots::{parse_vault_slots, AdmissionCounters, VaultSlotsRecord};
 use crate::engine::platform::{DeviceStoreError, NativeDeviceStore};
 use crate::engine::process::CryptoProcessOwner;
+use crate::engine::recovery_authorizer;
 use crate::engine::secret::DbKey;
 use crate::engine::sqlcipher::{open_sqlcipher, ConnectionMode, HardenedConnection, OpenError};
 use crate::engine::wrappers::{
-    unwrap_device_dbk, unwrap_recovery_dbk, unwrap_recovery_kek_with_pwk,
-    DeviceDbkAad, DeviceKek, ProtocolId, Pwk, PwkRecoveryKekAad, RecoveryDbkAad, RecoveryKek,
-    WrappedRecord, DATABASE_ROLE_LIVE,
+    unwrap_device_dbk, unwrap_recovery_dbk, unwrap_recovery_kek_with_pwk, DeviceDbkAad, DeviceKek,
+    ProtocolId, Pwk, PwkRecoveryKekAad, RecoveryDbkAad, RecoveryKek, WrappedRecord,
+    DATABASE_ROLE_LIVE,
 };
 use argon2::{Algorithm, Argon2, Params, Version};
 use std::path::Path;
@@ -68,11 +66,20 @@ impl ArgonWorkspace {
 }
 
 fn argon_params() -> Result<Params, RecoveryFailed> {
-    Params::new(ARGON_M_COST_KIB, ARGON_T_COST, ARGON_P_COST, Some(ARGON_OUTPUT_LEN))
-        .map_err(|_| RecoveryFailed)
+    Params::new(
+        ARGON_M_COST_KIB,
+        ARGON_T_COST,
+        ARGON_P_COST,
+        Some(ARGON_OUTPUT_LEN),
+    )
+    .map_err(|_| RecoveryFailed)
 }
 
-fn derive_pwk(password: &[u8], salt: &[u8; 16], workspace: &mut ArgonWorkspace) -> Result<Pwk, RecoveryFailed> {
+fn derive_pwk(
+    password: &[u8],
+    salt: &[u8; 16],
+    workspace: &mut ArgonWorkspace,
+) -> Result<Pwk, RecoveryFailed> {
     if password.is_empty() || password.len() > 1024 {
         return Err(RecoveryFailed);
     }
@@ -98,9 +105,14 @@ pub(crate) fn open_with_device_store(
     store: &NativeDeviceStore,
     counters: &AdmissionCounters,
 ) -> Result<DbKey, VaultOpenError> {
-    let slots = parse_vault_slots(slots_bytes, workspace_id, database_id).map_err(|_| VaultOpenError::Slots)?;
-    counters.keyring.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let device_kek = store.get_device_kek().map_err(VaultOpenError::DeviceStore)?;
+    let slots = parse_vault_slots(slots_bytes, workspace_id, database_id)
+        .map_err(|_| VaultOpenError::Slots)?;
+    counters
+        .keyring
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let device_kek = store
+        .get_device_kek()
+        .map_err(VaultOpenError::DeviceStore)?;
     open_with_device_kek(owner, db_path, &slots, &device_kek)
 }
 
@@ -114,9 +126,14 @@ pub(crate) fn open_with_test_device_store(
     store: &crate::engine::platform::TestOnlyDeviceStore,
     counters: &AdmissionCounters,
 ) -> Result<DbKey, VaultOpenError> {
-    let slots = parse_vault_slots(slots_bytes, workspace_id, database_id).map_err(|_| VaultOpenError::Slots)?;
-    counters.keyring.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let device_kek = store.get_device_kek().map_err(VaultOpenError::DeviceStore)?;
+    let slots = parse_vault_slots(slots_bytes, workspace_id, database_id)
+        .map_err(|_| VaultOpenError::Slots)?;
+    counters
+        .keyring
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let device_kek = store
+        .get_device_kek()
+        .map_err(VaultOpenError::DeviceStore)?;
     open_with_device_kek(owner, db_path, &slots, &device_kek)
 }
 
@@ -150,9 +167,12 @@ pub(crate) fn unlock_recovery_read_only(
     password: &[u8],
     counters: &AdmissionCounters,
 ) -> Result<RecoverySession<ReadOnly>, VaultOpenError> {
-    let slots = parse_vault_slots(slots_bytes, workspace_id, database_id).map_err(|_| VaultOpenError::Slots)?;
+    let slots = parse_vault_slots(slots_bytes, workspace_id, database_id)
+        .map_err(|_| VaultOpenError::Slots)?;
     let mut workspace = ArgonWorkspace::new().map_err(|_| VaultOpenError::Crypto)?;
-    counters.kdf.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    counters
+        .kdf
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let pwk = derive_pwk(password, &slots.recovery.argon_salt, &mut workspace)
         .map_err(|_| VaultOpenError::Crypto)?;
     workspace.0 .0.zeroize();
@@ -168,9 +188,11 @@ pub(crate) fn unlock_recovery_read_only(
         nonce: slots.recovery.kek_nonce,
         ciphertext: slots.recovery.kek_ciphertext,
     };
-    counters.unwrap.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let recovery_kek_bytes =
-        unwrap_recovery_kek_with_pwk(&pwk, &pwk_aad, &kek_record).map_err(|_| VaultOpenError::Crypto)?;
+    counters
+        .unwrap
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let recovery_kek_bytes = unwrap_recovery_kek_with_pwk(&pwk, &pwk_aad, &kek_record)
+        .map_err(|_| VaultOpenError::Crypto)?;
     let recovery_kek = RecoveryKek::from_bytes(recovery_kek_bytes);
 
     let recovery_aad = RecoveryDbkAad {
@@ -184,9 +206,11 @@ pub(crate) fn unlock_recovery_read_only(
         nonce: slots.recovery.dbk_nonce,
         ciphertext: slots.recovery.dbk_ciphertext,
     };
-    counters.unwrap.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let dbk_bytes =
-        unwrap_recovery_dbk(&recovery_kek, &recovery_aad, &dbk_record).map_err(|_| VaultOpenError::Crypto)?;
+    counters
+        .unwrap
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let dbk_bytes = unwrap_recovery_dbk(&recovery_kek, &recovery_aad, &dbk_record)
+        .map_err(|_| VaultOpenError::Crypto)?;
 
     let dbk = DbKey::from_bytes(dbk_bytes);
     let connection = open_sqlcipher(owner, db_path, &dbk, ConnectionMode::ReadOnlyRecovery)
@@ -213,7 +237,10 @@ pub(crate) fn fixture_derive_pwk(password: &[u8], salt: &[u8; 16]) -> Result<Pwk
 }
 
 #[cfg(test)]
-pub(crate) fn derive_pwk_for_tests(password: &[u8], salt: &[u8; 16]) -> Result<Pwk, RecoveryFailed> {
+pub(crate) fn derive_pwk_for_tests(
+    password: &[u8],
+    salt: &[u8; 16],
+) -> Result<Pwk, RecoveryFailed> {
     fixture_derive_pwk(password, salt)
 }
 
@@ -241,9 +268,9 @@ struct PreparedVerificationSecrets {
 mod tests {
     use super::*;
     use crate::engine::key_slots::build_test_canonical_slots;
+    use crate::engine::platform::TestOnlyDeviceStore;
     use crate::engine::process::bootstrap_crypto_process;
     use crate::engine::sqlcipher::ConnectionMode;
-    use crate::engine::platform::TestOnlyDeviceStore;
     use crate::engine::wrappers::{DeviceKek, RecoveryKek};
     use static_assertions::assert_not_impl_any;
     use std::path::PathBuf;
@@ -308,8 +335,7 @@ mod tests {
             &Pwk::from_bytes([0x03; 32]),
             dbk_bytes,
         );
-        let mut value: serde_json::Value =
-            serde_json::from_slice(&slots).expect("json");
+        let mut value: serde_json::Value = serde_json::from_slice(&slots).expect("json");
         value.as_object_mut().unwrap().remove("recovery");
         let broken = serde_json::to_vec(&value).unwrap();
         let store = TestOnlyDeviceStore::with_kek(&device_kek);

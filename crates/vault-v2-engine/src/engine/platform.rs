@@ -3,8 +3,8 @@
 use crate::engine::wrappers::{DeviceKek, ProtocolId};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use keyring::Error as KeyringError;
 use keyring::Entry;
+use keyring::Error as KeyringError;
 use std::marker::PhantomData;
 use zeroize::Zeroize;
 
@@ -29,7 +29,10 @@ pub(crate) struct NativeDeviceStore {
 }
 
 impl NativeDeviceStore {
-    pub(crate) fn open(workspace_id: &ProtocolId, protector_id: &ProtocolId) -> Result<Self, DeviceStoreError> {
+    pub(crate) fn open(
+        workspace_id: &ProtocolId,
+        protector_id: &ProtocolId,
+    ) -> Result<Self, DeviceStoreError> {
         let username = format!(
             "device-kek:{}:{}",
             URL_SAFE_NO_PAD.encode(workspace_id),
@@ -95,7 +98,10 @@ impl TestOnlyDeviceStore {
         if !self.available {
             return Err(DeviceStoreError::DeviceStoreUnavailable);
         }
-        let secret = self.secret.clone().ok_or(DeviceStoreError::DeviceKeyMissing)?;
+        let secret = self
+            .secret
+            .clone()
+            .ok_or(DeviceStoreError::DeviceKeyMissing)?;
         parse_device_kek_record(secret)
     }
 }

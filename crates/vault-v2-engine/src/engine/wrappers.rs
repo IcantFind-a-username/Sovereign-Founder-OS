@@ -3,8 +3,8 @@
 //! Three distinct internal AAD types — no generic purpose enum. DBK equality
 //! after unwrap uses only constant-time comparison.
 
-use chacha20poly1305::aead::{AeadInOut, KeyInit};
 use chacha20poly1305::aead::inout::InOutBuf;
+use chacha20poly1305::aead::{AeadInOut, KeyInit};
 use chacha20poly1305::{Key, Tag, XChaCha20Poly1305, XNonce};
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -105,7 +105,11 @@ impl PwkRecoveryKekAad {
     pub(crate) fn to_bytes(&self) -> [u8; PWK_RECOVERY_KEK_AAD_LEN] {
         let mut out = [0u8; PWK_RECOVERY_KEK_AAD_LEN];
         let mut offset = 0;
-        offset = write_literal(&mut out, offset, b"sovereign:vault:v2:pwk-recovery-kek-wrap");
+        offset = write_literal(
+            &mut out,
+            offset,
+            b"sovereign:vault:v2:pwk-recovery-kek-wrap",
+        );
         offset = write_u16_be(&mut out, offset, WRAPPER_VERSION);
         offset = write_u16_be(&mut out, offset, SUITE_VERSION);
         offset = write_bytes32(&mut out, offset, &self.workspace_id);
@@ -324,8 +328,8 @@ mod tests {
             &GOLDEN_DEVICE_DBK_NONCE_V1,
         )
         .expect("device wrap");
-        let pwk = derive_pwk_for_tests(GOLDEN_RECOVERY_PASSWORD_V1, &GOLDEN_ARGON_SALT_V1)
-            .expect("pwk");
+        let pwk =
+            derive_pwk_for_tests(GOLDEN_RECOVERY_PASSWORD_V1, &GOLDEN_ARGON_SALT_V1).expect("pwk");
         let pwk_aad = PwkRecoveryKekAad {
             workspace_id: id(0x01),
             database_id: id(0x02),
@@ -490,8 +494,7 @@ mod tests {
         let kek_record =
             wrap_recovery_kek_with_pwk(&pwk, &pwk_aad, recovery_kek.expose(), &[0x88; 24])
                 .expect("k");
-        let recovered_kek =
-            unwrap_recovery_kek_with_pwk(&pwk, &pwk_aad, &kek_record).expect("ku");
+        let recovered_kek = unwrap_recovery_kek_with_pwk(&pwk, &pwk_aad, &kek_record).expect("ku");
         let rk = RecoveryKek::from_bytes(recovered_kek);
 
         let recovery_aad = RecoveryDbkAad {
@@ -502,8 +505,7 @@ mod tests {
             database_role: DATABASE_ROLE_LIVE,
         };
         let recovery_record = wrap_recovery_dbk(&rk, &recovery_aad, &dbk, &[0x99; 24]).expect("r");
-        let from_recovery =
-            unwrap_recovery_dbk(&rk, &recovery_aad, &recovery_record).expect("ru");
+        let from_recovery = unwrap_recovery_dbk(&rk, &recovery_aad, &recovery_record).expect("ru");
         assert!(dbk_matches_expected(&from_recovery, &dbk));
     }
 
@@ -513,9 +515,10 @@ mod tests {
         use crate::engine::wrapper_golden_v1::{
             DEVICE_DBK_AAD_V1, GOLDEN_ARGON_SALT_V1, GOLDEN_DBK_PLAINTEXT_V1,
             GOLDEN_DEVICE_DBK_CIPHERTEXT_V1, GOLDEN_DEVICE_DBK_NONCE_V1, GOLDEN_DEVICE_KEK_V1,
-            GOLDEN_PWK_KEK_CIPHERTEXT_V1, GOLDEN_PWK_KEK_NONCE_V1, GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
-            GOLDEN_RECOVERY_DBK_NONCE_V1, GOLDEN_RECOVERY_KEK_V1, GOLDEN_RECOVERY_PASSWORD_V1,
-            PWK_RECOVERY_KEK_AAD_V1, RECOVERY_DBK_AAD_V1,
+            GOLDEN_PWK_KEK_CIPHERTEXT_V1, GOLDEN_PWK_KEK_NONCE_V1,
+            GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1, GOLDEN_RECOVERY_DBK_NONCE_V1,
+            GOLDEN_RECOVERY_KEK_V1, GOLDEN_RECOVERY_PASSWORD_V1, PWK_RECOVERY_KEK_AAD_V1,
+            RECOVERY_DBK_AAD_V1,
         };
 
         fn id(b: u8) -> ProtocolId {
@@ -573,8 +576,11 @@ mod tests {
             nonce: GOLDEN_RECOVERY_DBK_NONCE_V1,
             ciphertext: GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
         };
-        let recovery_dbk =
-            unwrap_recovery_dbk(&recovery_kek, &recovery_aad, &recovery_record).expect("recovery golden");
-        assert!(dbk_matches_expected(&recovery_dbk, &GOLDEN_DBK_PLAINTEXT_V1));
+        let recovery_dbk = unwrap_recovery_dbk(&recovery_kek, &recovery_aad, &recovery_record)
+            .expect("recovery golden");
+        assert!(dbk_matches_expected(
+            &recovery_dbk,
+            &GOLDEN_DBK_PLAINTEXT_V1
+        ));
     }
 }

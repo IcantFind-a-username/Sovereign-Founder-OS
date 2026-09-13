@@ -7,7 +7,9 @@ use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
 use rusqlite::Connection;
 
 /// Apply `query_only=ON` and the closed recovery authorizer.
-pub(crate) fn harden_recovery_connection(connection: &Connection) -> Result<(), RecoveryAuthorizerError> {
+pub(crate) fn harden_recovery_connection(
+    connection: &Connection,
+) -> Result<(), RecoveryAuthorizerError> {
     connection
         .pragma_update(None, "query_only", true)
         .map_err(|_| RecoveryAuthorizerError)?;
@@ -29,7 +31,10 @@ fn recovery_authorizer_callback(context: AuthContext<'_>) -> Authorization {
         {
             Authorization::Allow
         }
-        AuthAction::Pragma { pragma_name, pragma_value } => {
+        AuthAction::Pragma {
+            pragma_name,
+            pragma_value,
+        } => {
             if recovery_pragma_allowed(pragma_name, pragma_value) {
                 Authorization::Allow
             } else {
@@ -62,7 +67,7 @@ fn recovery_authorizer_callback(context: AuthContext<'_>) -> Authorization {
         | AuthAction::Analyze { .. }
         | AuthAction::CreateVtable { .. }
         | AuthAction::DropVtable { .. }
-        |         AuthAction::Transaction { .. }
+        | AuthAction::Transaction { .. }
         | AuthAction::Savepoint { .. }
         | AuthAction::Recursive => Authorization::Deny,
         AuthAction::Function { .. } => Authorization::Allow,
@@ -76,7 +81,10 @@ fn recovery_pragma_allowed(name: &str, value: Option<&str>) -> bool {
     let lower = name.to_ascii_lowercase();
     match lower.as_str() {
         "query_only" => !value_is_off(value),
-        "cipher_integrity_check" | "cipher_provider" | "cipher_provider_version" | "cipher_version"
+        "cipher_integrity_check"
+        | "cipher_provider"
+        | "cipher_provider_version"
+        | "cipher_version"
         | "integrity_check" => true,
         _ => false,
     }
@@ -101,9 +109,9 @@ pub(crate) fn query_only_is_on(connection: &Connection) -> Result<bool, Recovery
 mod tests {
     use super::*;
     use crate::engine::process::bootstrap_crypto_process;
-    use rusqlite::OptionalExtension;
     use crate::engine::secret::DbKey;
     use crate::engine::sqlcipher::{open_sqlcipher, ConnectionMode};
+    use rusqlite::OptionalExtension;
 
     fn owner() -> &'static crate::engine::process::CryptoProcessOwner {
         bootstrap_crypto_process().expect("openssl")
@@ -112,8 +120,13 @@ mod tests {
     fn readonly_encrypted_db() -> (tempfile::NamedTempFile, DbKey) {
         let dbk = DbKey::from_bytes([0x5c; 32]);
         let file = tempfile::NamedTempFile::new().expect("temp db");
-        open_sqlcipher(owner(), file.path(), &dbk, ConnectionMode::ReadWriteCreateInternal)
-            .expect("create");
+        open_sqlcipher(
+            owner(),
+            file.path(),
+            &dbk,
+            ConnectionMode::ReadWriteCreateInternal,
+        )
+        .expect("create");
         (file, dbk)
     }
 
@@ -152,7 +165,9 @@ mod tests {
         harden_recovery_connection(connection.rusqlite_connection()).expect("harden");
         let conn = connection.rusqlite_connection();
         let _: Option<String> = conn
-            .query_row("SELECT name FROM sqlite_schema LIMIT 1", [], |row| row.get(0))
+            .query_row("SELECT name FROM sqlite_schema LIMIT 1", [], |row| {
+                row.get(0)
+            })
             .optional()
             .expect("schema probe");
         let _ = conn
