@@ -169,6 +169,7 @@ activate = 1
             &root.join("vault.db"),
             &DbKey::from_bytes([0x5a; 32]),
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         ) {
             Ok(connection) => {
                 let (provider, version) = connection

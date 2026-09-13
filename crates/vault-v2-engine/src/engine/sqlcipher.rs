@@ -14,6 +14,7 @@
 
 use super::ffi::{self, HardeningFailure};
 use super::process::CryptoProcessOwner;
+use super::schema::{self, VaultSchemaBinding};
 use super::secret::DbKey;
 use rusqlite::config::DbConfig;
 use rusqlite::limits::Limit;
@@ -198,6 +199,8 @@ pub(crate) enum OpenError {
     /// something other than the value set. The connection is refused rather
     /// than returned half-hardened.
     ProfileNotApplied,
+    /// Authenticated vault schema did not match the closed profile.
+    VaultSchemaRejected,
 }
 
 /// The cipher's own integrity check found pages it could not authenticate.
@@ -224,6 +227,7 @@ pub(crate) fn open_sqlcipher(
     path: &Path,
     key: &DbKey,
     mode: ConnectionMode,
+    schema_binding: Option<&VaultSchemaBinding>,
 ) -> Result<HardenedConnection, OpenError> {
     // Open, key first, and switch off native-code loading — one audited
     // unsafe entry point. The raw token lives only for this call.
@@ -279,6 +283,16 @@ pub(crate) fn open_sqlcipher(
         .map_err(|_| OpenError::WrongKeyOrNotADatabase)?;
 
     apply_runtime_pragmas_after_probe(&connection)?;
+
+    if schema::vault_application_profile_is_active(&connection)
+        .map_err(|_| OpenError::VaultSchemaRejected)?
+    {
+        let binding = schema_binding.ok_or(OpenError::VaultSchemaRejected)?;
+        schema::verify_vault_schema_on_open(&connection, binding)
+            .map_err(|_| OpenError::VaultSchemaRejected)?;
+        schema::install_business_authorizer(&connection)
+            .map_err(|_| OpenError::VaultSchemaRejected)?;
+    }
 
     Ok(HardenedConnection {
         connection,
@@ -400,6 +414,7 @@ mod tests {
             db,
             &key(fill),
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         )
         .expect("create an encrypted container");
         opened
@@ -444,8 +459,8 @@ mod tests {
         // Mid-transaction: the rollback journal holds the page being replaced,
         // which is exactly where an old value would leak if the journal were
         // not encrypted too.
-        let opened =
-            open_sqlcipher(owner(), &db, &key(0xab), ConnectionMode::ReadWrite).expect("reopen");
+        let opened = open_sqlcipher(owner(), &db, &key(0xab), ConnectionMode::ReadWrite, None)
+            .expect("reopen");
         opened
             .connection
             .execute_batch(&format!(
@@ -505,7 +520,7 @@ mod tests {
         create_with_canary(&db, 0x11);
         let before = fs::read(&db).expect("read before");
 
-        let result = open_sqlcipher(owner(), &db, &key(0x22), ConnectionMode::ReadWrite);
+        let result = open_sqlcipher(owner(), &db, &key(0x22), ConnectionMode::ReadWrite, None);
         assert!(
             matches!(result, Err(OpenError::WrongKeyOrNotADatabase)),
             "a wrong key opened the database"
@@ -532,7 +547,7 @@ mod tests {
 
         // And the right key still works, so the failure was the key and not
         // a database the wrong-key attempt had damaged.
-        assert!(open_sqlcipher(owner(), &db, &key(0x11), ConnectionMode::ReadWrite).is_ok());
+        assert!(open_sqlcipher(owner(), &db, &key(0x11), ConnectionMode::ReadWrite, None).is_ok());
     }
 
     /// One flipped bit in page 2 is caught by the cipher's authentication,
@@ -550,6 +565,7 @@ mod tests {
                 &db,
                 &key(0x5a),
                 ConnectionMode::ReadWriteCreateInternal,
+                None,
             )
             .expect("create");
             // Enough rows to occupy well past page 2.
@@ -572,8 +588,14 @@ mod tests {
         );
 
         // Untouched, it passes — so a failure below is the flip, not the setup.
-        let intact = open_sqlcipher(owner(), &db, &key(0x5a), ConnectionMode::ReadOnlyRecovery)
-            .expect("reopen the intact file");
+        let intact = open_sqlcipher(
+            owner(),
+            &db,
+            &key(0x5a),
+            ConnectionMode::ReadOnlyRecovery,
+            None,
+        )
+        .expect("reopen the intact file");
         assert_eq!(
             intact.cipher_integrity_check(),
             Ok(()),
@@ -586,8 +608,14 @@ mod tests {
 
         // The key is right and page 1 is untouched, so the open succeeds; the
         // damage is on page 2 and must be found there.
-        let opened = open_sqlcipher(owner(), &db, &key(0x5a), ConnectionMode::ReadOnlyRecovery)
-            .expect("page 1 is intact, so opening still succeeds");
+        let opened = open_sqlcipher(
+            owner(),
+            &db,
+            &key(0x5a),
+            ConnectionMode::ReadOnlyRecovery,
+            None,
+        )
+        .expect("page 1 is intact, so opening still succeeds");
         assert!(
             matches!(opened.cipher_integrity_check(), Err(IntegrityFailure::Pages(n)) if n > 0),
             "a flipped ciphertext bit passed the cipher integrity check"
@@ -612,6 +640,7 @@ mod tests {
             &link.join("vault.db"),
             &key(0x33),
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         );
         assert!(
             matches!(result, Err(OpenError::Unopenable)),
@@ -628,7 +657,8 @@ mod tests {
             owner(),
             &real.join("vault.db"),
             &key(0x33),
-            ConnectionMode::ReadWriteCreateInternal
+            ConnectionMode::ReadWriteCreateInternal,
+            None,
         )
         .is_ok());
     }
@@ -676,6 +706,7 @@ mod tests {
             &root.join("vault.db"),
             &key(0x44),
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         )
         .expect("open");
         let connection = &opened.connection;
@@ -795,6 +826,7 @@ mod tests {
             &root.join("vault.db"),
             &key(0x55),
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         )
         .expect("open");
         let connection = &opened.connection;
@@ -894,6 +926,7 @@ mod tests {
             &root.join("vault.db"),
             &key(0x42),
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         )
         .expect("open under the fixed profile");
         let connection = &opened.connection;
@@ -960,8 +993,14 @@ mod tests {
         let dbk = DbKey::from_bytes([0xde; 32]);
         let (_dir, root) = canonical_tempdir();
         let db = root.join("vault.db");
-        open_sqlcipher(owner(), &db, &dbk, ConnectionMode::ReadWriteCreateInternal)
-            .expect("open with a distinctive DBK");
+        open_sqlcipher(
+            owner(),
+            &db,
+            &dbk,
+            ConnectionMode::ReadWriteCreateInternal,
+            None,
+        )
+        .expect("open with a distinctive DBK");
 
         for sql in take_sql_text_recorded_during_open() {
             assert!(

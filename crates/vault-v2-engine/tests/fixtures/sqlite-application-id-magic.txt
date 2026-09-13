@@ -1,0 +1,33 @@
+# Snapshot excerpt from https://sqlite.org/src/doc/trunk/magic.txt (2026-09-13).
+# Provisional project id 0x53464f53 is not listed below.
+# 0x00000000	Unused
+# 0x426f6f6b	BooK
+# 0x466c6970	Flip
+# 0x47706d61	Gpma
+# 0x616c7465	Alte
+# 0x616c7468	Alth
+# 0x616c7469	Alti
+# 0x616c7473	Alts
+# 0x616c7479	Alty
+# 0x616c747a	Altz
+# 0x616c7477	Altw
+# 0x616c7476	Altv
+# 0x616c7475	Altu
+# 0x616c7474	Altt
+# 0x616c7472	Altr
+# 0x616c7471	Altq
+# 0x616c7470	Altp
+# 0x616c746f	Alto
+# 0x616c746e	Altn
+# 0x616c746d	Altm
+# 0x616c746c	Altl
+# 0x616c746b	Altk
+# 0x616c746a	Altj
+# 0x616c7468	Alth
+# 0x616c7467	Altg
+# 0x616c7466	Altf
+# 0x616c7465	Alte
+# 0x616c7464	Altd
+# 0x616c7463	Altc
+# 0x616c7462	Altb
+# 0x616c7461	Alta

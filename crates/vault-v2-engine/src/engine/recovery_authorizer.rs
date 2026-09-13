@@ -27,7 +27,11 @@ fn recovery_authorizer_callback(context: AuthContext<'_>) -> Authorization {
     match action {
         AuthAction::Select => Authorization::Allow,
         AuthAction::Read { table_name, .. }
-            if table_name == "sqlite_schema" || table_name == "sqlite_master" =>
+            if table_name == "sqlite_schema"
+                || table_name == "sqlite_master"
+                || table_name == "vault_metadata_v1"
+                || table_name == "business_object_v1"
+                || table_name == "business_chunk_v1" =>
         {
             Authorization::Allow
         }
@@ -125,6 +129,7 @@ mod tests {
             file.path(),
             &dbk,
             ConnectionMode::ReadWriteCreateInternal,
+            None,
         )
         .expect("create");
         (file, dbk)
@@ -133,9 +138,14 @@ mod tests {
     #[test]
     fn recovery_hardening_sets_query_only_and_db_readonly() {
         let (file, dbk) = readonly_encrypted_db();
-        let connection =
-            open_sqlcipher(owner(), file.path(), &dbk, ConnectionMode::ReadOnlyRecovery)
-                .expect("open");
+        let connection = open_sqlcipher(
+            owner(),
+            file.path(),
+            &dbk,
+            ConnectionMode::ReadOnlyRecovery,
+            None,
+        )
+        .expect("open");
         harden_recovery_connection(connection.rusqlite_connection()).expect("harden");
         assert!(connection.is_db_readonly().expect("readonly flag"));
         assert!(query_only_is_on(connection.rusqlite_connection()).expect("query_only"));
@@ -144,9 +154,14 @@ mod tests {
     #[test]
     fn recovery_authorizer_denies_insert_and_clears_query_only_pragma() {
         let (file, dbk) = readonly_encrypted_db();
-        let connection =
-            open_sqlcipher(owner(), file.path(), &dbk, ConnectionMode::ReadOnlyRecovery)
-                .expect("open");
+        let connection = open_sqlcipher(
+            owner(),
+            file.path(),
+            &dbk,
+            ConnectionMode::ReadOnlyRecovery,
+            None,
+        )
+        .expect("open");
         harden_recovery_connection(connection.rusqlite_connection()).expect("harden");
         let conn = connection.rusqlite_connection();
         assert!(conn
@@ -159,9 +174,14 @@ mod tests {
     #[test]
     fn recovery_authorizer_allows_schema_probe_and_cipher_integrity() {
         let (file, dbk) = readonly_encrypted_db();
-        let connection =
-            open_sqlcipher(owner(), file.path(), &dbk, ConnectionMode::ReadOnlyRecovery)
-                .expect("open");
+        let connection = open_sqlcipher(
+            owner(),
+            file.path(),
+            &dbk,
+            ConnectionMode::ReadOnlyRecovery,
+            None,
+        )
+        .expect("open");
         harden_recovery_connection(connection.rusqlite_connection()).expect("harden");
         let conn = connection.rusqlite_connection();
         let _: Option<String> = conn

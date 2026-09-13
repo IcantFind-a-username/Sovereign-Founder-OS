@@ -4,6 +4,7 @@ use crate::engine::key_slots::{parse_vault_slots, AdmissionCounters, VaultSlotsR
 use crate::engine::platform::{DeviceStoreError, NativeDeviceStore};
 use crate::engine::process::CryptoProcessOwner;
 use crate::engine::recovery_authorizer;
+use crate::engine::schema::VaultSchemaBinding;
 use crate::engine::secret::DbKey;
 use crate::engine::sqlcipher::{open_sqlcipher, ConnectionMode, HardenedConnection, OpenError};
 use crate::engine::wrappers::{
@@ -213,8 +214,20 @@ pub(crate) fn unlock_recovery_read_only(
         .map_err(|_| VaultOpenError::Crypto)?;
 
     let dbk = DbKey::from_bytes(dbk_bytes);
-    let connection = open_sqlcipher(owner, db_path, &dbk, ConnectionMode::ReadOnlyRecovery)
-        .map_err(VaultOpenError::Database)?;
+
+    let schema_binding = VaultSchemaBinding {
+        workspace_id: slots.workspace_id,
+        database_id: slots.database_id,
+        db_key_epoch: slots.db_key_epoch,
+    };
+    let connection = open_sqlcipher(
+        owner,
+        db_path,
+        &dbk,
+        ConnectionMode::ReadOnlyRecovery,
+        Some(&schema_binding),
+    )
+    .map_err(VaultOpenError::Database)?;
     recovery_authorizer::harden_recovery_connection(connection.rusqlite_connection())
         .map_err(|_| VaultOpenError::Crypto)?;
 
@@ -284,8 +297,14 @@ mod tests {
     fn temp_db(owner: &CryptoProcessOwner, dbk: &DbKey) -> (tempfile::NamedTempFile, PathBuf) {
         let file = tempfile::NamedTempFile::new().expect("temp database file");
         let path = file.path().to_path_buf();
-        open_sqlcipher(owner, &path, dbk, ConnectionMode::ReadWriteCreateInternal)
-            .expect("create empty encrypted database for test");
+        open_sqlcipher(
+            owner,
+            &path,
+            dbk,
+            ConnectionMode::ReadWriteCreateInternal,
+            None,
+        )
+        .expect("create empty encrypted database for test");
         (file, path)
     }
 
@@ -317,8 +336,14 @@ mod tests {
             &counters,
         )
         .expect("device open");
-        let _ = open_sqlcipher(owner(), &path, &opened, ConnectionMode::ReadOnlyRecovery)
-            .expect("dbk from device route opens database");
+        let _ = open_sqlcipher(
+            owner(),
+            &path,
+            &opened,
+            ConnectionMode::ReadOnlyRecovery,
+            None,
+        )
+        .expect("dbk from device route opens database");
     }
 
     #[test]
