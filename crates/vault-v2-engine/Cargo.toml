@@ -66,8 +66,13 @@ serde_json_canonicalizer = "=0.3.2"
 sha2 = { version = "=0.10.9", default-features = false }
 base64 = { version = "=0.22.1", default-features = false, features = ["alloc"] }
 subtle = { version = "=2.6.1", default-features = false }
+# Task 4 — side-by-side legacy import (read-only AES-GCM + capability-dir I/O).
+cap-std = { version = "=4.0.2", default-features = true }
+cap-fs-ext = { version = "=4.0.2", default-features = false }
+aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc", "zeroize"] }
 
 [dev-dependencies]
+sovereign-vault = { path = "../vault" }
 # Exact pins per the Program 1A plan: the source-closure gate classifies
 # tokens through these crates, so their versions are part of the reviewed
 # gate, not a floating detail. Both match the workspace lock.

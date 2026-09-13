@@ -8,9 +8,9 @@ use crate::engine::schema::VaultSchemaBinding;
 use crate::engine::secret::DbKey;
 use crate::engine::sqlcipher::{open_sqlcipher, ConnectionMode, HardenedConnection, OpenError};
 use crate::engine::wrappers::{
-    unwrap_device_dbk, unwrap_recovery_dbk, unwrap_recovery_kek_with_pwk, DeviceDbkAad, DeviceKek,
-    ProtocolId, Pwk, PwkRecoveryKekAad, RecoveryDbkAad, RecoveryKek, WrappedRecord,
-    DATABASE_ROLE_LIVE,
+    dbk_matches_expected, unwrap_device_dbk, unwrap_recovery_dbk, unwrap_recovery_kek_with_pwk,
+    DeviceDbkAad, DeviceKek, ProtocolId, Pwk, PwkRecoveryKekAad, RecoveryDbkAad, RecoveryKek,
+    WrappedRecord, DATABASE_ROLE_LIVE,
 };
 use argon2::{Algorithm, Argon2, Params, Version};
 use std::path::Path;
@@ -114,7 +114,7 @@ pub(crate) fn open_with_device_store(
     let device_kek = store
         .get_device_kek()
         .map_err(VaultOpenError::DeviceStore)?;
-    open_with_device_kek(owner, db_path, &slots, &device_kek)
+    open_dbk_via_device_kek(owner, db_path, &slots, &device_kek)
 }
 
 #[cfg(test)]
@@ -135,10 +135,10 @@ pub(crate) fn open_with_test_device_store(
     let device_kek = store
         .get_device_kek()
         .map_err(VaultOpenError::DeviceStore)?;
-    open_with_device_kek(owner, db_path, &slots, &device_kek)
+    open_dbk_via_device_kek(owner, db_path, &slots, &device_kek)
 }
 
-fn open_with_device_kek(
+pub(crate) fn open_dbk_via_device_kek(
     _owner: &CryptoProcessOwner,
     _db_path: &Path,
     slots: &VaultSlotsRecord,
@@ -258,23 +258,78 @@ pub(crate) fn derive_pwk_for_tests(
 }
 
 /// Task 4 consumes this sealed prepared rotation value.
-#[allow(dead_code)] // consumed by Program 1A Task 4
 pub(crate) struct PreparedWrapperRotation {
     pub(crate) candidate_slots: VaultSlotsRecord,
-    _secrets: PreparedVerificationSecrets,
+    pub(crate) _secrets: PreparedVerificationSecrets,
 }
 
 /// Task 4 consumes this sealed initial-slots value.
-#[allow(dead_code)] // consumed by Program 1A Task 4
 pub(crate) struct PreparedInitialSlots {
     pub(crate) candidate_slots: VaultSlotsRecord,
-    _secrets: PreparedVerificationSecrets,
+    pub(crate) _secrets: PreparedVerificationSecrets,
 }
 
-struct PreparedVerificationSecrets {
-    _pwk: Pwk,
-    _recovery_kek: RecoveryKek,
-    _expected_dbk: DbKey,
+impl PreparedInitialSlots {
+    pub(crate) fn device_route_matches_expected(&self, device_route_dbk: &DbKey) -> bool {
+        dbk_matches_expected(
+            device_route_dbk.as_bytes(),
+            self._secrets._expected_dbk.as_bytes(),
+        )
+    }
+}
+
+pub(crate) struct PreparedVerificationSecrets {
+    pub(crate) _pwk: Pwk,
+    pub(crate) _recovery_kek: RecoveryKek,
+    pub(crate) _expected_dbk: DbKey,
+}
+
+/// Internal fixture enrollment: both routes verify before sidecar publication (Task 4).
+pub(crate) fn prepare_fixture_initial_slots(
+    owner: &CryptoProcessOwner,
+    db_path: &Path,
+    workspace_id: ProtocolId,
+    database_id: ProtocolId,
+    device_kek: &DeviceKek,
+    recovery_kek: &RecoveryKek,
+    pwk: &Pwk,
+    expected_dbk: &DbKey,
+    recovery_password: &[u8],
+) -> Result<PreparedInitialSlots, RecoveryFailed> {
+    let bytes = crate::engine::key_slots::build_test_canonical_slots(
+        workspace_id,
+        database_id,
+        device_kek,
+        recovery_kek,
+        pwk,
+        *expected_dbk.as_bytes(),
+    );
+    let record =
+        parse_vault_slots(&bytes, &workspace_id, &database_id).map_err(|_| RecoveryFailed)?;
+    let counters = AdmissionCounters::new();
+    let device_dbk =
+        open_dbk_via_device_kek(owner, db_path, &record, device_kek).map_err(|_| RecoveryFailed)?;
+    if !dbk_matches_expected(device_dbk.as_bytes(), expected_dbk.as_bytes()) {
+        return Err(RecoveryFailed);
+    }
+    let _session = unlock_recovery_read_only(
+        owner,
+        db_path,
+        &bytes,
+        &workspace_id,
+        &database_id,
+        recovery_password,
+        &counters,
+    )
+    .map_err(|_| RecoveryFailed)?;
+    Ok(PreparedInitialSlots {
+        candidate_slots: record,
+        _secrets: PreparedVerificationSecrets {
+            _pwk: Pwk::from_bytes(*pwk.expose()),
+            _recovery_kek: RecoveryKek::from_bytes(*recovery_kek.expose()),
+            _expected_dbk: DbKey::from_bytes(*expected_dbk.as_bytes()),
+        },
+    })
 }
 
 #[cfg(test)]

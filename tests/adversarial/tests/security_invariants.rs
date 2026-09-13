@@ -353,3 +353,36 @@ fn vault_v2_closed_schema() {
     assert!(schema_source.contains("business_chunk_v1"));
     assert!(schema_source.contains("object_type IN (1, 2)"));
 }
+
+#[test]
+fn vault_v2_failure_never_falls_back() {
+    let recovery_source = include_str!("../../../crates/vault-v2-engine/src/engine/recovery.rs");
+    let sqlcipher_source = include_str!("../../../crates/vault-v2-engine/src/engine/sqlcipher.rs");
+    let legacy_source = include_str!("../../../crates/vault-v2-engine/src/engine/legacy.rs");
+    for source in [recovery_source, sqlcipher_source] {
+        assert!(
+            !source.contains("legacy::"),
+            "v2 unlock/open path must not invoke the legacy importer"
+        );
+        assert!(
+            !source.contains("read_legacy_vault"),
+            "v2 unlock/open path must not read legacy vault"
+        );
+    }
+    assert!(
+        !legacy_source.contains("open_sqlcipher"),
+        "legacy importer must not open SQLCipher after AEAD failure"
+    );
+    let migration_source = include_str!("../../../crates/vault-v2-engine/src/engine/migration.rs");
+    let legacy_read = migration_source.find("read_legacy_vault_read_only");
+    let sqlcipher_open = migration_source.find("open_sqlcipher");
+    assert!(
+        legacy_read.is_some(),
+        "side-by-side import must read legacy"
+    );
+    assert!(sqlcipher_open.is_some(), "staging must open SQLCipher");
+    assert!(
+        legacy_read.expect("legacy read") < sqlcipher_open.expect("sqlcipher open"),
+        "legacy import must complete before v2 database open"
+    );
+}

@@ -26,6 +26,11 @@ impl DbKey {
     pub(crate) fn raw(&self) -> RawSqlcipherKey {
         RawSqlcipherKey::encode(&self.0)
     }
+
+    /// Crate-internal byte view for constant-time equality after unwrap (Task 4).
+    pub(crate) fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 /// Length of SQLCipher's raw-key token: `x'`, 64 hex digits, `'`.
