@@ -18,8 +18,103 @@ use super::secret::DbKey;
 use rusqlite::config::DbConfig;
 use rusqlite::limits::Limit;
 use rusqlite::OpenFlags;
+use sovereign_vault_v2_engine::{CIPHER_COMPATIBILITY, CIPHER_PAGE_SIZE_BYTES};
 use std::marker::PhantomData;
 use std::path::Path;
+
+#[cfg(test)]
+use std::cell::RefCell;
+
+#[cfg(test)]
+thread_local! {
+    static SQL_TEXT_DURING_OPEN: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+thread_local! {
+    static FIRST_PAGE_READ: RefCell<bool> = const { RefCell::new(false) };
+}
+
+#[cfg(test)]
+pub(crate) fn take_sql_text_recorded_during_open() -> Vec<String> {
+    SQL_TEXT_DURING_OPEN.with(|trace| {
+        let taken = trace.borrow().clone();
+        trace.borrow_mut().clear();
+        taken
+    })
+}
+
+#[cfg(test)]
+fn reset_open_observation_state() {
+    SQL_TEXT_DURING_OPEN.with(|trace| trace.borrow_mut().clear());
+    FIRST_PAGE_READ.with(|flag| *flag.borrow_mut() = false);
+}
+
+#[cfg(test)]
+fn assert_profile_still_before_first_page() {
+    FIRST_PAGE_READ.with(|flag| {
+        assert!(
+            !*flag.borrow(),
+            "a connection profile pragma ran after the first page read"
+        );
+    });
+}
+
+#[cfg(test)]
+fn mark_first_page_read() {
+    FIRST_PAGE_READ.with(|flag| *flag.borrow_mut() = true);
+}
+
+#[cfg(test)]
+fn record_sql_text(sql: &str) {
+    SQL_TEXT_DURING_OPEN.with(|trace| trace.borrow_mut().push(sql.to_string()));
+}
+
+fn pragma_update(
+    connection: &rusqlite::Connection,
+    name: &str,
+    value: impl rusqlite::types::ToSql,
+) -> Result<(), OpenError> {
+    #[cfg(test)]
+    {
+        assert_profile_still_before_first_page();
+        record_sql_text(&format!("PRAGMA {name}"));
+    }
+    connection
+        .pragma_update(None, name, value)
+        .map_err(|_| OpenError::ProfileNotApplied)
+}
+
+/// Cipher PRAGMAs that must be active before any page read.
+fn apply_cipher_pragmas_before_first_page(
+    connection: &rusqlite::Connection,
+) -> Result<(), OpenError> {
+    pragma_update(connection, "cipher_compatibility", CIPHER_COMPATIBILITY)?;
+    pragma_update(connection, "cipher_page_size", CIPHER_PAGE_SIZE_BYTES)?;
+    pragma_update(connection, "cipher", "aes-256-cbc")?;
+    pragma_update(connection, "cipher_hmac_algorithm", "HMAC_SHA512")?;
+    pragma_update(connection, "cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512")?;
+    pragma_update(connection, "cipher_use_hmac", 1)?;
+    pragma_update(connection, "cipher_memory_security", 1)?;
+    Ok(())
+}
+
+/// Runtime PRAGMAs verified after the first-page probe, before returning.
+fn apply_runtime_pragmas_after_probe(connection: &rusqlite::Connection) -> Result<(), OpenError> {
+    connection
+        .pragma_update(None, "journal_mode", "DELETE")
+        .map_err(|_| OpenError::ProfileNotApplied)?;
+    connection
+        .pragma_update(None, "synchronous", "FULL")
+        .map_err(|_| OpenError::ProfileNotApplied)?;
+    connection
+        .pragma_update(None, "temp_store", "MEMORY")
+        .map_err(|_| OpenError::ProfileNotApplied)?;
+    connection
+        .pragma_update(None, "foreign_keys", 1)
+        .map_err(|_| OpenError::ProfileNotApplied)?;
+    Ok(())
+}
 
 /// The runtime limits RFC 0005 Program 1A fixes, in the order the plan lists
 /// them. Each is set before the first page is read and then read back from
@@ -132,6 +227,9 @@ pub(crate) fn open_sqlcipher(
 ) -> Result<HardenedConnection, OpenError> {
     // Open, key first, and switch off native-code loading — one audited
     // unsafe entry point. The raw token lives only for this call.
+    #[cfg(test)]
+    reset_open_observation_state();
+
     let connection = ffi::open_keyed_hardened(owner, path, mode.flags().bits(), &key.raw())
         .map_err(|failure| match failure {
             HardeningFailure::PathNotRepresentable | HardeningFailure::Unopenable => {
@@ -141,6 +239,8 @@ pub(crate) fn open_sqlcipher(
             HardeningFailure::ExtensionLoadingNotDisabled
             | HardeningFailure::ThreadingModeNotAdmitted => OpenError::ProfileNotApplied,
         })?;
+
+    apply_cipher_pragmas_before_first_page(&connection)?;
 
     // The remaining no-page settings, each confirmed by what SQLite reports
     // back rather than by the call having returned.
@@ -168,11 +268,17 @@ pub(crate) fn open_sqlcipher(
     // Only now is a page read, and the read is what proves the key.
     // `sqlite_schema` exists in every database, so this touches page 1 and
     // nothing the caller wrote.
+    #[cfg(test)]
+    record_sql_text("SELECT count(*) FROM sqlite_schema");
+    #[cfg(test)]
+    mark_first_page_read();
     connection
         .query_row("SELECT count(*) FROM sqlite_schema", [], |row| {
             row.get::<_, i64>(0)
         })
         .map_err(|_| OpenError::WrongKeyOrNotADatabase)?;
+
+    apply_runtime_pragmas_after_probe(&connection)?;
 
     Ok(HardenedConnection {
         connection,
@@ -226,6 +332,7 @@ mod tests {
     use super::*;
     use static_assertions::assert_not_impl_any;
     use std::fs;
+    use std::os::unix::ffi::OsStrExt;
     use std::path::PathBuf;
 
     assert_not_impl_any!(HardenedConnection: Send, Sync);
@@ -731,5 +838,147 @@ mod tests {
             )
             .expect("read the schema again");
         assert_eq!(after, before, "the schema changed under writable_schema");
+    }
+
+    fn pragma_string(connection: &rusqlite::Connection, name: &str) -> String {
+        connection
+            .query_row(&format!("PRAGMA {name}"), [], |row| row.get::<_, String>(0))
+            .expect("read a string pragma")
+    }
+
+    fn pragma_i64(connection: &rusqlite::Connection, name: &str) -> i64 {
+        let as_i64: Result<i64, _> =
+            connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0));
+        if let Ok(value) = as_i64 {
+            return value;
+        }
+        let as_text: String = connection
+            .query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))
+            .expect("read a numeric pragma");
+        as_text.parse().expect("parse a numeric pragma value")
+    }
+
+    fn pragma_is_on(connection: &rusqlite::Connection, name: &str) -> bool {
+        let as_i64: Result<i64, _> =
+            connection.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0));
+        if let Ok(value) = as_i64 {
+            return value != 0;
+        }
+        let as_text: String = connection
+            .query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))
+            .expect("read a boolean pragma");
+        matches!(
+            as_text.to_ascii_lowercase().as_str(),
+            "1" | "on" | "true" | "yes"
+        )
+    }
+
+    /// Every pinned cipher and runtime PRAGMA is read back from the linked
+    /// library after a real open, and each was applied before the first page
+    /// read (see the test-only ordering guard in `pragma_update`).
+    #[test]
+    fn connection_profile_matches_every_required_pragma() {
+        let (_dir, root) = canonical_tempdir();
+        let opened = open_sqlcipher(
+            owner(),
+            &root.join("vault.db"),
+            &key(0x42),
+            ConnectionMode::ReadWriteCreateInternal,
+        )
+        .expect("open under the fixed profile");
+        let connection = &opened.connection;
+
+        assert_eq!(
+            pragma_i64(connection, "cipher_page_size"),
+            i64::from(CIPHER_PAGE_SIZE_BYTES)
+        );
+        assert_eq!(
+            pragma_string(connection, "cipher").to_ascii_lowercase(),
+            "aes-256-cbc"
+        );
+        assert_eq!(
+            pragma_string(connection, "cipher_hmac_algorithm"),
+            "HMAC_SHA512"
+        );
+        assert_eq!(
+            pragma_string(connection, "cipher_kdf_algorithm"),
+            "PBKDF2_HMAC_SHA512"
+        );
+        assert!(pragma_is_on(connection, "cipher_use_hmac"));
+        assert!(pragma_is_on(connection, "cipher_memory_security"));
+        assert_eq!(pragma_i64(connection, "cipher_plaintext_header_size"), 0);
+        assert_eq!(pragma_string(connection, "journal_mode"), "delete");
+        assert_eq!(pragma_i64(connection, "synchronous"), 2); // FULL
+        assert_eq!(pragma_i64(connection, "temp_store"), 2); // MEMORY
+        assert_eq!(pragma_i64(connection, "foreign_keys"), 1);
+        // Compatibility 4 pins the default KDF iteration count for this release.
+        assert_eq!(pragma_i64(connection, "kdf_iter"), 256_000);
+    }
+
+    fn haystack_contains_key_material(haystack: &[u8], key: &DbKey) -> Option<&'static str> {
+        let raw = {
+            let holder = key.raw();
+            holder.token_bytes().to_vec()
+        };
+        let raw_key = {
+            // Reconstruct the 32-byte pattern from the token hex for scanning.
+            let hex = std::str::from_utf8(&raw[2..66]).expect("ascii hex in token");
+            let mut bytes = [0u8; 32];
+            for (index, pair) in hex.as_bytes().chunks(2).enumerate() {
+                let text = std::str::from_utf8(pair).expect("hex pair");
+                bytes[index] = u8::from_str_radix(text, 16).expect("hex digit");
+            }
+            bytes
+        };
+        if contains(haystack, &raw_key) {
+            return Some("raw DBK bytes");
+        }
+        if contains(haystack, &raw) {
+            return Some("SQLCipher raw-key token");
+        }
+        let hex = std::str::from_utf8(&raw[2..66]).expect("hex body");
+        if contains(haystack, hex.as_bytes()) {
+            return Some("hex-encoded DBK");
+        }
+        None
+    }
+
+    /// The DBK never appears in SQL text executed during open, the process
+    /// environment, argv, or on disk in side files.
+    #[test]
+    fn raw_dbk_never_reaches_sql_text_logs_or_environment() {
+        let dbk = DbKey::from_bytes([0xde; 32]);
+        let (_dir, root) = canonical_tempdir();
+        let db = root.join("vault.db");
+        open_sqlcipher(owner(), &db, &dbk, ConnectionMode::ReadWriteCreateInternal)
+            .expect("open with a distinctive DBK");
+
+        for sql in take_sql_text_recorded_during_open() {
+            assert!(
+                haystack_contains_key_material(sql.as_bytes(), &dbk).is_none(),
+                "DBK material reached SQL text: {sql}"
+            );
+            assert!(
+                !sql.to_ascii_lowercase().contains("pragma key"),
+                "the key was set through SQL text: {sql}"
+            );
+        }
+
+        for (_, value) in std::env::vars_os() {
+            if let Some(what) = haystack_contains_key_material(value.as_bytes(), &dbk) {
+                panic!("{what} found in environment variable value");
+            }
+        }
+        for argument in std::env::args_os() {
+            if let Some(what) = haystack_contains_key_material(argument.as_bytes(), &dbk) {
+                panic!("{what} found in process argv");
+            }
+        }
+
+        for (path, bytes) in every_file_beside(&db) {
+            if let Some(what) = haystack_contains_key_material(&bytes, &dbk) {
+                panic!("{what} found on disk in {}", path.display());
+            }
+        }
     }
 }
