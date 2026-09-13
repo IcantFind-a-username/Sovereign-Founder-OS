@@ -1268,7 +1268,7 @@ while the controller routes eligible design/review cards to the strong role.
   the two untagged entries directly below; the decision itself is settled and
   must not be re-opened by the rounds that type it in.
 
-- [ ] **P2 | `THREAT_MODEL.md` | State the v1 entry swap/rollback gap and its freeze decision under T10.**
+- [x] **P2 | `THREAT_MODEL.md` | State the v1 entry swap/rollback gap and its freeze decision under T10.**
   Typing for the decided item above — the wording is settled; do not re-open
   the decision. Insert the following bullet into T10's Mitigations list,
   directly after the existing "Current limitation" bullet (re-wrap lines to

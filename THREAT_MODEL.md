@@ -188,6 +188,18 @@ boundary, closed broker, or exact recipient authorization.
 **Mitigations:**
 
 - **Current limitation:** the co-located raw Vault key makes whole-directory theft decryptable; current AEAD integrity does not provide key custody or rollback detection
+- **Current limitation (recorded decision, 2026-08-26):** v1 entry blobs are
+  encrypted with no associated data, so nothing binds a `*.enc` blob to its
+  entry name, vault root, or format version: an attacker who can write the
+  vault directory can substitute one entry's blob for another's, or roll a
+  single entry back to an older copy of itself, and it decrypts cleanly. The
+  v1 format is deliberately frozen rather than amended: adding AAD would break
+  every existing vault or force a migration of the exact on-disk format RFC
+  0005 Program 1A's legacy importer must read byte-exactly, would still not
+  detect same-entry rollback, and defends against a directory writer who can
+  already read the co-located `vault.key`. Per-entry swap and rollback are
+  accepted residual risks of the legacy format until v2's transactional
+  SQLCipher format and context-bound wrappers (targets above) replace it.
 - **Target:** RFC 0005 dual-unlock hierarchy: a closed Device Key Protector wraps a random 32-byte SQLCipher database key (DBK), while a bounded Argon2id-derived PWK wraps an independent Recovery KEK that separately wraps the DBK; neither unlock root directly encrypts business payloads
 - **Target:** a pinned SQLCipher profile provides transactional page/journal encryption, locking, and integrity checks; closed XChaCha20-Poly1305 wrappers bind exact workspace/wrapper/key/KDF/algorithm context with fresh 24-byte nonces and never substitute for the database format
 - **Target:** KDF parameters are bounded before allocation; authentication failure never tries another algorithm or legacy key
