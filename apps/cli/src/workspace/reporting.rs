@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use sovereign_audit_ledger::AuditLedger;
+use sovereign_execution::ExecutionState;
 
 impl Store {
     /// Aggregate the whole workspace into the Founder Command Center view.
@@ -410,6 +411,22 @@ impl Store {
             }
         }
 
+        for execution in &self.execution_recovery {
+            if !execution_state_is_indeterminate(&execution.state) {
+                continue;
+            }
+            let execution_id = execution.intent.execution_id;
+            findings.push(IntegrityFinding {
+                severity: "warning",
+                resource: format!("execution:{execution_id}"),
+                detail: format!(
+                    "execution {execution_id} has an indeterminate journal record \
+                     ({}) — automatic retry is forbidden; reconcile manually",
+                    indeterminate_execution_detail(&execution.state)
+                ),
+            });
+        }
+
         Ok(IntegrityReport {
             chain_verified,
             events: events.len(),
@@ -574,5 +591,23 @@ fn compliance_resource(subject: &str) -> String {
         "venture:profile".to_owned()
     } else {
         subject.to_owned()
+    }
+}
+
+fn execution_state_is_indeterminate(state: &ExecutionState) -> bool {
+    matches!(
+        state,
+        ExecutionState::Indeterminate
+            | ExecutionState::Started
+            | ExecutionState::RecordedIndeterminate { .. }
+    )
+}
+
+fn indeterminate_execution_detail(state: &ExecutionState) -> String {
+    match state {
+        ExecutionState::Indeterminate => "intent recorded, no terminal verdict".into(),
+        ExecutionState::Started => "started, no terminal verdict".into(),
+        ExecutionState::RecordedIndeterminate { reason } => reason.clone(),
+        _ => "unknown".into(),
     }
 }

@@ -994,7 +994,7 @@ while the controller routes eligible design/review cards to the strong role.
   removal surfaces an error and the file remains listed as present; and
   `cargo test -p sovereign-effects` passes.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Reconcile the execution journal on open and surface Indeterminate records.**
+- [x] **P2 | `apps/cli/src/workspace/` | Reconcile the execution journal on open and surface Indeterminate records.** (v01-08)
   Product defect found 2026-08-26: `ExecutionJournal::recover`
   (crates/execution/src/lib.rs:149) is never called by product code, so a
   kill between journal intent and the terminal record (the 4→5 gap in the
