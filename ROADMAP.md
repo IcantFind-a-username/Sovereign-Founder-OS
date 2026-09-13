@@ -33,7 +33,7 @@ used only for a named exit criterion with evidence.
 ## Current verified state
 
 The repository is a **Developer Preview / pre-release** with no tagged release.
-A fresh `cargo test --workspace --locked -- --list` enumerates 463 Rust tests.
+A fresh `cargo test --workspace --locked -- --list` enumerates 571 Rust tests.
 Formatting, lint, file-size, locked dependency, TypeScript, and release-build
 gates are configured in the repository.
 
@@ -108,8 +108,8 @@ all earlier applicable gates.
 
 | Milestone | New founder outcome | Principal gate |
 | --- | --- | --- |
-| **v0.1** | Run the narrow local workflow honestly | Owner authenticator/session 1C0, exact local-effect grant, Vault 1A engine evidence, explicit legacy warning, fault tests, tagged preview |
-| **v0.2** | Use a useful real local model without granting authority | Vault 1B/1C/1D activation, RFC 0004 boundary, validated tasks, zero egress in `Local Only` |
+| **v0.1** | Run the narrow local workflow honestly | Honest Experimental outbox labels, 1C0/exact-effect fixture-mechanism evidence, Vault 1A engine evidence, explicit legacy warning, fault tests, tagged preview |
+| **v0.2** | Use a useful real local model without granting authority | Product 1C0 admission and 1C0-bound outbox (RFC 0006 G2), Vault 1B/1C/1D activation, RFC 0004 boundary, validated tasks, zero egress in `Local Only` |
 | **v0.3** | Complete one consultant lead-to-invoice/follow-up loop | Minimal Enterprise Graph and resumable structured workflow |
 | **v0.4** | Dispatch one reviewed email safely | Minimum restore first; one approved dispatch; `Indeterminate` never auto-retries |
 | **v0.5** | Use the consultant workflow repeatedly as an Alpha | Integrated restore requalification, stable migrations, usability evidence |
@@ -126,8 +126,10 @@ Hard dependencies:
   product enrollment or workspace migration. Program 1B0 proves filtered
   backup/restore mechanics and the loss matrix over staging fixtures only.
   Program 1C0 establishes the one independently admitted owner authenticator,
-  session, and one-use approval issuer used by v0.1 Exact Effect and later Vault
-  ceremonies; Program 1C1 hands legacy approval, admission, authority,
+  session, and one-use approval issuer. v0.1 records fixture/mechanism evidence
+  for those building blocks; product Exact Effect and later Vault ceremonies
+  consume the admitted issuer only after the v0.2 RFC 0006 G2 gates.
+  Program 1C1 hands legacy approval, admission, authority,
   identity, and audit keys into separate trust domains. Program 1D may then
   freeze the final legacy generation and prove an equivalent real candidate
   before `PendingV2`; Program 1B1 must clean-restore
@@ -141,9 +143,10 @@ Hard dependencies:
 - A real local-model worker may be developed and tested against synthetic
   fixtures earlier, but it receives protected founder/workspace values only
   after Program 1D closes the complete persistence inventory. Consequently the
-  v0.2 release gate includes 1B1, 1C1, and 1D `ActiveV2` (with 1C0 already required by
-  v0.1), even though their implementation may proceed in parallel with model
-  confinement work.
+  v0.2 release gate includes product 1C0 admission (enabling an independently
+  authenticated, 1C0-bound product outbox), 1B1, 1C1, 1D `ActiveV2`, and the
+  RFC 0006 G2 protected-payload design, even though their implementation may
+  proceed in parallel with model confinement work.
 - RFC 0004 precedes any real public-model claim.
 - Persona/task validation begins in v0.1 and defines “useful” model work in
   v0.2.
@@ -186,8 +189,9 @@ signed audit chain offline.
 
 **Remaining work:** correct stale UI/docs claims; validate the consultant
 persona and first private-AI tasks; mandate isolated compilation/cache on the
-product path; deliver 1C0's admitted owner authenticator, expiry-bound session,
-and single one-use approval issuer; bind recipient/content/policy/expiry
+product path; honestly label the Experimental app-signed outbox and retain
+fixture/mechanism evidence for 1C0 and exact-effect building blocks (product
+1C0 admission waits for v0.2); bind recipient/content/policy/expiry
 into an opaque effect grant; make authorization claims transactional and
 revocable; add full real-subprocess validator race coverage; upgrade audit/
 effect ordering and rollback anchoring; implement RFC 0005 Program 1A as a non-product
@@ -198,11 +202,13 @@ concurrency, and filesystem-fault tests; publish preview binaries.
 **Exit criteria:**
 
 1. A clean install completes the local founder flow without source knowledge.
-2. No outbox effect exists without independently authenticated approval bound
-   to the exact grant; replay, substitution, rejection, and interruption fail
-   closed under concurrent process and fault-injection tests. This approval is
-   issued by 1C0; the application, Vault, and effect layer cannot create a
-   parallel owner signer or infer owner presence from the OS account.
+2. The Experimental product outbox is labelled as the application-signed
+   path it is. v0.1 does not claim independently authenticated owner
+   approval or product 1C0 admission. Fixture/mechanism evidence exists for
+   the 1C0 and exact-effect building blocks that have been built. Product
+   admission of a 1C0-bound outbox is a v0.2 gate, after RFC 0006 G2
+   (Program 1B1, Program 1C1, Program 1D `ActiveV2`, and the documented
+   protected-payload design).
 3. On each enabled platform, Program 1A proves the pinned SQLCipher profile,
    independent device/recovery wrappers, fail-closed protector behavior, and a
    side-by-side legacy importer without partial state or algorithm fallback.
@@ -227,8 +233,10 @@ account.
 **Work:** implement RFC 0004's local-only raw request and compiler-owned public
 projection boundary; add `Auto Protect` and `Local Only`; expose value-free
 visibility records; add deterministic placement/queue/`ComputeUnavailable`;
-complete RFC 0005 Programs 1B0/1B1, 1C1, and 1D `ActiveV2` (building on 1C0) so protected workspace values have a
-single authenticated persistence boundary;
+admit the product 1C0 authenticator and enable the 1C0-bound product
+outbox only after RFC 0006 G2; complete RFC 0005 Programs 1B0/1B1, 1C1,
+and 1D `ActiveV2` so protected workspace values have a single
+authenticated persistence boundary;
 integrate one replaceable real local backend behind a capability-constrained
 process boundary with authenticated IPC, model-digest binding, and resource
 limits; retain deterministic fallbacks; run privacy-canary and attack reviews.
@@ -249,6 +257,11 @@ Owned Mesh stays Research and has no product preset or setup CTA.
    Rust API; the legacy Amber/Green route is gone.
 5. Every model use has an understandable visibility record and no known
    Critical/High finding inside the declared API threat model.
+6. Product outbox effects require independently authenticated approval
+   issued by the admitted 1C0 authenticator and bound to the exact grant.
+   The application, Vault, and effect layer cannot create a parallel owner
+   signer or infer owner presence from the OS account. This gate opens only
+   after RFC 0006 G2's conjunctive requirements.
 
 ### v0.3 — First real founder workflow
 

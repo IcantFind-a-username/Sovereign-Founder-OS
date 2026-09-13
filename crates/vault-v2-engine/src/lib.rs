@@ -1,21 +1,25 @@
-//! Vault v2 engine — crate skeleton only.
+//! Vault v2 engine — split library and dedicated process binary.
 //!
-//! **Maturity: skeleton.** This crate carries no cryptography, no database
-//! connection, no engine API, and no raw handle yet. Nothing here protects
-//! anything; it exists so that the pieces that will (RFC 0005 Program 1A) land
-//! against a fixed, reviewed build boundary instead of creating one in a hurry.
+//! **Maturity: Program 1A in progress (Developer Preview).** RFC 0005 puts raw
+//! key material in a separate process; this crate is that process and its
+//! reviewed link boundary. It is not a product-facing vault API yet.
 //!
-//! The library target is deliberately value-free: protocol and version
-//! constants only. The engine, its single `unsafe` FFI module, and the
-//! zeroizing key holder are separate queued items, and the plan requires them
-//! to live in private modules that the library never re-exports
+//! **Library target (`sovereign_vault_v2_engine`):** deliberately value-free —
+//! on-disk format and SQLCipher profile constants only, with
+//! `#![forbid(unsafe_code)]`. Downstream crates may depend on the pins without
+//! pulling in key holders, FFI, or database handles.
+//!
+//! **Binary target (`sovereign-vault-v2-engine`):** compiles the private
+//! `engine` module (OpenSSL process bootstrap, SQLCipher FFI, zeroizing secret
+//! types). Cryptography is implemented there, not in the library's public API,
+//! and nothing in `lib.rs` re-exports those modules
 //! (`docs/superpowers/plans/2026-08-13-dual-root-vault-v2-implementation.md`,
 //! lines 399-406 and 465-469).
 //!
-//! Scope of the eventual protection, so the label stays honest: no network
-//! transport exists in this workspace (`crates/effects/src/lib.rs`:26-30), so
-//! "encryption" here will mean at-rest and backup confidentiality — never
-//! transit, and never end-to-end.
+//! Scope of the protection, so the label stays honest: no network transport
+//! exists in this workspace (`crates/effects/src/lib.rs`:26-30), so encryption
+//! here means at-rest and backup confidentiality — never transit, and never
+//! end-to-end.
 
 #![forbid(unsafe_code)]
 
