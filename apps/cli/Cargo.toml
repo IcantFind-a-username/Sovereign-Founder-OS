@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[lib]
+name = "sovereign_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "sovereign"
 path = "src/main.rs"

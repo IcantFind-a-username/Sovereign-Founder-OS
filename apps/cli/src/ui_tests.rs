@@ -8,7 +8,7 @@ use std::net::TcpStream;
 use std::time::Duration;
 
 use super::ui;
-use super::workspace::{DocumentKind, Store};
+use sovereign_cli::workspace::{DocumentKind, Store};
 
 /// Serve a temp workspace on an ephemeral port; returns the port and the
 /// pending approval id for a document that is waiting on the owner.
@@ -126,7 +126,7 @@ fn an_unauthenticated_local_post_can_approve_today_1c0_pin() {
     let workspace = Store::open(dir.path()).unwrap().load().unwrap();
     assert_eq!(
         workspace.documents[0].status,
-        super::workspace::DocumentStatus::ApprovedPendingDelivery,
+        sovereign_cli::workspace::DocumentStatus::ApprovedPendingDelivery,
         "no owner session is required today; this is the gap 1C0 closes"
     );
 }
@@ -149,7 +149,7 @@ fn a_foreign_host_header_is_refused() {
     let workspace = Store::open(dir.path()).unwrap().load().unwrap();
     assert_eq!(
         workspace.approvals[0].status,
-        super::workspace::ApprovalStatus::Pending
+        sovereign_cli::workspace::ApprovalStatus::Pending
     );
 }
 
@@ -176,7 +176,7 @@ fn a_mutation_without_json_content_type_is_refused() {
     let workspace = Store::open(dir.path()).unwrap().load().unwrap();
     assert_eq!(
         workspace.approvals[0].status,
-        super::workspace::ApprovalStatus::Pending
+        sovereign_cli::workspace::ApprovalStatus::Pending
     );
 }
 
@@ -198,6 +198,6 @@ fn a_body_over_the_cap_is_refused() {
     let workspace = Store::open(dir.path()).unwrap().load().unwrap();
     assert_eq!(
         workspace.approvals[0].status,
-        super::workspace::ApprovalStatus::Pending
+        sovereign_cli::workspace::ApprovalStatus::Pending
     );
 }

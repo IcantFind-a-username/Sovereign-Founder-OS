@@ -2297,13 +2297,17 @@ dependencies = [
  "chrono",
  "serde_json",
  "sovereign-audit-ledger",
+ "sovereign-authority",
  "sovereign-capability",
+ "sovereign-cli",
  "sovereign-contracts",
+ "sovereign-fault-testing",
  "sovereign-identity",
  "sovereign-policy",
  "sovereign-sandbox",
  "sovereign-vault",
  "tempfile",
+ "uuid",
 ]
 
 [[package]]
