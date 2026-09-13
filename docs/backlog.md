@@ -1009,7 +1009,7 @@ while the controller routes eligible design/review cards to the strong role.
   `recover_is_a_no_op_on_a_clean_journal` passes; and
   `cargo test -p sovereign-cli` passes.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Pin the checkpoint-gap double-burn as recorded behavior.** IN PROGRESS (2026-09-13)
+- [x] **P2 | `apps/cli/src/workspace/` | Pin the checkpoint-gap double-burn as recorded behavior.** Landed 2026-09-13.
   A kill between the outbox write and the checkpoint persist (steps 9-11 of
   the send chain) makes the resumed run re-execute the whole step with fresh
   ids (kernel_exec.rs:57-58): one `.eml` (the orphan pre-clean at

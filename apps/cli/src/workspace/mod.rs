@@ -47,6 +47,8 @@ mod util;
 mod verify;
 
 #[cfg(test)]
+mod checkpoint_gap_pin_tests;
+#[cfg(test)]
 mod compliance_tests;
 #[cfg(test)]
 mod compose_tests;
