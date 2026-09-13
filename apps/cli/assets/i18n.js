@@ -3,7 +3,6 @@ const STRINGS = {
   en: {
     title: "SOVEREIGN FOUNDER OS",
     stage: "Stage 1 · minimal usable workspace on the secure kernel",
-    honest_intro: "Runs entirely on your machine at 127.0.0.1 — no cloud, no account, no telemetry. Your business state lives in a local encrypted vault, whose key is stored beside it on this machine; every change passes the policy engine and leaves a signed audit event.",
     tab_command: "Command Center", tab_workspace: "Workspace", tab_security: "Security Center",
     cc_business_title: "Your business at a glance",
     cc_no_venture: "No company set yet — name your business in Company →",
@@ -153,7 +152,6 @@ const STRINGS = {
   zh: {
     title: "SOVEREIGN FOUNDER OS",
     stage: "第一阶段 · 安全内核之上的最小可用工作台",
-    honest_intro: "完全运行在你自己的设备上(127.0.0.1)——无云端、无账号、无遥测。你的业务数据保存在本地加密保险库中,其密钥与密文一同存放在本机;每一次变更都先经过策略引擎,并留下签名审计记录。",
     tab_command: "指挥中心", tab_workspace: "工作台", tab_security: "安全中心",
     cc_business_title: "你的业务一览",
     cc_no_venture: "尚未设置公司 — 去“公司”页为你的业务命名 →",
