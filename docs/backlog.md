@@ -1288,7 +1288,7 @@ while the controller routes eligible design/review cards to the strong role.
   Done when: the bullet is present under T10, no file outside `THREAT_MODEL.md`
   changes, and `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [ ] **P2 | `crates/vault/` | Pin the frozen v1 blob format and its accepted swap/rollback behavior with tests.**
+- [x] **P2 | `crates/vault/` | Pin the frozen v1 blob format and its accepted swap/rollback behavior with tests.**
   Typing for the decided item above; land the `THREAT_MODEL.md` entry first so
   doc comments can cite it. Four tests, no production code changes:
   1. `v1_blob_shape_is_frozen`: after `put`, parse the written `*.enc` as
