@@ -49,13 +49,13 @@ mod verify;
 #[cfg(test)]
 mod compliance_tests;
 #[cfg(test)]
-mod execution_journal_tests;
-#[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
 mod crew_tests;
 #[cfg(test)]
 mod erp_tests;
+#[cfg(test)]
+mod execution_journal_tests;
 #[cfg(test)]
 mod privacy_tests;
 #[cfg(test)]

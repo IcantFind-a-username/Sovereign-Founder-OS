@@ -75,10 +75,8 @@ fn recover_is_a_no_op_on_a_clean_journal() {
 
     let reopened = Store::open(dir.path()).unwrap();
     let report = reopened.integrity_check().unwrap();
-    assert!(
-        report
-            .findings
-            .iter()
-            .all(|finding| !finding.resource.starts_with("execution:"))
-    );
+    assert!(report
+        .findings
+        .iter()
+        .all(|finding| !finding.resource.starts_with("execution:")));
 }
