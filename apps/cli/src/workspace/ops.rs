@@ -302,6 +302,15 @@ impl Store {
     /// broker. Any failure in the chain leaves the approval pending (fail
     /// closed); delivery to the customer stays the founder's own action.
     pub fn decide(&self, approval_id: Uuid, approve: bool) -> Result<Workspace, WorkspaceError> {
+        let _lock = super::process_lock::acquire(&self.root).map_err(|error| match error {
+            super::process_lock::LockError::AlreadyRunning => {
+                WorkspaceError::Invalid("another workspace writer is already active".into())
+            }
+            super::process_lock::LockError::Unavailable => {
+                WorkspaceError::Storage("workspace lock unavailable".into())
+            }
+        })?;
+
         let mut workspace = self.load()?;
         let approval = workspace.approval(approval_id)?;
         if approval.status != ApprovalStatus::Pending {
