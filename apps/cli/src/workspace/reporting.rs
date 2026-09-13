@@ -170,6 +170,20 @@ impl Store {
             });
         }
 
+        if let Err(error) = self.verify_ledger_freshness() {
+            findings.push(IntegrityFinding {
+                severity: "critical",
+                resource: "ledger.head".into(),
+                detail: error.to_string(),
+            });
+            return Ok(IntegrityReport {
+                chain_verified,
+                events: events.len(),
+                ok: false,
+                findings,
+            });
+        }
+
         let has = |action: &str, resource: &str| {
             events
                 .iter()

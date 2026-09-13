@@ -61,6 +61,8 @@ mod execution_journal_tests;
 #[cfg(test)]
 mod privacy_tests;
 #[cfg(test)]
+mod rfc0007_open_tests;
+#[cfg(test)]
 mod stage1_suite;
 #[cfg(test)]
 mod test_support;

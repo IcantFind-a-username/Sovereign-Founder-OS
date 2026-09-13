@@ -32,12 +32,29 @@ impl Store {
             .map_err(storage)?
             .recover()
             .map_err(storage)?;
-        Ok(Self {
+        let store = Self {
             root: root.to_path_buf(),
             device,
             policy: PolicyEngine::new(),
             execution_recovery,
-        })
+        };
+        store.verify_ledger_freshness()?;
+        Ok(store)
+    }
+
+    /// RFC 0007 open-time check: reject a rewound or forked ledger when
+    /// `ledger.head` survives a prefix restore. Legacy roots with no anchor
+    /// yet pass (`require_anchor` false) until the next append re-anchors.
+    pub(super) fn verify_ledger_freshness(&self) -> Result<(), WorkspaceError> {
+        let ledger_path = self.root.join("ledger.json");
+        if !ledger_path.exists() {
+            return Ok(());
+        }
+        let ledger =
+            AuditLedger::load(&ledger_path, self.device.public_key_b64()).map_err(storage)?;
+        ledger
+            .verify_freshness_at_head_path(&ledger_path, false)
+            .map_err(storage)
     }
 
     pub fn load(&self) -> Result<Workspace, WorkspaceError> {
