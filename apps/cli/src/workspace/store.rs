@@ -148,7 +148,7 @@ impl Store {
                 )
                 .map_err(storage)?;
         }
-        ledger.save(&ledger_path).map_err(storage)?;
+        ledger.save(&ledger_path, &self.device).map_err(storage)?;
         Ok(())
     }
 }

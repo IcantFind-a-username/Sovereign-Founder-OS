@@ -323,7 +323,7 @@ impl Demo {
             },
             device,
         )?;
-        ledger.save(&self.root.join("ledger.json"))?;
+        ledger.save(&self.root.join("ledger.json"), device)?;
         ledger.verify_chain()?;
         ok(&format!(
             "audit event {} appended and signed; hash chain verified",

@@ -25,6 +25,7 @@ uuid = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+chrono = { workspace = true }
 sovereign-fault-testing = { path = "../fault-testing" }
 tempfile = "3"
 
