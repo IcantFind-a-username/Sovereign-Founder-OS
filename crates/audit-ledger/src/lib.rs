@@ -6,6 +6,13 @@ use sovereign_identity::DeviceIdentity;
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod head;
+
+pub use head::{
+    hash_head_body, ledger_head_path, verify_freshness, LedgerHead, LedgerHeadBody,
+    LEDGER_HEAD_VERSION,
+};
+
 pub const GENESIS_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 #[derive(Debug, Error)]
@@ -24,6 +31,16 @@ pub enum LedgerError {
     Json(#[from] serde_json::Error),
     #[error("identity error: {0}")]
     Identity(#[from] sovereign_identity::IdentityError),
+    #[error("ledger was rewound below the freshness anchor")]
+    Rewound,
+    #[error("ledger forked from the freshness anchor")]
+    Forked,
+    #[error("freshness anchor is missing")]
+    MissingAnchor,
+    #[error("freshness anchor is invalid")]
+    InvalidAnchor,
+    #[error("freshness anchor device binding does not match the ledger")]
+    AnchorDeviceMismatch,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +83,25 @@ impl AuditLedger {
 
     pub fn events(&self) -> &[AuditEvent] {
         &self.events
+    }
+
+    pub fn trusted_device_public_key_b64(&self) -> Option<&str> {
+        self.trusted_device_public_key_b64.as_deref()
+    }
+
+    /// RFC 0007 open-time freshness check using `ledger.head` beside the ledger path.
+    pub fn verify_freshness_at_head_path(
+        &self,
+        ledger_path: &std::path::Path,
+        require_anchor: bool,
+    ) -> Result<(), LedgerError> {
+        let head_path = ledger_head_path(ledger_path);
+        let head = if head_path.is_file() {
+            Some(LedgerHead::load(&head_path)?)
+        } else {
+            None
+        };
+        verify_freshness(self, head.as_ref(), require_anchor)
     }
 
     pub fn last_hash(&self) -> String {
@@ -164,9 +200,24 @@ impl AuditLedger {
     /// Durably persist the chain. Crash-safe: the whole file is written to a
     /// sibling temp path, fsynced, then renamed over the target, so a crash
     /// mid-save leaves the previous complete chain — never a truncated one.
-    pub fn save(&self, path: &std::path::Path) -> Result<(), LedgerError> {
+    /// Persist the chain, then the device-signed freshness anchor (`ledger.head`).
+    pub fn save(&self, path: &std::path::Path, device: &DeviceIdentity) -> Result<(), LedgerError> {
         let json = serde_json::to_vec_pretty(&self.events)?;
         write_atomic(path, &json)?;
+        if let Some(key) = self.trusted_device_public_key_b64() {
+            if key != device.public_key_b64() {
+                return Err(LedgerError::DeviceMismatch);
+            }
+        }
+        let mut head = LedgerHead {
+            version: LEDGER_HEAD_VERSION,
+            workspace_binding: device.public_key_b64().to_owned(),
+            event_count: self.events().len() as u64,
+            last_event_hash: self.last_hash(),
+            device_signature: String::new(),
+        };
+        head.sign(device)?;
+        head.save(&ledger_head_path(path))?;
         Ok(())
     }
 
@@ -242,7 +293,7 @@ mod tests {
                 )
                 .unwrap();
             // Each save fully replaces the previous file via temp+rename.
-            ledger.save(&path).unwrap();
+            ledger.save(&path, &device).unwrap();
         }
         assert!(!path.with_extension("tmp").exists());
         let reloaded = AuditLedger::load(&path, device.public_key_b64()).unwrap();
@@ -314,7 +365,7 @@ mod tests {
                 &device,
             )
             .unwrap();
-        ledger.save(&path).unwrap();
+        ledger.save(&path, &device).unwrap();
         let loaded = AuditLedger::load(&path, device.public_key_b64()).unwrap();
         assert_eq!(loaded.events().len(), 1);
     }
@@ -352,7 +403,7 @@ mod tests {
         let device = DeviceIdentity::generate();
 
         let mut ledger = one_event_ledger(&device);
-        ledger.save(&path).unwrap();
+        ledger.save(&path, &device).unwrap();
         let before = std::fs::read(&path).unwrap();
 
         // Extend in memory. The in-memory append always succeeds; `save` is
@@ -375,7 +426,7 @@ mod tests {
 
         let blocked = sovereign_fault_testing::BlockedPath::block(&ledger_dir).unwrap();
         assert!(
-            ledger.save(&path).is_err(),
+            ledger.save(&path, &device).is_err(),
             "saving into an unavailable directory must fail, not report success"
         );
         drop(blocked);
@@ -413,7 +464,7 @@ mod tests {
 
         let ledger = one_event_ledger(&device);
         ledger
-            .save(&path)
+            .save(&path, &device)
             .expect("a stale temp must not block the save");
 
         assert!(

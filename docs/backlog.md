@@ -1085,7 +1085,7 @@ while the controller routes eligible design/review cards to the strong role.
   entries below. Done when: the design lands in the governed place, the
   entries are queued, and no code lands in the round.
 
-- [ ] **P2 | `crates/audit-ledger/` | Persist and verify a device-signed ledger head anchor.**
+- [x] **P2 | `crates/audit-ledger/` | Persist and verify a device-signed ledger head anchor.**
   Blocked until the freshness-anchor design above is checked off; implement
   exactly its shape — an ambiguity found mid-round is a diagnosis for the
   queue, not a license to improvise. Write the signed head anchor alongside
