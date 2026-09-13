@@ -1180,7 +1180,7 @@ while the controller routes eligible design/review cards to the strong role.
   mode 0600 and the vault root is 0700 after `Vault::init` followed by `put`,
   and `cargo test -p sovereign-vault` passes.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Pin the export's plaintext-and-unauthenticated boundary with a test.**
+- [x] **P2 | `apps/cli/src/workspace/` | Pin the export's plaintext-and-unauthenticated boundary with a test (v01-05).** Landed 2026-09-13.
   `Store::export` (reporting.rs:289-313) writes the whole business graph as
   cleartext JSON, and `verify_export` (verify.rs:12-120) re-verifies only the
   Ed25519 audit chain and the device binding — the `workspace` object itself is
