@@ -2395,6 +2395,7 @@ dependencies = [
  "sovereign-contracts",
  "sovereign-effects",
  "sovereign-execution",
+ "sovereign-fault-testing",
  "sovereign-identity",
  "sovereign-model",
  "sovereign-policy",

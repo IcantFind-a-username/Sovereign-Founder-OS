@@ -1026,7 +1026,7 @@ while the controller routes eligible design/review cards to the strong role.
   changes, the double-burn behavior changed and needs a recorded decision);
   `cargo test -p sovereign-cli` passes.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Kill a real send subprocess and prove the workspace reopens fail-closed.**
+- [x] **P2 | `apps/cli/src/workspace/` | Kill a real send subprocess and prove the workspace reopens fail-closed.** Landed 2026-09-13 (`a_sigkilled_send_leaves_a_fail_closed_workspace_that_reopens_clean`).
   Blocked on the `crates/fault-testing` entry above; the first real
   process-kill test outside `crates/sandbox`. Add a `#[ignore]`d worker test
   in `workspace/tests.rs` that (given the marker env var) builds a seeded

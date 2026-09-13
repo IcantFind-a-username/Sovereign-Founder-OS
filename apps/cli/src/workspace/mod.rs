@@ -63,6 +63,8 @@ mod privacy_tests;
 #[cfg(test)]
 mod rfc0007_open_tests;
 #[cfg(test)]
+mod send_sigkill_tests;
+#[cfg(test)]
 mod stage1_suite;
 #[cfg(test)]
 mod test_support;
