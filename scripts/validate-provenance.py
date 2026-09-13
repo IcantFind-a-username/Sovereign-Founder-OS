@@ -130,6 +130,29 @@ def validate_document_markers(root: Path) -> list[str]:
                 f"unsafe operation contains {forbidden_workflow!r}"
             )
 
+    preview_workflow = _read(root, ".github/workflows/developer-preview.yml", errors)
+    for marker in (
+        'tags:\n      - "developer-preview-*"',
+        "developer-preview-publish",
+        "scripts/developer_preview_release.py",
+        "--prerelease",
+        "--draft",
+        "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+        "verify-staging",
+        "assert-prerelease",
+    ):
+        if marker not in preview_workflow:
+            errors.append(
+                ".github/workflows/developer-preview.yml: "
+                f"missing trust-boundary marker {marker!r}"
+            )
+    for forbidden_workflow in ("--clobber", "--latest", 'tags: ["v*"]'):
+        if forbidden_workflow in preview_workflow:
+            errors.append(
+                ".github/workflows/developer-preview.yml: "
+                f"unsafe operation contains {forbidden_workflow!r}"
+            )
+
     workflow_directory = root / ".github/workflows"
     if workflow_directory.is_dir():
         for path in sorted(workflow_directory.glob("*.yml")):

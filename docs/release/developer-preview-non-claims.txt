@@ -1,0 +1,22 @@
+This is a Developer Preview — not a production release.
+
+- Not production-ready. Not supported. Not a security certification.
+- Not a SemVer product release. This tag is not v0.1, v0.1.0, or any
+  ROADMAP milestone completion.
+- Not product 1C0. The founder UI has no independently authenticated owner
+  session. The Experimental local outbox is application-signed; an
+  unauthenticated local API decision still uses the application-created
+  owner key. Product 1C0 admission is a v0.2 gate (RFC 0006 G2).
+- Experimental, and labelled that way: Consultant Core v1; the co-located
+  vault key; the app-signed outbox; the model gateway (caller-declared
+  class, self-reported provider trust). “Current” never means universally
+  secure.
+- Program 1A / vault-v2-engine, if mentioned, is a non-product engine
+  (`publish = false`). No product Vault enrollment, backup, recovery,
+  migration, PendingV2, or ActiveV2.
+- Export verifies format, device-key binding, and the signed audit chain.
+  It does not authenticate every workspace field. The archive is plaintext.
+- No network email, no OAuth broker, no encrypted backup, no restore, no
+  whole-device rollback detection, no Owned Mesh.
+- A provenance snapshot is a different tag family (provenance-*). This
+  preview does not satisfy or waive those gates.

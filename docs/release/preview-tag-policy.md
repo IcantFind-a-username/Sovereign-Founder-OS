@@ -3,8 +3,11 @@
 **Status:** Governance / planning (2026-09-13). This file is policy only.
 **Does not:** enable `.github/workflows/release.yml`, cut any git tag, mint a
 GitHub Release, or start Wave D / product 1C0 / `ActiveV2`.
-**Implements later:** close-plan ticket **v01-33** (owner + CI, not unattended
-Composer). Founder install copy is **v01-34**.
+**Implements:** close-plan ticket **v01-33** via
+[`.github/workflows/developer-preview.yml`](../../.github/workflows/developer-preview.yml)
+(owner + CI, not unattended Composer). Founder install copy is **v01-34**.
+Humans mint annotated `developer-preview-*` tags; this policy and workflow do
+not create tags or live releases during development.
 **Feeds:** honest-close gap review ([#141](https://github.com/IcantFind-a-username/Sovereign-Founder-OS/pull/141)).
 
 Owner-approved honest close ([#121](https://github.com/IcantFind-a-username/Sovereign-Founder-OS/pull/121)):
@@ -242,3 +245,7 @@ table uses the honest-close reading of exits 1–5
 - Close plan (ticket map, includes v01-33): PR #117
 - Gap review (current status, forbids product `v0.1`): PR #141
 - `.github/workflows/release.yml` — disabled product stub (leave disabled)
+- [`.github/workflows/developer-preview.yml`](../../.github/workflows/developer-preview.yml)
+  — Developer Preview prerelease publisher (tag-triggered only)
+- [docs/release/VERIFY-PREVIEW.md](VERIFY-PREVIEW.md) — preview verifier copied
+  into releases as `VERIFY.md`

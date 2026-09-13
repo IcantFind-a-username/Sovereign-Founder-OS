@@ -1,3 +1,7 @@
+# Disabled SemVer product publication gate. Do not add tag triggers or
+# release publishers here. Developer Preview uses
+# .github/workflows/developer-preview.yml per docs/release/preview-tag-policy.md.
+
 name: Product Release Gate
 
 on:
