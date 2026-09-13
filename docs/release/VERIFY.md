@@ -5,6 +5,10 @@ source packaging and tamper detection; it is not an immutable release, a
 maintainer signature, an independent publication timestamp, or a legal
 originality finding.
 
+Developer Preview **binaries** are a different publication class
+(`developer-preview-*`, not `provenance-*` and not `v0.1`). See
+[preview-tag-policy.md](preview-tag-policy.md).
+
 ## Expected Files
 
 - `SNAPSHOT-source.tar.gz`: normalized source for one exact ref;

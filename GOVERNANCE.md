@@ -34,6 +34,18 @@ Require RFC process (see [CONTRIBUTING.md](CONTRIBUTING.md)):
 
 ## Publication Classes
 
+### Developer Preview builds
+
+Developer Preview builds use `developer-preview-YYYY.MM.DD.N`. They ship
+prerelease binaries with checksums and, when feasible, attestations. They are
+not SemVer product releases, not provenance snapshots, and not a `v0.1`
+milestone claim. Tag rules, required artifacts, release-note non-claims, and
+the still-disabled `release.yml` stub are in
+[docs/release/preview-tag-policy.md](docs/release/preview-tag-policy.md).
+
+Never mint `v0.1` or `v0.1.0` until the owner records that the honest-close
+exit criteria are actually met.
+
 ### SemVer product releases
 
 Product releases use semantic versions and ship supported product artifacts.
@@ -45,6 +57,7 @@ published release.
 
 Automatic `v*` publication is disabled until that separate product-release
 workflow exists and the applicable [roadmap](ROADMAP.md) gates pass.
+`v0.1` / `v0.1.0` stay forbidden under the Developer Preview policy above.
 
 ### Provenance snapshots
 
