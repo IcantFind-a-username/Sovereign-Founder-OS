@@ -1,6 +1,9 @@
 # RFC 0002: WASM Sandbox and Plugin Capabilities
 
-**Status:** Draft
+**Status:** Draft; Amendment 1 proposed 2026-09-13 (closed fixture
+exact-effect profile). **Not accepted.** An implementation PR must not
+mark this RFC Accepted, start Wave D code, or treat discussion as
+consent.
 **Stage:** 1
 **Security impact:** Critical
 
@@ -56,6 +59,7 @@ Sandbox escape vulnerabilities in the chosen engine remain possible. Process iso
 | --- | --- | --- |
 | Pure local computation | Publisher-verified and locally admitted import-free Core Wasm; exact V2 binding; authenticated input through `sovereign_core_wasm_v2`; Experimental: one zero-import component world (`sovereign:tool/pure-tool@0.1.0`); no guest host effects | Wasmtime Component with reviewed WIT world |
 | Low-risk constrained plugin | Denied | Wasmtime Component plus explicit capability host interfaces |
+| Fixture exact local-outbox (`low-risk-effectful` / `write_rfc5322`) | Denied on every product and default-release path. The existing `RiskClass::LowRiskEffectful` serde token (`low_risk_effectful`) is already rejected at admission (`UnsupportedRiskClass`). | Target after Amendment 1 acceptance only: synthetic fixture; import-free Core Wasm v2 guest; trusted coordinator publishes one exact `.eml`. Not a product plugin class and not Phase D completion. |
 | High-risk/native tool | Denied | Ephemeral container or micro-VM |
 | Unknown or undeclared | Denied | None |
 
@@ -335,7 +339,10 @@ refuses Red data and symlink/traversal escape. The broker accepts raw
 classification/content rather than an opaque grant, the capability does not
 bind final recipient/bytes, and the execution journal ends before the write.
 It therefore does not satisfy exact-effect binding, durable effect-intent
-ordering, or Phase D's opaque-grant gate.
+ordering, or Phase D's opaque-grant gate. Amendment 1 does **not** promote
+this prototype. The Target fixture profile below is a separate
+coordinator-owned publication of fixed synthetic bytes; the guest still
+receives no filesystem or network import.
 
 Red data can never enter a network grant. Amber disclosure requires minimization, preview, and evidence. Personal data is never written to a public blockchain.
 
@@ -365,13 +372,16 @@ tokens stay restricted to pure computation until transactional reservation,
 revocation, crash-safe effect ordering, owner authority, and reviewed host
 interfaces are complete.
 
-Any future RFC 0002 exact-effect profile amendment starts from this Current
-approval-retention fact. It must not plan to fix retention again; its remaining
-authorization work is the one-transaction reservation, revocation, complete
-race/restart evidence, exact effect binding, and owner-authority integration.
-RFC 0003 Amendment 1 (2026-08-26) pins the one-transaction reservation and
-revocation protocol for the current filesystem store; the other three items
-remain unpinned.
+Amendment 1 (proposed 2026-09-13, **not accepted**) is that exact-effect
+profile amendment. It starts from this Current approval-retention fact and
+must not re-plan retention. RFC 0003 Amendment 1 (2026-08-26) still pins
+the one-transaction reservation and revocation protocol for the current
+filesystem store. Amendment 1 additionally pins the *fixture* reservation
+and closed profile (redb coordinator, `low-risk-effectful` /
+`write_rfc5322` identity, state machine, value-free evidence). Product
+Capability V2 tokens stay restricted to pure computation. Filesystem-store
+revocation, complete cross-process validator race/restart evidence, and
+product owner-authority integration remain unpinned.
 
 Production time comes from a trusted runtime clock. An untrusted caller cannot provide the validation timestamp.
 
@@ -506,8 +516,195 @@ pass.
 - Per-host-call authorization and audit.
 - No network or filesystem until their brokers pass adversarial review.
 
+Amendment 1 does **not** complete Phase D. Product “Low-risk constrained
+plugin” remains Denied. The fixture profile is a synthetic mechanism
+proof, not a reviewed general host interface, and it grants the guest no
+host-call surface.
+
 Stage 1 remains **In Progress** until all required phases and exit tests pass.
 
 ## External Services and Blockchain
 
 This design requires no external API, account, wallet, or blockchain. Future public-chain use, if any, is limited to non-personal hashes, timestamps, signatures, or state commitments. It must not become the authorization source, availability dependency, or storage location for personal or business plaintext.
+
+## Amendments
+
+### Amendment 1 (proposed 2026-09-13): closed fixture exact-effect profile
+
+**Status.** Proposed. This RFC stays Draft. [CONTRIBUTING.md](../CONTRIBUTING.md)
+requires a minimum **seven-day** discussion for substantial changes and
+explicit maintainer acceptance or rejection with rationale. Opening or
+merging this text is not acceptance. An implementation PR cannot accept
+its own RFC. Wave D fixture code must not start until a maintainer
+records acceptance with rationale.
+
+**Why.** RFC 0002 already anticipated an exact-effect profile amendment
+and forbade re-planning the Current approval-retention fix. The v2
+synthetic-owner / exact local-outbox plan
+(`docs/superpowers/plans/2026-08-14-synthetic-owner-exact-local-outbox-v2-implementation.md`,
+Task 0) cannot start until this closed profile exists here. Honest-close
+places product 1C0 admission in v0.2; v0.1 is fixture evidence plus
+honest labels. This amendment unblocks that fixture discussion only.
+
+**What this is not.** It is not product 1C0 admission, Program 2
+completion, product authority, product-safe persistence, E2EE, an email
+send, SMTP, Phase D completion, Vault `ActiveV2` activation, or removal
+of the Experimental app-signed outbox / `kernel_exec` `owner_approval_key`.
+It does not weaken RFC 0006 G2. Those conjunctive product gates remain:
+
+- Program 1B1 clean-machine recovery qualification;
+- Program 1C1 identity/role-key custody and handoff;
+- Program 1D `ActiveV2` activation; and
+- a later reviewed protected-payload persistence design.
+
+Empty-registry fixture enrollment remains first-valid-UV-wins and is
+**not** owner admission.
+
+#### Closed structured profile
+
+The amendment defines one structured Target/Fixture profile. It is never
+parsed from a dotted or free-form string. The v2 plan’s identity block is
+normative for field names:
+
+```text
+risk_class   = low-risk-effectful
+backend      = core-wasm
+abi          = sovereign_core_wasm_v2
+tool_id      = local_outbox
+tool_version = 1.0.0
+operation_id = write_rfc5322
+```
+
+Wire encoding must not fork those identities into a second accepted
+spelling. Current protocol tokens already use snake_case
+(`pure_compute`, `core_wasm`). The existing Rust enums already contain
+the matching variants and reject them on the product admission path:
+
+| Profile identity (this RFC / v2 plan) | Current serde / wire token | Current product behavior |
+| --- | --- | --- |
+| `low-risk-effectful` | `low_risk_effectful` (`RiskClass::LowRiskEffectful`) | Admission returns `UnsupportedRiskClass` |
+| `core-wasm` | `core_wasm` (`ArtifactBackend::CoreWasm`) | Admitted only for `pure_compute` |
+| `sovereign_core_wasm_v2` | `sovereign_core_wasm_v2` | Current authenticated Core Wasm v2 ABI |
+| `local_outbox` | `local_outbox` | Not a Current tool_id |
+| `1.0.0` | `1.0.0` | — |
+| `write_rfc5322` | `write_rfc5322` | Not a Current operation_id |
+
+Implementers MUST use the existing snake_case tokens on Capability V2 /
+manifest bytes after acceptance. They MUST NOT accept both hyphenated and
+underscored risk_class or backend values, MUST NOT introduce a new
+Wasmtime backend, and MUST NOT treat `core-wasm` as a second engine.
+`core-wasm` names the existing import-free Core Wasm v2 guest.
+
+#### Compatibility with existing profiles
+
+Unchanged Current profiles:
+
+- `risk_class = pure_compute`, `backend = core_wasm`,
+  `abi = sovereign_core_wasm_v1 | sovereign_core_wasm_v2`;
+- Experimental zero-import component world
+  `sovereign:tool/pure-tool@0.1.0`;
+- Experimental `sovereign-effects` host-orchestration prototype, which
+  still does not satisfy exact-effect binding;
+- product “Low-risk constrained plugin” = Denied;
+- product Capability V2 issuance remains `pure_compute` only.
+
+Adding this row does not enlarge the Current effective-permission
+intersection, does not admit guest host interfaces, and does not change
+signed field order of existing Capability V2 bodies. A later Wave D
+change that adds fixture issuance must keep existing `pure_compute`
+tokens byte-stable (`tests/signed_shape.rs` remains load-bearing).
+
+#### Fixture-only limits
+
+The profile permits only the compile-time synthetic recipient
+`fixture-recipient@example.test` and fixed compiled sender, subject, and
+body. Every address is under `.example.test`. No venture, customer, or
+document schema exists. No product or Vault root, import, migration,
+business value, provider credential, attachment, SMTP setting, or
+arbitrary path is accepted.
+
+The Core Wasm guest has no ambient filesystem, network, environment,
+clock, randomness, or host-call surface. It receives authenticated
+canonical input and returns a closed result. The trusted coordinator
+alone owns publication.
+
+The coordinator allocates a random 128-bit `effect_intent_id` before
+reading the compiled values, then seals the exact normalized recipient,
+exact RFC 5322 bytes, exact coordinator-derived outbox-relative path,
+operation, policy and invocation binding, expiry, fixture generation, and
+signer epoch. A changed byte or field creates a new intent and requires a
+new preview and approval. RFC 0003 / Capability V2 primary resource and
+canonical input bind only the random intent id, generation, fixed
+operation, and immutable coordinator reference — never recipient/content
+or an unkeyed digest of either.
+
+#### One-transaction reservation
+
+The fixture authority plane is a broker-or-process-owned redb store, a
+separate store on a separate gate from RFC 0003 Amendment 1’s filesystem
+bundle. Reservation is one write transaction. It consumes opaque
+side-effect-free proofs (`VerifiedCapabilityV2` and, when required,
+`VerifiedApprovalV1`) by value and commits together:
+
+```text
+approval claim (retained through the already-Current signed approval expiry)
+capability/token claim
+idempotency binding to random effect_intent_id
+synthetic authority-node use/decrement
+Prepared -> AuthorityReserved
+```
+
+The coordinator must not copy COSE, canonicalization, trust, policy,
+approval, or context checks, and must not call the legacy consuming
+validator before opening its own transaction. No public API accepts raw
+claim IDs, a raw redb handle, recipient bytes, RFC 5322 bytes, or a
+generic writer as authority. Approval retention is already Current; this
+amendment does not add a second retention implementation.
+
+#### Effect state machine
+
+Required states:
+
+```text
+Prepared -----------> AuthorityReserved -----------> Dispatching
+   |                         |                           |-> Succeeded
+   `-> FailedBeforeDispatch  `-> FailedBeforeDispatch  `-> Indeterminate
+```
+
+`FailedBeforeDispatch` is allowed only in a live process that proves no
+payload byte was written, published, or exposed and durably commits that
+result. After a process death, `Dispatching` plus an absent file is
+always `Indeterminate`; absence is never proof of non-exposure. Entering
+`Dispatching` never causes automatic retry, failover, rewrite, deletion,
+or a new-send suggestion. Recovery maps exact identical final bytes to
+`Succeeded`; absent, different, wrong-type, unreadable, or uncertain
+durability to `Indeterminate`.
+
+#### Value-free evidence
+
+Public signed effect evidence contains only version/type, a random event
+id, the random intent id, a closed outcome, the previous-event hash, a
+synthetic signer public identity/key, the event hash, and the signature.
+It is value-free: no recipient/content or deterministic digest, business
+id, path, byte count, time, account, reason, or policy value.
+
+#### Architecture non-claims for implementers
+
+The v2 plan — not the obsolete v1 plan — is the implementation target
+after acceptance: one release-excluded fixture process, one public
+listener at the compiled origin, typed in-process calls, no HMAC
+transport, no hidden child broker, no second/ephemeral listen port, and
+no `sovereign-cli` default/release dependency. RFC 0006 G2 is untouched.
+RFC 0006 G13–G15 still describe the superseded v1 broker/IPC; continuing
+that residue is forbidden. Retiring those transport clauses is a
+**separate** RFC 0006 amendment if maintainers want the fixture RFC to
+match the v2 plan. That amendment is not this change and must not touch
+G2.
+
+#### Acceptance
+
+“Accepted” means a maintainer records explicit acceptance with rationale
+after the seven-day substantial-change discussion, without weakening G2
+or promoting this profile to a product path. Until then this text is a
+discussion draft. Rejection with rationale also closes Wave D until a
+revised proposal is accepted.
