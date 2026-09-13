@@ -1,0 +1,6 @@
+error[E0432]: unresolved import `sovereign_vault_v2_engine::ConnectionMode`
+ --> $DIR/tests/ui/cannot_construct_create_mode.rs:4:5
+  |
+4 | use sovereign_vault_v2_engine::ConnectionMode;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `ConnectionMode` in the root
+

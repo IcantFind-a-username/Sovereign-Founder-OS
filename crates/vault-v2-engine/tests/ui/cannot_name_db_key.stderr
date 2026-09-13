@@ -1,0 +1,6 @@
+error[E0432]: unresolved import `sovereign_vault_v2_engine::DbKey`
+ --> $DIR/tests/ui/cannot_name_db_key.rs:4:5
+  |
+4 | use sovereign_vault_v2_engine::DbKey;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `DbKey` in the root
+

@@ -8,10 +8,11 @@
 //!   declares it in `Cargo.toml`;
 //! - `FFI_BOUNDARY_FILES` holds exactly `src/engine/ffi.rs` and
 //!   `src/engine/process.rs`; nothing else is expected to ever join it;
-//! - the exactly-two-entry-points proof and the five `tests/ui/` compile-fail
-//!   fixtures are a separate queued item that tightens this gate once the
-//!   engine API exists.
+//! - `AUXILIARY_ROOTS` admits exactly the five `tests/ui/` compile-fail fixtures;
+//! - the gate proves exactly two production FFI entry points plus the single
+//!   `cfg(test)` OpenSSL LOAD_CONFIG negative control (plan lines 540-546).
 
+mod ffi_entry;
 mod gate;
 
 use gate::{run_gate, GateConfig};
@@ -23,7 +24,18 @@ const ROOTS: &[&str] = &[
     "tests/build_gate.rs",
     "tests/ast_gate.rs",
     "tests/public.rs",
+    "tests/ui.rs",
     "src/main.rs",
+];
+
+/// Task 1 trybuild fixtures: admitted as roots for orphan detection only, not
+/// part of the recursive `mod` closure (plan lines 510-514).
+const AUXILIARY_ROOTS: &[&str] = &[
+    "tests/ui/cannot_name_db_key.rs",
+    "tests/ui/cannot_call_raw_key_shim.rs",
+    "tests/ui/cannot_reach_raw_handle.rs",
+    "tests/ui/cannot_construct_create_mode.rs",
+    "tests/ui/cannot_select_cipher_profile.rs",
 ];
 
 /// The two `include!` edges that let the build script's gate logic be the
@@ -117,6 +129,7 @@ fn real_config() -> GateConfig<'static> {
         allowed_macros: ALLOWED_MACROS,
         allowed_attributes: ALLOWED_ATTRIBUTES,
         allowed_derives: ALLOWED_DERIVES,
+        auxiliary_roots: AUXILIARY_ROOTS,
     }
 }
 
@@ -143,8 +156,10 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
             "src/main.rs",
             "tests/ast_gate.rs",
             "tests/build_gate.rs",
+            "tests/ffi_entry.rs",
             "tests/gate.rs",
             "tests/public.rs",
+            "tests/ui.rs",
         ],
         "the source closure changed — a new file must be a declared target \
          root, a resolved module, or an admitted include, and this pin must \
@@ -177,6 +192,7 @@ fn lib_only_config() -> GateConfig<'static> {
         allowed_macros: &["assert", "assert_eq", "matches", "stringify"],
         allowed_attributes: &["cfg", "test", "allow", "doc", "derive"],
         allowed_derives: &["Debug"],
+        auxiliary_roots: &[],
     }
 }
 
@@ -275,6 +291,45 @@ fn unsafe_hidden_inside_allowed_macro_tokens_is_rejected() {
 }
 
 #[test]
+fn a_third_ffi_declaration_in_a_macro_definition_is_rejected() {
+    assert_rejects(
+        &[(
+            "src/lib.rs",
+            "macro_rules! smuggle { () => { extern \"C\" { fn evil(); } } }\npub fn f() {}\n",
+        )],
+        &lib_only_config(),
+        "macro definitions are forbidden",
+    );
+}
+
+#[test]
+fn a_third_ffi_declaration_hidden_in_macro_invocation_tokens_is_rejected() {
+    assert_rejects(
+        &[("src/lib.rs", "pub fn f() { assert!(sqlite3_key_v2); }\n")],
+        &lib_only_config(),
+        "forbidden token `sqlite3_key_v2`",
+    );
+}
+
+#[test]
+fn a_third_unsafe_ffi_entry_point_in_a_boundary_file_is_rejected() {
+    let config = GateConfig {
+        roots: &["src/lib.rs"],
+        ffi_boundary_files: &["src/engine/ffi.rs"],
+        ..lib_only_config()
+    };
+    assert_rejects(
+        &[
+            ("src/lib.rs", "mod engine;\n"),
+            ("src/engine/mod.rs", "pub mod ffi;\n"),
+            ("src/engine/ffi.rs", "pub fn extra_shim() { unsafe {} }\n"),
+        ],
+        &config,
+        "unsafe block outside the admitted production FFI entry points",
+    );
+}
+
+#[test]
 fn a_macro_definition_is_rejected() {
     assert_rejects(
         &[(
@@ -297,16 +352,19 @@ fn an_unsafe_block_outside_the_ffi_boundary_is_rejected() {
 
 #[test]
 fn an_unsafe_block_inside_an_admitted_boundary_file_is_accepted() {
-    // This is the admission mechanism the queued FFI item will use for
-    // `src/engine/ffi.rs` and `src/engine/process.rs`.
     let config = GateConfig {
-        ffi_boundary_files: &["src/boundary.rs"],
+        roots: &["src/lib.rs"],
+        ffi_boundary_files: &["src/engine/ffi.rs"],
         ..lib_only_config()
     };
     let violations = violations_of(
         &[
-            ("src/lib.rs", "mod boundary;\n"),
-            ("src/boundary.rs", "pub fn f() { unsafe {} }\n"),
+            ("src/lib.rs", "mod engine;\n"),
+            ("src/engine/mod.rs", "pub mod ffi;\n"),
+            (
+                "src/engine/ffi.rs",
+                "pub fn open_keyed_hardened() { unsafe {} }\n",
+            ),
         ],
         &config,
     );

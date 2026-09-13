@@ -1,0 +1,6 @@
+error[E0432]: unresolved import `sovereign_vault_v2_engine::SqlcipherProfile`
+ --> $DIR/tests/ui/cannot_select_cipher_profile.rs:4:5
+  |
+4 | use sovereign_vault_v2_engine::SqlcipherProfile;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `SqlcipherProfile` in the root
+
