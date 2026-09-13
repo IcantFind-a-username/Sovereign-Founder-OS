@@ -21,7 +21,10 @@ fn playground_clap_port_and_option_contract() {
         (&["sovereign", "playground", "--port", "abc"][..], None),
         (&["sovereign", "playground", "--port"][..], None),
         (&["sovereign", "playground", "--unknown"][..], None),
-        (&["sovereign", "playground", "--root", "/tmp"][..], Some(7788)),
+        (
+            &["sovereign", "playground", "--root", "/tmp"][..],
+            Some(7788),
+        ),
         (&["sovereign", "playground", "--no-open"][..], None),
         (&["sovereign", "playground", "extra"][..], None),
     ];
@@ -85,17 +88,16 @@ fn ui_clap_and_dispatch_remain_compatible() {
     match Cli::try_parse_from(["sovereign", "ui"]).unwrap() {
         Cli {
             root: None,
-            command: Commands::Ui {
-                port,
-                no_open,
-                supervised,
-            },
+            command:
+                Commands::Ui {
+                    port,
+                    no_open,
+                    supervised,
+                },
         } => assert_eq!((port, no_open, supervised), (7787, false, false)),
         _ => panic!("parsed a different command"),
     }
-    match Cli::try_parse_from(["sovereign", "--root", "/tmp/isolated", "ui"])
-        .unwrap()
-    {
+    match Cli::try_parse_from(["sovereign", "--root", "/tmp/isolated", "ui"]).unwrap() {
         Cli {
             root,
             command: Commands::Ui { port, .. },
@@ -117,11 +119,12 @@ fn ui_clap_and_dispatch_remain_compatible() {
     {
         Cli {
             root: None,
-            command: Commands::Ui {
-                port,
-                no_open,
-                supervised,
-            },
+            command:
+                Commands::Ui {
+                    port,
+                    no_open,
+                    supervised,
+                },
         } => assert_eq!((port, no_open, supervised), (0, true, true)),
         _ => panic!("parsed a different command"),
     }

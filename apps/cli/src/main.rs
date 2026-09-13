@@ -134,10 +134,8 @@ pub(crate) fn resolve_data_root(root: Option<&std::path::Path>) -> Result<PathBu
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    let data_root =
-        resolve_data_root(cli.root.as_deref()).map_err(|message| -> Box<dyn std::error::Error> {
-            message.into()
-        })?;
+    let data_root = resolve_data_root(cli.root.as_deref())
+        .map_err(|message| -> Box<dyn std::error::Error> { message.into() })?;
     match cli.command {
         Commands::Init => cmd_init(&data_root)?,
         #[cfg(feature = "owner-effect-fixture")]
