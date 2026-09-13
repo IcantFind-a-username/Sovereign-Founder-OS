@@ -1129,7 +1129,7 @@ while the controller routes eligible design/review cards to the strong role.
   if this test starts failing, the RFC 0004 boundary landed and the test must
   be inverted, not deleted. `cargo test -p sovereign-model` passes.
 
-- [ ] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.**
+- [x] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.** v01-02 · claimed 2026-09-13.
   `model-check` prints "Red data stays local" (main.rs:295), and
   `draft_assistant` carries a comment that Amber "would never be routed to a
   cloud provider" (ops.rs:122-123) — false: Amber routes to cloud by design
