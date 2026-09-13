@@ -69,6 +69,15 @@ run_inner() {
   ./scripts/check-vault-v2-non-activation.sh
 }
 
+on_qualification_failure() {
+  local log="$ROOT/.harness/qualify-vault-v2.log"
+  if [ -f "$log" ]; then
+    echo "run-vault-platform-qualifier: qualify-vault-v2.log (last 80 lines):" >&2
+    tail -n 80 "$log" >&2
+  fi
+  exit 1
+}
+
 if [ "$EXPECTED_TRIPLE" = "x86_64-unknown-linux-gnu" ] && [ "${SFO_PLATFORM_KEYRING_READY:-}" != "1" ]; then
   if command -v apt-get >/dev/null 2>&1; then
     sudo apt-get update -qq
@@ -81,4 +90,18 @@ if [ "$EXPECTED_TRIPLE" = "x86_64-unknown-linux-gnu" ] && [ "${SFO_PLATFORM_KEYR
   gnome-keyring-daemon --components=secrets --daemonize --unlock <<< 'sfo-ci-platform-qual'
 fi
 
-run_inner
+if [ "$EXPECTED_TRIPLE" = "aarch64-apple-darwin" ] && [ "${SFO_PLATFORM_KEYCHAIN_READY:-}" != "1" ]; then
+  export SFO_PLATFORM_KEYCHAIN_READY=1
+  if command -v security >/dev/null 2>&1; then
+    login_keychain="${HOME}/Library/Keychains/login.keychain-db"
+    if [ ! -f "$login_keychain" ]; then
+      login_keychain="${HOME}/Library/Keychains/login.keychain"
+    fi
+    if [ -f "$login_keychain" ]; then
+      security unlock-keychain -p "" "$login_keychain" 2>/dev/null || true
+      security set-keychain-settings -t 3600 -u "$login_keychain" 2>/dev/null || true
+    fi
+  fi
+fi
+
+run_inner || on_qualification_failure

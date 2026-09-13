@@ -18,6 +18,12 @@ QUALIFY_STATE=running # running | completed | failed
 QUALIFY_STEPS=""
 TARGET_DIR=""
 MANIFEST=""
+REVIEWED_HOME=""
+REVIEWED_USERPROFILE=""
+REVIEWED_APPDATA=""
+REVIEWED_LOCALAPPDATA=""
+REVIEWED_SYSTEMROOT=""
+REVIEWED_PATH=""
 
 on_exit() {
   local status=$?
@@ -328,16 +334,24 @@ ensure_frozen_offline_args() {
   fi
 }
 
+qualification_child_home() {
+  if [ -n "${SFO_VAULT_PLATFORM_NAMESPACE:-}" ]; then
+    echo "${SFO_QUALIFY_HOME:-$REVIEWED_HOME}"
+  else
+    echo "$FRESH_HOME"
+  fi
+}
+
 run_child() {
   local log_label="$1"
   shift
   local -a cmd=("$@")
-  local admitted
-  admitted=$(admitted_engine_target)
+  local child_home
+  child_home=$(qualification_child_home)
   note_step "$log_label"
   echo "==== [$log_label] ${cmd[*]}" >>"$QUALIFY_LOG"
-  env -i \
-    HOME="$FRESH_HOME" \
+  set -- env -i \
+    HOME="$child_home" \
     TMPDIR="$FRESH_TMP" \
     LANG="${LANG:-C.UTF-8}" \
     LC_ALL="${LC_ALL:-C.UTF-8}" \
@@ -355,8 +369,52 @@ run_child() {
     SFO_VAULT_PLATFORM_ADMITTED_TARGET="${SFO_VAULT_PLATFORM_ADMITTED_TARGET:-}" \
     DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
-    PATH="$CHILD_PATH" \
-    "${cmd[@]}" >>"$QUALIFY_LOG" 2>&1 || die "$log_label failed (see $QUALIFY_LOG)"
+    PATH="$CHILD_PATH"
+  if [ -n "${SFO_VAULT_PLATFORM_NAMESPACE:-}" ]; then
+    [ -n "$REVIEWED_USERPROFILE" ] && set -- "$@" USERPROFILE="$REVIEWED_USERPROFILE"
+    [ -n "$REVIEWED_APPDATA" ] && set -- "$@" APPDATA="$REVIEWED_APPDATA"
+    [ -n "$REVIEWED_LOCALAPPDATA" ] && set -- "$@" LOCALAPPDATA="$REVIEWED_LOCALAPPDATA"
+    [ -n "$REVIEWED_SYSTEMROOT" ] && set -- "$@" SYSTEMROOT="$REVIEWED_SYSTEMROOT"
+  fi
+  set -- "$@" "${cmd[@]}"
+  "$@" >>"$QUALIFY_LOG" 2>&1 || die "$log_label failed (see $QUALIFY_LOG)"
+}
+
+append_child_path_dir() {
+  local dir="$1"
+  [ -n "$dir" ] || return 0
+  case ":$CHILD_PATH:" in
+  *":$dir:"*) ;;
+  *) CHILD_PATH="${CHILD_PATH:+$CHILD_PATH:}$dir" ;;
+  esac
+}
+
+append_runner_msvc_dirs_to_child_path() {
+  [ -n "${SFO_VAULT_PLATFORM_NAMESPACE:-}" ] || return 0
+  local uname_s path_sep entry old_ifs
+  uname_s=$(uname -s 2>/dev/null || echo unknown)
+  case "$uname_s" in
+  MINGW* | MSYS* | CYGWIN* | Windows_nt | Windows_NT) ;;
+  *) return 0 ;;
+  esac
+  path_sep=":"
+  case "$REVIEWED_PATH" in
+  *\;*) path_sep=";" ;;
+  esac
+  old_ifs="$IFS"
+  IFS="$path_sep"
+  for entry in $REVIEWED_PATH; do
+    case "$entry" in
+    *" "*) continue ;;
+    "") continue ;;
+    esac
+    if [ -f "$entry/link.exe" ] || [ -f "$entry/link.EXE" ] ||
+      [ -f "$entry/cl.exe" ] || [ -f "$entry/cl.EXE" ] ||
+      [ -f "$entry/lib.exe" ] || [ -f "$entry/lib.EXE" ]; then
+      append_child_path_dir "$entry"
+    fi
+  done
+  IFS="$old_ifs"
 }
 
 build_child_path() {
@@ -368,16 +426,12 @@ build_child_path() {
     "${ABS_CC%/*}" \
     "${ABS_PERL%/*}" \
     "${ABS_MAKE%/*}"; do
-    case ":$CHILD_PATH:" in
-    *":$dir:"*) ;;
-    *) CHILD_PATH="${CHILD_PATH:+$CHILD_PATH:}$dir" ;;
-    esac
+    append_child_path_dir "$dir"
   done
-  # Linker directory for the C toolchain.
-  case ":$CHILD_PATH:" in
-  *":/usr/bin:"*) ;;
-  *) CHILD_PATH="${CHILD_PATH:+$CHILD_PATH:}/usr/bin" ;;
-  esac
+  if [ -d /usr/bin ]; then
+    append_child_path_dir /usr/bin
+  fi
+  append_runner_msvc_dirs_to_child_path
 }
 
 run_cargo_child() {
@@ -454,6 +508,13 @@ mkdir -p "$(dirname "$QUALIFY_LOG")"
 : >"$QUALIFY_LOG"
 
 reject_caller_shaping_env
+
+REVIEWED_HOME="${HOME:-}"
+REVIEWED_USERPROFILE="${USERPROFILE:-}"
+REVIEWED_APPDATA="${APPDATA:-}"
+REVIEWED_LOCALAPPDATA="${LOCALAPPDATA:-}"
+REVIEWED_SYSTEMROOT="${SYSTEMROOT:-}"
+REVIEWED_PATH="${PATH:-}"
 
 REVIEWED_CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 if [ -n "${RUSTUP_HOME:-}" ]; then
