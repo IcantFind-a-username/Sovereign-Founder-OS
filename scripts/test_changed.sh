@@ -186,6 +186,8 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # A separate workspace, so nothing else in this gate builds it.
   run_step "owner-webauthn-adapter" cargo test \
     --manifest-path fixtures/owner-webauthn/Cargo.toml --locked
+  run_step "qualify-vault-v2-selftest" env GATE_SELFTEST_RUNNING=1 \
+    ./scripts/tests/qualify_vault_v2_test.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
@@ -202,6 +204,24 @@ elif [ -n "$PKGS" ]; then
   run_step "clippy(scoped)" cargo clippy "${P_FLAGS[@]}" --all-targets --locked -- -D warnings
   run_step "test(scoped)" cargo test "${P_FLAGS[@]}" --locked
   RAN="${PKGS# }"
+fi
+
+QUALIFY_NOTE=""
+NEED_VAULT_QUALIFY=0
+if [ "$FULL" -eq 1 ]; then
+  NEED_VAULT_QUALIFY=1
+else
+  case " $PKGS " in
+  *" sovereign-vault-v2-engine "*) NEED_VAULT_QUALIFY=1 ;;
+  esac
+fi
+if [ "$NEED_VAULT_QUALIFY" -eq 1 ]; then
+  if rustc -vV 2>/dev/null | grep -q '^host: x86_64-unknown-linux-gnu'; then
+    run_step "qualify-vault-v2(full)" ./scripts/qualify-vault-v2.sh full
+    QUALIFY_NOTE=", vault-v2 qualification ok"
+  else
+    QUALIFY_NOTE=", SKIPPED qualify-vault-v2 (host is not x86_64-unknown-linux-gnu; CI covers it)"
+  fi
 fi
 
 # ---- frontend type-check (environment-dependent: needs npx + network) ----
@@ -232,5 +252,5 @@ GATE_STATE=completed
 if [ -z "$RAN" ] && [ "$FRONTEND" -eq 0 ]; then
   echo "test_changed: ALL GREEN — steps:$STEPS_RUN — no cargo test scope in this change set (full log: $LOG)"
 else
-  echo "test_changed: ALL GREEN — steps:$STEPS_RUN — scope: ${RAN:-frontend-only}${FE_NOTE} (full log: $LOG)"
+  echo "test_changed: ALL GREEN — steps:$STEPS_RUN — scope: ${RAN:-frontend-only}${FE_NOTE}${QUALIFY_NOTE} (full log: $LOG)"
 fi

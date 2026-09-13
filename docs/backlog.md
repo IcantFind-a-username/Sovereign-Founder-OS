@@ -1427,7 +1427,7 @@ while the controller routes eligible design/review cards to the strong role.
   build script's comment and handled by the qualification wrapper below rather
   than by shortening the allowlist.
 
-- [ ] **P2 | `.github/workflows/`, `scripts/` | Add the vault-v2 qualification entry point and its evidence ledger.**
+- [x] **P2 | `.github/workflows/`, `scripts/` | Add the vault-v2 qualification entry point and its evidence ledger.**
   RFC 0005 Program 1A Task 1's tail: `scripts/qualify-vault-v2.sh` as the sole
   sanitized Cargo qualification entry point, the mandatory native-store and
   durability job, and `docs/security/vault-v2-verification.md` as an honest
