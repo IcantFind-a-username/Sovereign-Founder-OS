@@ -305,12 +305,11 @@ fn cmd_workflow_demo() -> Result<(), Box<dyn std::error::Error>> {
 fn cmd_model_check() {
     use sovereign_model::{DeterministicProvider, Health, ModelGateway, ModelRequest};
 
-    println!("Model gateway · raw requests stay on this device");
+    println!("Model gateway · provider self-reports Local; labels are not verified");
     println!("(the built-in providers are deterministic stand-ins, not LLMs)\n");
 
-    // The primary is down and a cloud stand-in sits between the two local
-    // providers. Work continues, and it continues *locally*: losing local
-    // capacity is not a reason to widen who sees the data.
+    // The primary is down and a cloud stand-in sits between two local ones.
+    // Amber may reach the cloud provider; Red skips it and fails over locally.
     let gateway = ModelGateway::new(vec![
         Box::new(DeterministicProvider::local("local-primary", Health::Down)),
         Box::new(DeterministicProvider::cloud(
@@ -435,14 +434,16 @@ fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&root)?;
 
     let device_path = root.join("device.json");
-    if !device_path.exists() {
+    let device = if !device_path.exists() {
         let device = DeviceIdentity::generate();
         device.save(&device_path)?;
         println!("device identity: {}", device.device_id());
+        device
     } else {
         let device = DeviceIdentity::load(&device_path)?;
         println!("device identity: {} (existing)", device.device_id());
-    }
+        device
+    };
 
     let vault = Vault::init(root.join("vault"))?;
     println!("vault ready: {} entries", vault.list().len());
@@ -450,7 +451,7 @@ fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
     let ledger_path = root.join("ledger.json");
     if !ledger_path.exists() {
         let ledger = AuditLedger::new();
-        ledger.save(&ledger_path)?;
+        ledger.save(&ledger_path, &device)?;
     }
     println!("ledger ready: {}", ledger_path.display());
     println!("data directory: {}", root.display());
