@@ -12,6 +12,7 @@ use std::path::Path;
 
 use sovereign_audit_ledger::{hash_bytes, AppendInput, AuditLedger};
 use sovereign_contracts::{ActionRequest, AutomationLevel, DataClass};
+use sovereign_execution::ExecutionJournal;
 use sovereign_identity::DeviceIdentity;
 use sovereign_policy::PolicyEngine;
 use sovereign_vault::Vault;
@@ -27,10 +28,15 @@ impl Store {
             device.save(&device_path).map_err(storage)?;
             device
         };
+        let execution_recovery = ExecutionJournal::open(root.join("executions"))
+            .map_err(storage)?
+            .recover()
+            .map_err(storage)?;
         Ok(Self {
             root: root.to_path_buf(),
             device,
             policy: PolicyEngine::new(),
+            execution_recovery,
         })
     }
 
