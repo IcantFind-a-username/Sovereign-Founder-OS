@@ -119,8 +119,7 @@ pub(crate) fn publish_initial_slots(
         device_kek,
         recovery_password,
     )?;
-    let slots_bytes =
-        std::fs::read(staging.slots_path()).map_err(|_| StorageError::Rejected)?;
+    let slots_bytes = std::fs::read(staging.slots_path()).map_err(|_| StorageError::Rejected)?;
     parse_vault_slots(&slots_bytes, workspace_id, database_id).map_err(|_| StorageError::Rejected)
 }
 
@@ -160,8 +159,7 @@ pub(crate) fn publish_wrapper_rotation(
         device_kek,
         recovery_password,
     )?;
-    let slots_bytes =
-        std::fs::read(staging.slots_path()).map_err(|_| StorageError::Rejected)?;
+    let slots_bytes = std::fs::read(staging.slots_path()).map_err(|_| StorageError::Rejected)?;
     parse_vault_slots(&slots_bytes, workspace_id, database_id).map_err(|_| StorageError::Rejected)
 }
 
