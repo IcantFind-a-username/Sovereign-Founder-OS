@@ -38,6 +38,8 @@ pub enum SandboxError {
     CompileWorkerFailed(String),
     #[error("the compilation worker exceeded its wall-clock deadline and was killed")]
     CompileWorkerTimeout,
+    #[error("a signed compiled cache is configured but no compilation worker is attached")]
+    CompileWorkerRequired,
     #[error("the compiled cache is unavailable: {0}")]
     CompiledCacheUnavailable(String),
     #[error("a compiled cache entry failed verification and was quarantined: {0}")]

@@ -19,11 +19,14 @@ use sovereign_capability::v2::{
 use sovereign_contracts::{AutomationLevel, DataClass};
 use sovereign_effects::OutboxReceipt;
 use sovereign_identity::{
-    AdmissionRole, ApprovalRole, AuthorityRole, KeyValidity, PublisherRole, RoleTrustStore,
-    TypedSigner,
+    AdmissionRole, ApprovalRole, AuthorityRole, CompiledCacheRole, KeyValidity, PublisherRole,
+    RoleTrustStore, TypedSigner,
 };
 use sovereign_policy::{AuthenticatedPolicyContextV2, PolicyAuthorizationV2, PolicyEngine};
-use sovereign_sandbox::{VerifiedExecutionRequest, VerifiedSandboxExecutor, WasmExecutionResult};
+use sovereign_sandbox::{
+    CompileWorker, CompiledCache, VerifiedExecutionRequest, VerifiedSandboxExecutor,
+    WasmExecutionResult,
+};
 use sovereign_vault::Vault;
 use uuid::Uuid;
 
@@ -304,8 +307,13 @@ impl Store {
             let _ = purge_authority_claims(&store, now());
             store
         });
+        let now_unix = now();
+        let worker = delivery_compile_worker();
+        let compiled_cache = self.open_workspace_compiled_cache(now_unix, validity)?;
         let mut executor = VerifiedSandboxExecutor::new(vec![selector], validator)
             .map_err(kernel)?
+            .with_compile_worker(worker)
+            .with_compiled_cache(compiled_cache)
             .with_execution_journal(
                 sovereign_execution::ExecutionJournal::open(self.root.join("executions"))
                     .map_err(kernel)?,
@@ -364,6 +372,29 @@ impl Store {
             }
             Err(error) => Err(storage(error)),
         }
+    }
+
+    fn open_workspace_compiled_cache(
+        &self,
+        now_unix: i64,
+        validity: KeyValidity,
+    ) -> Result<CompiledCache, WorkspaceError> {
+        let cache_secret = self.owner_secret("compiled_cache_key")?;
+        let signer = TypedSigner::<CompiledCacheRole>::from_secret_bytes(
+            WORKSPACE_COMPILED_CACHE_ISSUER,
+            cache_secret,
+        )
+        .map_err(kernel)?;
+        let mut trust = RoleTrustStore::<CompiledCacheRole>::new();
+        trust.trust_signer(&signer, validity).map_err(kernel)?;
+        CompiledCache::open(
+            self.root.join("compiled-cache"),
+            signer,
+            trust,
+            WORKSPACE_COMPILED_CACHE_ISSUER,
+            now_unix,
+        )
+        .map_err(kernel)
     }
 }
 
@@ -503,6 +534,44 @@ fn assemble_record(
             bytes: receipt.bytes,
         }),
     }
+}
+
+/// Killable out-of-process compilation for the product send path. Uses the
+/// real `sovereign` binary (not the rustc test harness when tests run under
+/// `cargo test`).
+fn delivery_compile_worker() -> CompileWorker {
+    CompileWorker::new(
+        resolve_sovereign_binary_for_compile_worker(),
+        vec![crate::COMPILE_WORKER_SUBCOMMAND.to_string()],
+    )
+}
+
+fn resolve_sovereign_binary_for_compile_worker() -> std::path::PathBuf {
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_sovereign") {
+        return std::path::PathBuf::from(path);
+    }
+    if let Ok(path) = std::env::var("SOVEREIGN_COMPILE_WORKER_PROGRAM") {
+        return std::path::PathBuf::from(path);
+    }
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("sovereign"));
+    if exe.file_name().is_some_and(|name| name == "sovereign") {
+        return exe;
+    }
+    if let Some(parent) = exe.parent() {
+        let candidate = parent
+            .parent()
+            .map(|grandparent| grandparent.join("sovereign"))
+            .unwrap_or_else(|| parent.join("sovereign"));
+        if candidate.is_file() {
+            return candidate;
+        }
+    }
+    let from_workspace_target =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/sovereign");
+    if from_workspace_target.is_file() {
+        return from_workspace_target;
+    }
+    std::path::PathBuf::from("sovereign")
 }
 
 fn delivery_manifest_json(

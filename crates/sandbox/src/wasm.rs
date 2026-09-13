@@ -57,6 +57,13 @@ const MAX_GUEST_OUTPUT_BYTES: usize = 256 * 1024;
 /// Host ceiling on a guest-reported error string; longer strings truncate.
 const MAX_GUEST_ERROR_BYTES: usize = 4 * 1024;
 
+#[cfg(test)]
+const TINY_VALID_MODULE: &[u8] = &[
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x01, 0x60, 0x00, 0x01, 0x7f, 0x03,
+    0x02, 0x01, 0x00, 0x07, 0x11, 0x01, 0x0d, 0x73, 0x6f, 0x76, 0x65, 0x72, 0x65, 0x69, 0x67, 0x6e,
+    0x5f, 0x72, 0x75, 0x6e, 0x00, 0x00, 0x0a, 0x06, 0x01, 0x04, 0x00, 0x41, 0x07, 0x0b,
+];
+
 /// Host-enforced ceilings. Guest code can request less, never more.
 #[derive(Debug, Clone)]
 pub struct WasmSandboxLimits {
@@ -354,6 +361,9 @@ impl WasmSandbox {
             None => {
                 let module = match &self.compile_worker {
                     Some(worker) => worker.compile(&self.engine, module_bytes)?,
+                    None if self.compiled_cache.is_some() => {
+                        return Err(SandboxError::CompileWorkerRequired);
+                    }
                     None => Module::from_binary(&self.engine, module_bytes)
                         .map_err(|error| SandboxError::InvalidModule(error.to_string()))?,
                 };
@@ -489,6 +499,9 @@ impl WasmSandbox {
                 let component = match &self.compile_worker {
                     Some(worker) => {
                         worker.compile_component(&self.component_engine, component_bytes)?
+                    }
+                    None if self.compiled_cache.is_some() => {
+                        return Err(SandboxError::CompileWorkerRequired);
                     }
                     None => Component::new(&self.component_engine, component_bytes)
                         .map_err(|error| SandboxError::InvalidModule(error.to_string()))?,
@@ -692,4 +705,32 @@ fn deadline_ticks(wall_timeout: Duration, epoch_tick: Duration) -> u64 {
 fn elapsed_ticks(last_tick: Instant, now: Instant, epoch_tick: Duration) -> u64 {
     let ticks = now.duration_since(last_tick).as_nanos() / epoch_tick.as_nanos();
     u64::try_from(ticks.max(1)).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod compile_cache_policy_tests {
+    use super::*;
+    use sovereign_identity::{CompiledCacheRole, KeyValidity, RoleTrustStore, TypedSigner};
+
+    #[test]
+    fn signed_cache_without_worker_fails_closed_on_miss() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = 1_700_000_000;
+        let signer =
+            TypedSigner::<CompiledCacheRole>::from_secret_bytes("cache.test.local", [0x42; 32])
+                .unwrap();
+        let mut trust = RoleTrustStore::<CompiledCacheRole>::new();
+        trust
+            .trust_signer(&signer, KeyValidity::new(now - 60, now + 3_600).unwrap())
+            .unwrap();
+        let cache =
+            CompiledCache::open(dir.path(), signer, trust, "cache.test.local", now).unwrap();
+        let sandbox = WasmSandbox::new(WasmSandboxLimits::default())
+            .unwrap()
+            .with_compiled_cache(cache);
+        assert!(matches!(
+            sandbox.execute(TINY_VALID_MODULE),
+            Err(SandboxError::CompileWorkerRequired)
+        ));
+    }
 }

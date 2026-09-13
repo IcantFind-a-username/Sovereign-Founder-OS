@@ -59,7 +59,10 @@ fn check(results: &mut Vec<serde_json::Value>, key: &str, name: &str, pass: bool
 /// one (`CompileWorker::address_space_enforcement`).
 fn compile_worker() -> CompileWorker {
     let program = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("sovereign"));
-    CompileWorker::new(program, vec![crate::COMPILE_WORKER_SUBCOMMAND.to_string()])
+    CompileWorker::new(
+        program,
+        vec![sovereign_cli::COMPILE_WORKER_SUBCOMMAND.to_string()],
+    )
 }
 
 /// A trusted compiled cache signed and verified under a demo cache key.

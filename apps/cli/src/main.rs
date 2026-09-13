@@ -107,10 +107,6 @@ enum Commands {
     OwnerEffectBroker,
 }
 
-/// The hidden subcommand name the runtime spawns for out-of-process
-/// compilation; kept in one place so the parent and the CLI agree.
-pub const COMPILE_WORKER_SUBCOMMAND: &str = "__compile-worker";
-
 fn default_data_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))

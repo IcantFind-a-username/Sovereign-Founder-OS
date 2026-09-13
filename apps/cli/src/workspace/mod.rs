@@ -60,6 +60,8 @@ mod erp_tests;
 #[cfg(test)]
 mod execution_journal_tests;
 #[cfg(test)]
+mod kernel_exec_tests;
+#[cfg(test)]
 mod privacy_tests;
 #[cfg(test)]
 mod rfc0007_open_tests;
@@ -119,6 +121,7 @@ const MAX_COMPLIANCE_REPORTS: usize = 500;
 const BUILTIN_PUBLISHER_SECRET: [u8; 32] = *b"sovereign-builtin-publisher-01!!";
 const BUILTIN_PUBLISHER_ISSUER: &str = "builtin.sovereign-founder-os";
 const RUNTIME_AUTHORITY_ISSUER: &str = "workspace-runtime.local";
+const WORKSPACE_COMPILED_CACHE_ISSUER: &str = "founder-device.compiled-cache";
 const OWNER_APPROVAL_ISSUER: &str = "founder-owner.local";
 pub const OWNER_ADMISSION_ISSUER: &str = "founder-device.workspace";
 const WORKSPACE_AUDIENCE: &str = "sovereign-runtime";
