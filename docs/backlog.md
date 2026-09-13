@@ -165,6 +165,17 @@ while the controller routes eligible design/review cards to the strong role.
 > kept intact rather than deleted: if the lane resumes, the cards are here. While it is dormant
 > they must not sit at P1, where they made the priority list mean nothing.
 
+> **v0.1 close plan (2026-09-13, planning only).** Coordinator map for closing
+> ROADMAP milestone v0.1: current-state vs exit criteria, dependency order,
+> `v01-NN` tickets, and explicit v0.2+ non-goals. Do not implement from this
+> note. Canonical write-up:
+> [2026-09-13-v0.1-close-plan.md](handoff/reports/2026-09-13-v0.1-close-plan.md).
+> First Composer-ready claims are the existing open rows “Make the gateway's
+> docs and tests state the self-reported trust boundary honestly”, “Stop the
+> CLI claiming locality the gateway cannot enforce”, and “State the v1 entry
+> swap/rollback gap and its freeze decision under T10”. Do not start product
+> 1C0 or the superseded v1 broker until the plan's Wave G0 decision lands.
+
 - [ ] **P3 | `.codex/` | S0-01 — Configure project models and verify real dispatch.** `lane:codex` IN PROGRESS (2026-09-09)
   Definition and done criteria: [S0-01](handoff/codex/cards/S0-01.md).
   Complete only when the linked card's checks and independent acceptance pass.
