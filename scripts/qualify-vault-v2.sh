@@ -17,6 +17,7 @@ fi
 QUALIFY_STATE=running # running | completed | failed
 QUALIFY_STEPS=""
 TARGET_DIR=""
+TARGET_DIR_OWNED=0
 MANIFEST=""
 REVIEWED_HOME=""
 REVIEWED_USERPROFILE=""
@@ -24,10 +25,12 @@ REVIEWED_APPDATA=""
 REVIEWED_LOCALAPPDATA=""
 REVIEWED_SYSTEMROOT=""
 REVIEWED_PATH=""
+REVIEWED_PERL5LIB=""
+REVIEWED_PERLLIB=""
 
 on_exit() {
   local status=$?
-  if [ -n "$TARGET_DIR" ] && [ -d "$TARGET_DIR" ]; then
+  if [ "$TARGET_DIR_OWNED" = 1 ] && [ -n "$TARGET_DIR" ] && [ -d "$TARGET_DIR" ]; then
     rm -rf "$TARGET_DIR"
   fi
   if [ "$QUALIFY_STATE" = "running" ]; then
@@ -375,6 +378,8 @@ run_child() {
     [ -n "$REVIEWED_APPDATA" ] && set -- "$@" APPDATA="$REVIEWED_APPDATA"
     [ -n "$REVIEWED_LOCALAPPDATA" ] && set -- "$@" LOCALAPPDATA="$REVIEWED_LOCALAPPDATA"
     [ -n "$REVIEWED_SYSTEMROOT" ] && set -- "$@" SYSTEMROOT="$REVIEWED_SYSTEMROOT"
+    [ -n "$REVIEWED_PERL5LIB" ] && set -- "$@" PERL5LIB="$REVIEWED_PERL5LIB"
+    [ -n "$REVIEWED_PERLLIB" ] && set -- "$@" PERLLIB="$REVIEWED_PERLLIB"
   fi
   set -- "$@" "${cmd[@]}"
   "$@" >>"$QUALIFY_LOG" 2>&1 || die "$log_label failed (see $QUALIFY_LOG)"
@@ -389,14 +394,26 @@ append_child_path_dir() {
   esac
 }
 
+prepend_child_path_dir() {
+  local dir="$1"
+  [ -n "$dir" ] || return 0
+  case ":$CHILD_PATH:" in
+  *":$dir:"*) ;;
+  *) CHILD_PATH="${CHILD_PATH:+$dir:}$CHILD_PATH" ;;
+  esac
+}
+
+runner_path_is_windows() {
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+  MINGW* | MSYS* | CYGWIN* | Windows_nt | Windows_NT) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
 append_runner_msvc_dirs_to_child_path() {
   [ -n "${SFO_VAULT_PLATFORM_NAMESPACE:-}" ] || return 0
-  local uname_s path_sep entry old_ifs
-  uname_s=$(uname -s 2>/dev/null || echo unknown)
-  case "$uname_s" in
-  MINGW* | MSYS* | CYGWIN* | Windows_nt | Windows_NT) ;;
-  *) return 0 ;;
-  esac
+  runner_path_is_windows || return 0
+  local path_sep entry old_ifs
   path_sep=":"
   case "$REVIEWED_PATH" in
   *\;*) path_sep=";" ;;
@@ -408,18 +425,24 @@ append_runner_msvc_dirs_to_child_path() {
     *" "*) continue ;;
     "") continue ;;
     esac
-    if [ -f "$entry/link.exe" ] || [ -f "$entry/link.EXE" ] ||
-      [ -f "$entry/cl.exe" ] || [ -f "$entry/cl.EXE" ] ||
-      [ -f "$entry/lib.exe" ] || [ -f "$entry/lib.EXE" ]; then
-      append_child_path_dir "$entry"
-    fi
+    case "$entry" in
+    *MSVC* | *\\VC\\Tools* | *"/VC/Tools"* | *"Microsoft Visual Studio"*)
+      if [ -f "$entry/link.exe" ] || [ -f "$entry/link.EXE" ] ||
+        [ -f "$entry/cl.exe" ] || [ -f "$entry/cl.EXE" ] ||
+        [ -f "$entry/lib.exe" ] || [ -f "$entry/lib.EXE" ]; then
+        prepend_child_path_dir "$entry"
+      fi
+      ;;
+    esac
   done
   IFS="$old_ifs"
 }
 
 build_child_path() {
   CHILD_PATH=""
-  local dir
+  append_runner_msvc_dirs_to_child_path
+  local dir uname_s
+  uname_s=$(uname -s 2>/dev/null || echo unknown)
   for dir in \
     "${ABS_CARGO%/*}" \
     "${ABS_RUSTC%/*}" \
@@ -428,10 +451,14 @@ build_child_path() {
     "${ABS_MAKE%/*}"; do
     append_child_path_dir "$dir"
   done
-  if [ -d /usr/bin ]; then
-    append_child_path_dir /usr/bin
-  fi
-  append_runner_msvc_dirs_to_child_path
+  case "$uname_s" in
+  MINGW* | MSYS* | CYGWIN* | Windows_nt | Windows_NT) ;;
+  *)
+    if [ -d /usr/bin ]; then
+      append_child_path_dir /usr/bin
+    fi
+    ;;
+  esac
 }
 
 run_cargo_child() {
@@ -515,6 +542,8 @@ REVIEWED_APPDATA="${APPDATA:-}"
 REVIEWED_LOCALAPPDATA="${LOCALAPPDATA:-}"
 REVIEWED_SYSTEMROOT="${SYSTEMROOT:-}"
 REVIEWED_PATH="${PATH:-}"
+REVIEWED_PERL5LIB="${PERL5LIB:-}"
+REVIEWED_PERLLIB="${PERLLIB:-}"
 
 REVIEWED_CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
 if [ -n "${RUSTUP_HOME:-}" ]; then
@@ -530,7 +559,13 @@ build_child_path
 
 FRESH_HOME=$(mktemp -d "${TMPDIR:-/tmp}/sovereign-qualify-home.XXXXXX")
 FRESH_TMP=$(mktemp -d "${TMPDIR:-/tmp}/sovereign-qualify-tmp.XXXXXX")
-TARGET_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sovereign-qualify-target.XXXXXX")
+if [ -n "${SFO_QUALIFY_TARGET_DIR:-}" ] && [ -d "$SFO_QUALIFY_TARGET_DIR" ]; then
+  TARGET_DIR="$SFO_QUALIFY_TARGET_DIR"
+  TARGET_DIR_OWNED=0
+else
+  TARGET_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sovereign-qualify-target.XXXXXX")
+  TARGET_DIR_OWNED=1
+fi
 MANIFEST=$(mktemp "${TMPDIR:-/tmp}/sovereign-qualify-manifest.XXXXXX")
 emit_tool_manifest
 

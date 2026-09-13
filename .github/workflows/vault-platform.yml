@@ -58,5 +58,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@1a3a6d54512beeaffd394f8d516ca16f2c506a20 # 1.97.0
       - name: Acquire locked dependencies
         run: cargo fetch --locked
+      - name: Prewarm engine build (vendored OpenSSL; reused by qualification child)
+        shell: bash
+        run: >-
+          cargo build -p sovereign-vault-v2-engine --features platform-qualifier
+          --locked
       - name: Native store qualification
-        run: bash ./scripts/run-vault-platform-qualifier.sh x86_64-pc-windows-msvc
+        shell: bash
+        env:
+          SFO_QUALIFY_TARGET_DIR: ${{ github.workspace }}/target
+        run: ./scripts/run-vault-platform-qualifier.sh x86_64-pc-windows-msvc
