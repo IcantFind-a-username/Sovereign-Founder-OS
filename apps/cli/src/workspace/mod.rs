@@ -49,6 +49,8 @@ mod verify;
 #[cfg(test)]
 mod compliance_tests;
 #[cfg(test)]
+mod execution_journal_tests;
+#[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
 mod crew_tests;
@@ -77,6 +79,7 @@ pub use verify::verify_export;
 
 use std::path::PathBuf;
 
+use sovereign_execution::RecoveredExecution;
 use sovereign_identity::DeviceIdentity;
 use sovereign_policy::PolicyEngine;
 
@@ -116,4 +119,6 @@ pub struct Store {
     root: PathBuf,
     device: DeviceIdentity,
     policy: PolicyEngine,
+    /// Snapshot from [`ExecutionJournal::recover`] at open; never triggers replay.
+    execution_recovery: Vec<RecoveredExecution>,
 }
