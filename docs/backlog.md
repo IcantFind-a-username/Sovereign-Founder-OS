@@ -1045,7 +1045,7 @@ while the controller routes eligible design/review cards to the strong role.
   env var is absent. Split `tests.rs` first if the addition would cross the
   file-size limit.
 
-- [ ] **P3 | `apps/cli/src/workspace/` | Race two real processes over one delivery.**
+- [x] **P3 | `apps/cli/src/workspace/` | Race two real processes over one delivery.** Landed 2026-09-13 (`two_processes_deciding_the_same_delivery_produce_exactly_one_effect`).
   Blocked on the subprocess-kill entry above (reuses its worker pattern).
   Two respawned workers attempt `decide` on the same seeded delivery against
   the same root; assert exactly one `.eml` results, the loser fails closed

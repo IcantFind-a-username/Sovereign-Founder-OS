@@ -39,6 +39,7 @@ mod kernel_exec;
 mod model_config;
 mod ops;
 mod privacy_ops;
+mod process_lock;
 mod reporting;
 mod send_workflow;
 mod store;
@@ -62,6 +63,8 @@ mod execution_journal_tests;
 mod privacy_tests;
 #[cfg(test)]
 mod rfc0007_open_tests;
+#[cfg(test)]
+mod send_concurrency_tests;
 #[cfg(test)]
 mod send_sigkill_tests;
 #[cfg(test)]
