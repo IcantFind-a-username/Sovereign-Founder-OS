@@ -31,6 +31,13 @@ const SANDBOX_CHECK_MODULE: &[u8] = &[
 #[derive(Parser)]
 #[command(name = "sovereign", about = "Sovereign Runtime CLI", version)]
 struct Cli {
+    /// Store vault, ledger, workspace, and artifacts under this directory
+    /// instead of the per-user default (`dirs::data_local_dir()` /
+    /// `sovereign-founder-os`). Developer Preview: for clean installs,
+    /// tests, and demos — not a production deployment switch.
+    #[arg(long, global = true)]
+    root: Option<PathBuf>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -103,16 +110,36 @@ enum Commands {
 /// compilation; kept in one place so the parent and the CLI agree.
 pub const COMPILE_WORKER_SUBCOMMAND: &str = "__compile-worker";
 
-fn data_dir() -> PathBuf {
+fn default_data_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("sovereign-founder-os")
 }
 
+/// Resolve the workspace data root from an optional `--root` override.
+pub(crate) fn resolve_data_root(root: Option<&std::path::Path>) -> Result<PathBuf, String> {
+    match root {
+        Some(path) => {
+            if path.exists() && !path.is_dir() {
+                return Err(format!(
+                    "--root must be a directory, not a file: {}",
+                    path.display()
+                ));
+            }
+            Ok(path.to_path_buf())
+        }
+        None => Ok(default_data_dir()),
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+    let data_root =
+        resolve_data_root(cli.root.as_deref()).map_err(|message| -> Box<dyn std::error::Error> {
+            message.into()
+        })?;
     match cli.command {
-        Commands::Init => cmd_init()?,
+        Commands::Init => cmd_init(&data_root)?,
         #[cfg(feature = "owner-effect-fixture")]
         Commands::OwnerEffectBroker => {
             // Print the sentence, not the type name: `Box<dyn Error>` from
@@ -129,20 +156,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("{error}");
             std::process::exit(1);
         }
-        Commands::Demo { fast } => demo::run(fast, data_dir())?,
+        Commands::Demo { fast } => demo::run(fast, data_root)?,
         Commands::SandboxCheck => cmd_sandbox_check()?,
-        Commands::Status => cmd_status()?,
+        Commands::Status => cmd_status(&data_root)?,
         Commands::Ui {
             port,
             no_open,
             supervised,
-        } => ui::run(port, data_dir(), !no_open, supervised)?,
+        } => ui::run(port, data_root, !no_open, supervised)?,
         Commands::Playground { port } => sovereign_consultant_playground::run(port)?,
         Commands::BusinessDemo { port } => business_demo::run(port)?,
-        Commands::ModelCheck => cmd_model_check(),
-        Commands::WorkflowDemo => cmd_workflow_demo()?,
+        Commands::ModelCheck => cmd_model_check(&data_root),
+        Commands::WorkflowDemo => cmd_workflow_demo(&data_root)?,
         Commands::VerifyExport { path } => cmd_verify_export(&path)?,
-        Commands::Integrity => cmd_integrity()?,
+        Commands::Integrity => cmd_integrity(&data_root)?,
         Commands::CompileWorker => {
             let code =
                 sovereign_sandbox::run_compile_worker(std::io::stdin().lock(), std::io::stdout());
@@ -152,8 +179,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn cmd_integrity() -> Result<(), Box<dyn std::error::Error>> {
-    let store = workspace::Store::open(&data_dir())?;
+fn cmd_integrity(data_root: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    let store = workspace::Store::open(data_root)?;
     let report = store.integrity_check()?;
 
     let check = |ok: bool| if ok { "PASS" } else { "FAIL" };
@@ -243,7 +270,7 @@ fn cmd_verify_export(path: &std::path::Path) -> Result<(), Box<dyn std::error::E
     }
 }
 
-fn cmd_workflow_demo() -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_workflow_demo(data_root: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     use sovereign_workflow::{StepContext, WorkflowRunner, WorkflowStep};
 
     struct NamedStep {
@@ -267,7 +294,7 @@ fn cmd_workflow_demo() -> Result<(), Box<dyn std::error::Error>> {
         Box::new(NamedStep { name, crash })
     }
 
-    let dir = data_dir().join("workflow-demo");
+    let dir = data_root.join("workflow-demo");
     let _ = std::fs::remove_dir_all(&dir);
     let names = [
         "generate_offer",
@@ -302,7 +329,7 @@ fn cmd_workflow_demo() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn cmd_model_check() {
+fn cmd_model_check(data_root: &std::path::Path) {
     use sovereign_model::{DeterministicProvider, Health, ModelGateway, ModelRequest};
 
     println!("Model gateway · provider self-reports Local; labels are not verified");
@@ -361,7 +388,7 @@ fn cmd_model_check() {
     // health, so "is my local model connected?" has a command-line answer
     // that never claims more than it probed.
     println!("\n== Configured providers on this device ==");
-    match workspace::provider_status(&data_dir()) {
+    match workspace::provider_status(data_root) {
         Ok(providers) => {
             for provider in providers {
                 println!(
@@ -429,11 +456,10 @@ fn cmd_sandbox_check() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
-    let root = data_dir();
-    std::fs::create_dir_all(&root)?;
+fn cmd_init(data_root: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    std::fs::create_dir_all(data_root)?;
 
-    let device_path = root.join("device.json");
+    let device_path = data_root.join("device.json");
     let device = if !device_path.exists() {
         let device = DeviceIdentity::generate();
         device.save(&device_path)?;
@@ -445,21 +471,21 @@ fn cmd_init() -> Result<(), Box<dyn std::error::Error>> {
         device
     };
 
-    let vault = Vault::init(root.join("vault"))?;
+    let vault = Vault::init(data_root.join("vault"))?;
     println!("vault ready: {} entries", vault.list().len());
 
-    let ledger_path = root.join("ledger.json");
+    let ledger_path = data_root.join("ledger.json");
     if !ledger_path.exists() {
         let ledger = AuditLedger::new();
         ledger.save(&ledger_path, &device)?;
     }
     println!("ledger ready: {}", ledger_path.display());
-    println!("data directory: {}", root.display());
+    println!("data directory: {}", data_root.display());
     Ok(())
 }
 
-fn cmd_status() -> Result<(), Box<dyn std::error::Error>> {
-    let root = data_dir();
+fn cmd_status(data_root: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    let root = data_root;
     let vault = Vault::init(root.join("vault"))?;
     println!("vault entries:");
     for name in vault.list() {

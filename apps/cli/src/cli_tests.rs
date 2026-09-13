@@ -1,5 +1,7 @@
-use super::{Cli, Commands};
+use super::{resolve_data_root, Cli, Commands};
 use clap::{error::ErrorKind, CommandFactory, Parser};
+use std::fs;
+use std::path::Path;
 
 #[test]
 fn playground_clap_port_and_option_contract() {
@@ -19,7 +21,7 @@ fn playground_clap_port_and_option_contract() {
         (&["sovereign", "playground", "--port", "abc"][..], None),
         (&["sovereign", "playground", "--port"][..], None),
         (&["sovereign", "playground", "--unknown"][..], None),
-        (&["sovereign", "playground", "--root", "/tmp"][..], None),
+        (&["sovereign", "playground", "--root", "/tmp"][..], Some(7788)),
         (&["sovereign", "playground", "--no-open"][..], None),
         (&["sovereign", "playground", "extra"][..], None),
     ];
@@ -75,17 +77,32 @@ fn ui_clap_and_dispatch_remain_compatible() {
         "Ui {\n        /// Port to bind on loopback\n        #[arg(long, default_value_t = 7787)]\n        port: u16,\n        /// Do not open the browser automatically\n        #[arg(long)]\n        no_open: bool,\n        /// Exit when whoever launched this closes its stdin. The desktop app\n        /// uses it so the runtime can never outlive the window that owns it.\n        #[arg(long)]\n        supervised: bool,\n    }"
     ));
     assert!(source.contains(
-        "Commands::Ui {\n            port,\n            no_open,\n            supervised,\n        } => ui::run(port, data_dir(), !no_open, supervised)?,"
+        "Commands::Ui {\n            port,\n            no_open,\n            supervised,\n        } => ui::run(port, data_root, !no_open, supervised)?,"
     ));
     assert!(source
         .contains("Commands::Playground { port } => sovereign_consultant_playground::run(port)?,"));
     assert!(!source.contains("Playground { port, "));
-    match Cli::try_parse_from(["sovereign", "ui"]).unwrap().command {
-        Commands::Ui {
-            port,
-            no_open,
-            supervised,
+    match Cli::try_parse_from(["sovereign", "ui"]).unwrap() {
+        Cli {
+            root: None,
+            command: Commands::Ui {
+                port,
+                no_open,
+                supervised,
+            },
         } => assert_eq!((port, no_open, supervised), (7787, false, false)),
+        _ => panic!("parsed a different command"),
+    }
+    match Cli::try_parse_from(["sovereign", "--root", "/tmp/isolated", "ui"])
+        .unwrap()
+    {
+        Cli {
+            root,
+            command: Commands::Ui { port, .. },
+        } => {
+            assert_eq!(root.as_deref(), Some(Path::new("/tmp/isolated")));
+            assert_eq!(port, 7787);
+        }
         _ => panic!("parsed a different command"),
     }
     match Cli::try_parse_from([
@@ -97,13 +114,32 @@ fn ui_clap_and_dispatch_remain_compatible() {
         "--supervised",
     ])
     .unwrap()
-    .command
     {
-        Commands::Ui {
-            port,
-            no_open,
-            supervised,
+        Cli {
+            root: None,
+            command: Commands::Ui {
+                port,
+                no_open,
+                supervised,
+            },
         } => assert_eq!((port, no_open, supervised), (0, true, true)),
         _ => panic!("parsed a different command"),
     }
+}
+
+#[test]
+fn resolve_data_root_rejects_file_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("not-a-dir");
+    fs::write(&file, b"x").unwrap();
+    let err = resolve_data_root(Some(&file)).unwrap_err();
+    assert!(err.contains("--root must be a directory"));
+}
+
+#[test]
+fn resolve_data_root_accepts_missing_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let nested = dir.path().join("fresh-root");
+    assert!(!nested.exists());
+    assert_eq!(resolve_data_root(Some(&nested)).unwrap(), nested);
 }

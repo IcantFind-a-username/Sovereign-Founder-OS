@@ -6,8 +6,8 @@
 //! on an ephemeral loopback port against a throwaway state directory and
 //! speaks HTTP to it, so a test can assert what the server actually accepts.
 //!
-//! State is redirected by `HOME`/`XDG_DATA_HOME` because `sovereign ui` has no
-//! `--root` flag yet (tracked in the backlog); `dirs::data_local_dir()` follows
+//! State is redirected by `HOME`/`XDG_DATA_HOME` when tests do not pass `--root`;
+//! `dirs::data_local_dir()` follows
 //! them on both macOS and Linux. A test must never touch the owner's real data.
 
 use std::io::{BufRead, BufReader, Read, Write};
