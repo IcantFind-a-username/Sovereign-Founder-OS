@@ -101,8 +101,10 @@ impl Store {
     ///
     /// Providers come from the device's `model.json` (an Experimental Ollama
     /// adapter over loopback) with deterministic stand-ins as fallback. The
-    /// gateway gives them health-aware failover and a data-disclosure record;
-    /// Red data would never be routed to a non-local provider.
+    /// gateway gives them health-aware failover and a data-disclosure record.
+    /// Only Red is skipped for non-local providers; Amber may reach cloud.
+    /// `data_class` is caller-declared and provider locality is self-reported
+    /// — labels are not verified.
     pub fn draft_assistant(
         &self,
         customer_id: Uuid,
@@ -124,8 +126,9 @@ impl Store {
             .complete(&ModelRequest {
                 task: "draft_outreach".into(),
                 prompt: note,
-                // Business outreach about a named customer is Amber; it stays
-                // local here, and would never be routed to a cloud provider.
+                // Caller labels this Amber (named-customer business data). The
+                // gateway may route to any healthy provider; disclosure records
+                // provider self-reported trust — labels are not verified.
                 data_class: DataClass::Amber,
                 max_output_chars: 8192,
             })

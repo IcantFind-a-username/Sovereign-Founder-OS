@@ -1112,7 +1112,7 @@ while the controller routes eligible design/review cards to the strong role.
   rollback limit); and `cargo test -p sovereign-cli` passes. The open-time
   check and the two exact test names are pinned by RFC 0007.
 
-- [ ] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.**
+- [x] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.** (claimed v01-01)
   v0.1 "correct stale UI/docs claims" (ROADMAP.md:182). The crate doc claims
   "Red data never leaves the device" (src/lib.rs:14-16), but `data_class` is
   caller-declared (:52-60), provider trust is self-reported (:118-123), and
@@ -1129,7 +1129,7 @@ while the controller routes eligible design/review cards to the strong role.
   if this test starts failing, the RFC 0004 boundary landed and the test must
   be inverted, not deleted. `cargo test -p sovereign-model` passes.
 
-- [ ] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.**
+- [x] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.** v01-02 · claimed 2026-09-13.
   `model-check` prints "Red data stays local" (main.rs:295), and
   `draft_assistant` carries a comment that Amber "would never be routed to a
   cloud provider" (ops.rs:122-123) — false: Amber routes to cloud by design

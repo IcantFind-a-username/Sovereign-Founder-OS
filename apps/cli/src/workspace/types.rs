@@ -223,7 +223,8 @@ pub struct DraftSuggestion {
 /// A durable, owner-visible record of one time a model provider was given
 /// customer data. The product's promise is sovereignty over that data, so the
 /// founder gets a plain-language log of exactly what happened: which provider,
-/// how much it trusts the machine it ran on, whether the data stayed local, and
+/// how much it self-reports trusting its host (unverified), whether it
+/// self-reported staying local (`stayed_local`), and
 /// which providers were skipped on the way there. This mirrors the signed
 /// `model.drafted` audit event, but keeps the human-readable detail (the event
 /// stores only a hash of it) so the log is legible without the export tooling.
@@ -235,7 +236,7 @@ pub struct ModelDisclosure {
     pub task: String,
     pub provider_id: String,
     pub provider_trust: String,
-    /// True when the provider ran locally and the data never left the machine.
+    /// True when the provider self-reports local trust; not verified by the gateway.
     pub stayed_local: bool,
     pub data_class: String,
     pub output_chars: usize,
