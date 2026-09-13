@@ -50,7 +50,7 @@ impl NativeDeviceStore {
         parse_device_kek_record(secret)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "platform-qualifier"))]
     pub(crate) fn set_device_kek(&self, kek: &DeviceKek) -> Result<(), DeviceStoreError> {
         let mut record = Vec::with_capacity(DEVICE_KEK_RECORD_LEN);
         record.extend_from_slice(DEVICE_KEK_PREFIX);
@@ -59,6 +59,32 @@ impl NativeDeviceStore {
         record.zeroize();
         Ok(())
     }
+
+    /// Platform qualification only — never used on a product enrollment path.
+    #[cfg(feature = "platform-qualifier")]
+    pub(crate) fn delete_device_kek(&self) -> Result<(), DeviceStoreError> {
+        qualification_namespace_present()?;
+        self.entry.delete_credential().map_err(map_set_error)
+    }
+}
+
+#[cfg(feature = "platform-qualifier")]
+pub(crate) fn open_qualification_store(
+    workspace_id: &ProtocolId,
+    protector_id: &ProtocolId,
+) -> Result<NativeDeviceStore, DeviceStoreError> {
+    qualification_namespace_present()?;
+    NativeDeviceStore::open(workspace_id, protector_id)
+}
+
+#[cfg(feature = "platform-qualifier")]
+fn qualification_namespace_present() -> Result<(), DeviceStoreError> {
+    let namespace = std::env::var("SFO_VAULT_PLATFORM_NAMESPACE")
+        .map_err(|_| DeviceStoreError::DeviceStoreConfigurationInvalid)?;
+    if !namespace.starts_with("sfo-ci:") {
+        return Err(DeviceStoreError::DeviceStoreConfigurationInvalid);
+    }
+    Ok(())
 }
 
 /// In-memory injected store for unit tests (crate-private).
@@ -184,5 +210,64 @@ mod tests {
         let store = TestOnlyDeviceStore::with_kek(&kek);
         let loaded = store.get_device_kek().expect("load");
         assert_eq!(loaded.expose(), kek.expose());
+    }
+}
+
+#[cfg(all(test, feature = "platform-qualifier"))]
+mod platform_qualification {
+    use super::*;
+    use crate::engine::wrappers::ProtocolId;
+
+    fn random_protocol_id() -> ProtocolId {
+        let mut id = [0u8; 32];
+        getrandom::fill(&mut id).expect("rng");
+        id
+    }
+
+    #[test]
+    fn invalid_namespace_prefix_is_rejected() {
+        let saved = std::env::var("SFO_VAULT_PLATFORM_NAMESPACE").ok();
+        std::env::set_var("SFO_VAULT_PLATFORM_NAMESPACE", "not-sfo-ci");
+        let workspace = random_protocol_id();
+        let protector = random_protocol_id();
+        assert!(matches!(
+            open_qualification_store(&workspace, &protector),
+            Err(DeviceStoreError::DeviceStoreConfigurationInvalid)
+        ));
+        if let Some(value) = saved {
+            std::env::set_var("SFO_VAULT_PLATFORM_NAMESPACE", value);
+        }
+    }
+
+    #[test]
+    fn native_store_set_get_delete_roundtrip() {
+        let namespace = std::env::var("SFO_VAULT_PLATFORM_NAMESPACE")
+            .expect("CI must set SFO_VAULT_PLATFORM_NAMESPACE");
+        assert!(
+            namespace.starts_with("sfo-ci:"),
+            "namespace must be sfo-ci:<run>:<attempt>"
+        );
+        let workspace = random_protocol_id();
+        let protector = random_protocol_id();
+        let store = open_qualification_store(&workspace, &protector).expect("open native store");
+        let kek = DeviceKek::from_bytes([0x42; 32]);
+        store.set_device_kek(&kek).expect("set_secret");
+        let loaded = store.get_device_kek().expect("get_secret");
+        assert_eq!(loaded.expose(), kek.expose());
+        store.delete_device_kek().expect("delete_credential");
+        assert!(matches!(
+            store.get_device_kek(),
+            Err(DeviceStoreError::DeviceKeyMissing)
+        ));
+    }
+
+    #[test]
+    fn admitted_target_env_matches_plan_contract() {
+        let admitted = std::env::var("SFO_VAULT_PLATFORM_ADMITTED_TARGET")
+            .expect("workflow must set SFO_VAULT_PLATFORM_ADMITTED_TARGET");
+        match admitted.as_str() {
+            "x86_64-unknown-linux-gnu" | "aarch64-apple-darwin" | "x86_64-pc-windows-msvc" => {}
+            other => panic!("unexpected admitted triple: {other}"),
+        }
     }
 }
