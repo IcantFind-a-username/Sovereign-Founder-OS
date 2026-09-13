@@ -51,6 +51,7 @@ uuid = { workspace = true }
 wat = "1"
 
 [dev-dependencies]
+sovereign-fault-testing = { path = "../../crates/fault-testing" }
 tempfile = "3"
 httparse = { version = "=1.10.1", default-features = false }
 
