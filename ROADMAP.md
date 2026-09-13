@@ -48,7 +48,7 @@ security gates, labelled accordingly; it claims none of those gates.
 | --- | --- | --- |
 | **Today** | Business tiles (leads, projects, tasks, overdue follow-ups, receivables), the AI team's pending proposals with the exact change approval applies, work suggestions, deterministic guidance, send approvals, evidence rollups | A first/open GET may initialize the co-located device/Vault key files; not an authenticated, side-effect-free read |
 | **Company / Customers / Documents** | Editable profile with registration facts; leads and customers with stage, discovery notes, projects and dated tasks, follow-ups, recorded acceptance, signed timeline; editable drafts with revisions; signed send approval to a local `.eml`; receivables with founder-recorded payments; plaintext export | No network send, no restore, no encrypted backup; payments are founder attestations |
-| **Team** | Six hireable AI employees that only propose; approval applies exactly the recorded change under policy with signed evidence; optional loopback Ollama model with validated output, deterministic templates otherwise | No tools, no autonomy, no cloud model; the Ollama process is routed to, not confined |
+| **Team** | Six hireable AI employees that only propose; approval applies exactly the recorded change under policy with signed evidence; optional loopback Ollama model with validated output, deterministic templates otherwise | No tools, no autonomy, no cloud model; the Ollama process is routed to, not confined. Script-measured live-model behavior is **Current** only within the bounds in [Live local model verification](#live-local-model-verification) |
 | **Compliance** | Singapore demo rule pack with a cited source per rule, deterministic checks over recorded facts, keyword rule search, reports bound to a facts digest | Unreviewed demo pack, Singapore only, never a "compliant" verdict; not legal or tax advice |
 | **Security Center** | Identity/vault/audit/plugin/disclosure facts, state reconciliation, live attack gauntlet | Reconciliation checks selected event presence, not every workspace value |
 
@@ -57,6 +57,35 @@ audit chain. It cannot yet authenticate every workspace value or restore the
 installation. Export excludes keys, artifacts, outbox files, authority records,
 journals, and workflow checkpoints. The loopback server has no authenticated
 owner session.
+
+### Live local model verification
+
+**Status:** **Current** within the stated bounds below. This is evidence for
+the Founder MVP Team surface, not satisfaction of v0.2 exit criteria.
+
+**Evidence:** [Live verification against a real local model](docs/handoff/reports/2026-09-11-live-model-verification.md)
+(2026-09-11; base `b0ada96`, transport fix #94).
+
+**What was measured:** On one founder machine (`qwen2.5:7b` via Ollama 0.33.3
+over loopback), each of the six AI employee roles ran five times per language
+against a fixed workspace with identical facts. Proposal validation rates went
+from 27/30 to 30/30 (English) and 27/30 to 29/30 (Chinese) after one chunked
+HTTP transport fix and two prompt/parsing fixes. When the model returned
+output the typed guards could not verify, proposals fell back to deterministic
+templates with disclosure — including every failure captured in that report.
+
+**Stated bounds (do not over-read):**
+
+- Script/protocol verification on one model and one machine — not the
+  five-consultant usability study (that still needs five people; see backlog).
+- Measures output *validity* (shape and field guards), not proposal *quality*
+  or fitness for a real customer.
+- No other models, hosts, or ongoing regression harness are claimed.
+- Ollama remains a separate loopback process this product routes to; it is
+  **not** sandboxed, capability-confined, or digest-bound as v0.2 requires.
+- This does **not** implement or prove RFC 0004's product boundary, `Local
+  Only` zero egress, or compiler-owned public projection — those stay
+  **Target** on the v0.2 milestone.
 
 ### Experimental Trust Layer slice
 
@@ -187,8 +216,11 @@ progress by itself. Every milestone must therefore:
 inspect evidence, export supported state, and verify the export format and
 signed audit chain offline.
 
-**Remaining work:** correct stale UI/docs claims; validate the consultant
-persona and first private-AI tasks; mandate isolated compilation/cache on the
+**Remaining work:** correct stale UI/docs claims; finish consultant-persona
+validation (the five-consultant usability half — the script-measured live
+model half is **Current** within bounds per
+[live model verification](docs/handoff/reports/2026-09-11-live-model-verification.md));
+mandate isolated compilation/cache on the
 product path; honestly label the Experimental app-signed outbox and retain
 fixture/mechanism evidence for 1C0 and exact-effect building blocks (product
 1C0 admission waits for v0.2); bind recipient/content/policy/expiry

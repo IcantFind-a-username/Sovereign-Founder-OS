@@ -1599,9 +1599,18 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 - [x] **P1 | `apps/cli/src/workspace/` | Singapore demo rule pack, keyword retrieval, deterministic compliance checks, reports.** Landed 2026-09-10 (`compliance*`).
 - [x] **P1 | `apps/cli/assets/`, `apps/cli/src/ui_mvp.rs` | Seven-tab bilingual MVP pages.** Landed 2026-09-10; verified by hand in the in-app browser.
 
+- [x] **P2 | `docs/` | v01-32 — Record live private-AI script verification as Current-within-bound.**
+  Landed 2026-09-13: `ROADMAP.md` adds [Live local model verification](../ROADMAP.md#live-local-model-verification)
+  with explicit limits and a link to
+  `docs/handoff/reports/2026-09-11-live-model-verification.md`; `docs/INDEX.md`
+  points readers at the same evidence. No v0.2 confinement, RFC 0004 product
+  boundary, or Local Only zero-egress claims.
+
 - [ ] **P1 | `docs/` | The five-consultant usability protocol on the MVP.**
   The model half of this item is done and reported
-  (`docs/handoff/reports/2026-09-11-live-model-verification.md`, 2026-09-11):
+  (`docs/handoff/reports/2026-09-11-live-model-verification.md`, 2026-09-11);
+  roadmap status is **Current** within the bounds in
+  [ROADMAP.md](../ROADMAP.md#live-local-model-verification) (v01-32, 2026-09-13):
   `qwen2.5:7b` through Ollama, every role five times per language against
   fixed facts, 27/30 → 30/30 (en) and 27/30 → 29/30 (zh) after one transport
   fix (#94) and two prompt/parsing fixes. What remains needs five people, not
