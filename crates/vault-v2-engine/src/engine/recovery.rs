@@ -3,6 +3,7 @@
 use crate::engine::key_slots::{
     parse_vault_slots, AdmissionCounters, VaultSlotsRecord,
 };
+use crate::engine::recovery_authorizer;
 use crate::engine::platform::{DeviceStoreError, NativeDeviceStore};
 use crate::engine::process::CryptoProcessOwner;
 use crate::engine::secret::DbKey;
@@ -190,7 +191,8 @@ pub(crate) fn unlock_recovery_read_only(
     let dbk = DbKey::from_bytes(dbk_bytes);
     let connection = open_sqlcipher(owner, db_path, &dbk, ConnectionMode::ReadOnlyRecovery)
         .map_err(VaultOpenError::Database)?;
-    harden_recovery_connection(&connection).map_err(|_| VaultOpenError::Crypto)?;
+    recovery_authorizer::harden_recovery_connection(connection.rusqlite_connection())
+        .map_err(|_| VaultOpenError::Crypto)?;
 
     // Drop recovery secrets before returning the session.
     drop(recovery_kek);
@@ -202,12 +204,17 @@ pub(crate) fn unlock_recovery_read_only(
     })
 }
 
-fn harden_recovery_connection(connection: &HardenedConnection) -> Result<(), RecoveryFailed> {
-    connection
-        .rusqlite_connection()
-        .pragma_update(None, "query_only", true)
-        .map_err(|_| RecoveryFailed)?;
-    Ok(())
+/// Derive PWK for test fixtures (same path as production recovery unlock).
+pub(crate) fn fixture_derive_pwk(password: &[u8], salt: &[u8; 16]) -> Result<Pwk, RecoveryFailed> {
+    let mut workspace = ArgonWorkspace::new()?;
+    let pwk = derive_pwk(password, salt, &mut workspace)?;
+    workspace.0 .0.zeroize();
+    Ok(pwk)
+}
+
+#[cfg(test)]
+pub(crate) fn derive_pwk_for_tests(password: &[u8], salt: &[u8; 16]) -> Result<Pwk, RecoveryFailed> {
+    fixture_derive_pwk(password, salt)
 }
 
 /// Task 4 consumes this sealed prepared rotation value.
@@ -318,5 +325,42 @@ mod tests {
             &counters,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn recovery_password_unlock_opens_read_only_session_with_golden_fixture() {
+        use crate::engine::key_slots::build_wrapper_golden_v1_slots;
+        use crate::engine::recovery_authorizer::query_only_is_on;
+        use crate::engine::wrapper_golden_v1::GOLDEN_RECOVERY_PASSWORD_V1;
+
+        let (workspace, database, slots, dbk_bytes) = build_wrapper_golden_v1_slots();
+        let dbk = DbKey::from_bytes(dbk_bytes);
+        let (_file, path) = temp_db(owner(), &dbk);
+        let counters = AdmissionCounters::new();
+        let session = unlock_recovery_read_only(
+            owner(),
+            &path,
+            &slots,
+            &workspace,
+            &database,
+            GOLDEN_RECOVERY_PASSWORD_V1,
+            &counters,
+        )
+        .expect("golden password unlock");
+        let conn = session.connection().rusqlite_connection();
+        assert!(session.connection().is_db_readonly().expect("readonly"));
+        assert!(query_only_is_on(conn).expect("query_only"));
+        let names: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_schema")
+            .expect("schema read prepare")
+            .query_map([], |row| row.get(0))
+            .expect("schema read")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("schema rows");
+        assert!(names.is_empty());
+        let (kdf, unwrap, keyring) = counters.snapshot();
+        assert_eq!(keyring, 0);
+        assert_eq!(kdf, 1);
+        assert_eq!(unwrap, 2);
     }
 }

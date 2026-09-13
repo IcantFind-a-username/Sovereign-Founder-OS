@@ -99,3 +99,47 @@ fn the_allowlist_is_closed_and_recorded() {
         "duplicate entries in the allowlist"
     );
 }
+
+#[test]
+fn getrandom_locked_feature_tree_has_no_opt_in_reviewed_features() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("workspace root");
+    let output = std::process::Command::new("cargo")
+        .args([
+            "tree",
+            "-p",
+            "getrandom",
+            "-e",
+            "features",
+            "-p",
+            "sovereign-vault-v2-engine",
+            "--locked",
+        ])
+        .current_dir(workspace)
+        .output()
+        .expect("cargo tree");
+    assert!(
+        output.status.success(),
+        "cargo tree failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let tree = String::from_utf8_lossy(&output.stdout);
+    let forbidden = ["wasm_js", "sys_rng"];
+    for name in forbidden {
+        assert!(
+            !tree.contains(name),
+            "getrandom feature tree must not enable {name}: {tree}"
+        );
+    }
+}
+
+#[test]
+fn rustflags_with_getrandom_custom_backend_is_rejected() {
+    let rejected = rejected_variables(&env(&[(
+        "RUSTFLAGS",
+        "--cfg getrandom_backend=\"linux_getrandom\"",
+    )]));
+    assert_eq!(rejected, vec!["RUSTFLAGS".to_string()]);
+}

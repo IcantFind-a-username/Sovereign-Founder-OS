@@ -299,6 +299,70 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "run manually to refresh wrapper_golden_v1 ciphertext literals"]
+    fn emit_wrapper_golden_v1_ciphertext_literals() {
+        use crate::engine::recovery::derive_pwk_for_tests;
+        use crate::engine::wrapper_golden_v1::{
+            GOLDEN_ARGON_SALT_V1, GOLDEN_DBK_PLAINTEXT_V1, GOLDEN_DEVICE_DBK_NONCE_V1,
+            GOLDEN_DEVICE_KEK_V1, GOLDEN_PWK_KEK_NONCE_V1, GOLDEN_RECOVERY_DBK_NONCE_V1,
+            GOLDEN_RECOVERY_KEK_V1, GOLDEN_RECOVERY_PASSWORD_V1,
+        };
+        fn id(b: u8) -> ProtocolId {
+            [b; 32]
+        }
+        let device_aad = DeviceDbkAad {
+            workspace_id: id(0x01),
+            database_id: id(0x02),
+            protector_record_id: id(0x03),
+            device_wrapper_id: id(0x04),
+            recovery_slot_commitment: id(0x05),
+        };
+        let device = wrap_device_dbk(
+            &DeviceKek::from_bytes(GOLDEN_DEVICE_KEK_V1),
+            &device_aad,
+            &GOLDEN_DBK_PLAINTEXT_V1,
+            &GOLDEN_DEVICE_DBK_NONCE_V1,
+        )
+        .expect("device wrap");
+        let pwk = derive_pwk_for_tests(GOLDEN_RECOVERY_PASSWORD_V1, &GOLDEN_ARGON_SALT_V1)
+            .expect("pwk");
+        let pwk_aad = PwkRecoveryKekAad {
+            workspace_id: id(0x01),
+            database_id: id(0x02),
+            recovery_record_id: id(0x13),
+            recovery_kek_id: id(0x14),
+            argon_salt: GOLDEN_ARGON_SALT_V1,
+        };
+        let pwk_wrap = wrap_recovery_kek_with_pwk(
+            &pwk,
+            &pwk_aad,
+            &GOLDEN_RECOVERY_KEK_V1,
+            &GOLDEN_PWK_KEK_NONCE_V1,
+        )
+        .expect("pwk wrap");
+        let recovery_aad = RecoveryDbkAad {
+            workspace_id: id(0x01),
+            database_id: id(0x02),
+            recovery_record_id: id(0x13),
+            recovery_kek_id: id(0x14),
+            database_role: DATABASE_ROLE_LIVE,
+        };
+        let recovery = wrap_recovery_dbk(
+            &RecoveryKek::from_bytes(GOLDEN_RECOVERY_KEK_V1),
+            &recovery_aad,
+            &GOLDEN_DBK_PLAINTEXT_V1,
+            &GOLDEN_RECOVERY_DBK_NONCE_V1,
+        )
+        .expect("recovery wrap");
+        eprintln!("DEVICE_DBK_AAD={:02x?}", device_aad.to_bytes());
+        eprintln!("PWK_KEK_AAD={:02x?}", pwk_aad.to_bytes());
+        eprintln!("RECOVERY_DBK_AAD={:02x?}", recovery_aad.to_bytes());
+        eprintln!("DEVICE_DBK_CT={:02x?}", device.ciphertext);
+        eprintln!("PWK_KEK_CT={:02x?}", pwk_wrap.ciphertext);
+        eprintln!("RECOVERY_DBK_CT={:02x?}", recovery.ciphertext);
+    }
+
+    #[test]
     fn typed_aad_lengths_match_rfc_golden_profile() {
         let device = DeviceDbkAad {
             workspace_id: fixed_id(0x01),
@@ -441,5 +505,76 @@ mod tests {
         let from_recovery =
             unwrap_recovery_dbk(&rk, &recovery_aad, &recovery_record).expect("ru");
         assert!(dbk_matches_expected(&from_recovery, &dbk));
+    }
+
+    #[test]
+    fn checked_in_wrapper_golden_v1_aad_and_ciphertext_vectors() {
+        use crate::engine::recovery::derive_pwk_for_tests;
+        use crate::engine::wrapper_golden_v1::{
+            DEVICE_DBK_AAD_V1, GOLDEN_ARGON_SALT_V1, GOLDEN_DBK_PLAINTEXT_V1,
+            GOLDEN_DEVICE_DBK_CIPHERTEXT_V1, GOLDEN_DEVICE_DBK_NONCE_V1, GOLDEN_DEVICE_KEK_V1,
+            GOLDEN_PWK_KEK_CIPHERTEXT_V1, GOLDEN_PWK_KEK_NONCE_V1, GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
+            GOLDEN_RECOVERY_DBK_NONCE_V1, GOLDEN_RECOVERY_KEK_V1, GOLDEN_RECOVERY_PASSWORD_V1,
+            PWK_RECOVERY_KEK_AAD_V1, RECOVERY_DBK_AAD_V1,
+        };
+
+        fn id(b: u8) -> ProtocolId {
+            [b; 32]
+        }
+
+        let device_aad = DeviceDbkAad {
+            workspace_id: id(0x01),
+            database_id: id(0x02),
+            protector_record_id: id(0x03),
+            device_wrapper_id: id(0x04),
+            recovery_slot_commitment: id(0x05),
+        };
+        assert_eq!(device_aad.to_bytes(), DEVICE_DBK_AAD_V1);
+
+        let pwk_aad = PwkRecoveryKekAad {
+            workspace_id: id(0x01),
+            database_id: id(0x02),
+            recovery_record_id: id(0x13),
+            recovery_kek_id: id(0x14),
+            argon_salt: GOLDEN_ARGON_SALT_V1,
+        };
+        assert_eq!(pwk_aad.to_bytes(), PWK_RECOVERY_KEK_AAD_V1);
+
+        let recovery_aad = RecoveryDbkAad {
+            workspace_id: id(0x01),
+            database_id: id(0x02),
+            recovery_record_id: id(0x13),
+            recovery_kek_id: id(0x14),
+            database_role: DATABASE_ROLE_LIVE,
+        };
+        assert_eq!(recovery_aad.to_bytes(), RECOVERY_DBK_AAD_V1);
+
+        let device_kek = DeviceKek::from_bytes(GOLDEN_DEVICE_KEK_V1);
+        let device_record = WrappedRecord {
+            nonce: GOLDEN_DEVICE_DBK_NONCE_V1,
+            ciphertext: GOLDEN_DEVICE_DBK_CIPHERTEXT_V1,
+        };
+        let device_dbk =
+            unwrap_device_dbk(&device_kek, &device_aad, &device_record).expect("device golden");
+        assert!(dbk_matches_expected(&device_dbk, &GOLDEN_DBK_PLAINTEXT_V1));
+
+        let pwk = derive_pwk_for_tests(GOLDEN_RECOVERY_PASSWORD_V1, &GOLDEN_ARGON_SALT_V1)
+            .expect("golden pwk");
+        let kek_record = WrappedRecord {
+            nonce: GOLDEN_PWK_KEK_NONCE_V1,
+            ciphertext: GOLDEN_PWK_KEK_CIPHERTEXT_V1,
+        };
+        let recovery_kek_bytes =
+            unwrap_recovery_kek_with_pwk(&pwk, &pwk_aad, &kek_record).expect("pwk golden");
+        assert_eq!(recovery_kek_bytes, GOLDEN_RECOVERY_KEK_V1);
+
+        let recovery_kek = RecoveryKek::from_bytes(recovery_kek_bytes);
+        let recovery_record = WrappedRecord {
+            nonce: GOLDEN_RECOVERY_DBK_NONCE_V1,
+            ciphertext: GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
+        };
+        let recovery_dbk =
+            unwrap_recovery_dbk(&recovery_kek, &recovery_aad, &recovery_record).expect("recovery golden");
+        assert!(dbk_matches_expected(&recovery_dbk, &GOLDEN_DBK_PLAINTEXT_V1));
     }
 }

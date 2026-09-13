@@ -427,10 +427,99 @@ mod test_support {
         );
         serde_json_canonicalizer::to_vec(&serde_json::Value::Object(top)).expect("canonical")
     }
+
+    /// Sidecar bytes for password-recovery E2E using the checked-in v1 golden profile.
+    pub(crate) fn build_wrapper_golden_v1_slots() -> (ProtocolId, ProtocolId, Vec<u8>, [u8; 32]) {
+        use crate::engine::wrapper_golden_v1::{
+            GOLDEN_ARGON_SALT_V1, GOLDEN_DATABASE_ID_V1, GOLDEN_DBK_PLAINTEXT_V1,
+            GOLDEN_DEVICE_DBK_NONCE_V1, GOLDEN_DEVICE_KEK_V1,
+            GOLDEN_PWK_KEK_CIPHERTEXT_V1, GOLDEN_PWK_KEK_NONCE_V1, GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
+            GOLDEN_RECOVERY_DBK_NONCE_V1, GOLDEN_WORKSPACE_ID_V1,
+        };
+        use crate::engine::wrappers::{DeviceDbkAad, DeviceKek, WRAPPED_RECORD_LEN};
+
+        fn rid(b: u8) -> ProtocolId {
+            [b; 32]
+        }
+
+        let recovery = RecoverySubrecord {
+            argon_profile_tag: ARGON_PROFILE_TAG_V1,
+            argon_salt: GOLDEN_ARGON_SALT_V1,
+            recovery_record_id: rid(0x13),
+            recovery_kek_id: rid(0x14),
+            kek_nonce: GOLDEN_PWK_KEK_NONCE_V1,
+            kek_ciphertext: GOLDEN_PWK_KEK_CIPHERTEXT_V1,
+            dbk_nonce: GOLDEN_RECOVERY_DBK_NONCE_V1,
+            dbk_ciphertext: GOLDEN_RECOVERY_DBK_CIPHERTEXT_V1,
+        };
+        let commitment = recovery_slot_commitment(&recovery).expect("commitment");
+
+        let device_aad = DeviceDbkAad {
+            workspace_id: GOLDEN_WORKSPACE_ID_V1,
+            database_id: GOLDEN_DATABASE_ID_V1,
+            protector_record_id: rid(0x03),
+            device_wrapper_id: rid(0x04),
+            recovery_slot_commitment: commitment,
+        };
+        let device_kek = DeviceKek::from_bytes(GOLDEN_DEVICE_KEK_V1);
+        let device_dbk = crate::engine::wrappers::wrap_device_dbk(
+            &device_kek,
+            &device_aad,
+            &GOLDEN_DBK_PLAINTEXT_V1,
+            &GOLDEN_DEVICE_DBK_NONCE_V1,
+        )
+        .expect("device wrap for golden sidecar");
+        assert_eq!(device_dbk.ciphertext.len(), WRAPPED_RECORD_LEN);
+
+        let recovery_value = recovery_subrecord_value(&recovery).expect("recovery value");
+        let mut device_object = serde_json::Map::new();
+        device_object.insert(
+            "dbk_ciphertext".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(device_dbk.ciphertext)),
+        );
+        device_object.insert(
+            "dbk_nonce".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(device_dbk.nonce)),
+        );
+        device_object.insert(
+            "device_wrapper_id".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(rid(0x04))),
+        );
+        device_object.insert(
+            "protector_record_id".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(rid(0x03))),
+        );
+        device_object.insert(
+            "recovery_slot_commitment".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(commitment)),
+        );
+        let mut top = serde_json::Map::new();
+        top.insert(
+            "database_id".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(GOLDEN_DATABASE_ID_V1)),
+        );
+        top.insert("db_key_epoch".into(), serde_json::Value::String("1".into()));
+        top.insert("device".into(), serde_json::Value::Object(device_object));
+        top.insert("format_version".into(), serde_json::Value::String("2".into()));
+        top.insert("recovery".into(), recovery_value);
+        top.insert("suite_version".into(), serde_json::Value::String("1".into()));
+        top.insert(
+            "workspace_id".into(),
+            serde_json::Value::String(URL_SAFE_NO_PAD.encode(GOLDEN_WORKSPACE_ID_V1)),
+        );
+        let bytes =
+            serde_json_canonicalizer::to_vec(&serde_json::Value::Object(top)).expect("canonical");
+        (
+            GOLDEN_WORKSPACE_ID_V1,
+            GOLDEN_DATABASE_ID_V1,
+            bytes,
+            GOLDEN_DBK_PLAINTEXT_V1,
+        )
+    }
 }
 
 #[cfg(test)]
-pub(crate) use test_support::build_test_canonical_slots;
+pub(crate) use test_support::{build_test_canonical_slots, build_wrapper_golden_v1_slots};
 
 #[cfg(test)]
 mod tests {
