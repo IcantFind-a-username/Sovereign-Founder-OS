@@ -305,12 +305,11 @@ fn cmd_workflow_demo() -> Result<(), Box<dyn std::error::Error>> {
 fn cmd_model_check() {
     use sovereign_model::{DeterministicProvider, Health, ModelGateway, ModelRequest};
 
-    println!("Model gateway · raw requests stay on this device");
+    println!("Model gateway · provider self-reports Local; labels are not verified");
     println!("(the built-in providers are deterministic stand-ins, not LLMs)\n");
 
-    // The primary is down and a cloud stand-in sits between the two local
-    // providers. Work continues, and it continues *locally*: losing local
-    // capacity is not a reason to widen who sees the data.
+    // The primary is down and a cloud stand-in sits between two local ones.
+    // Amber may reach the cloud provider; Red skips it and fails over locally.
     let gateway = ModelGateway::new(vec![
         Box::new(DeterministicProvider::local("local-primary", Health::Down)),
         Box::new(DeterministicProvider::cloud(
