@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `engine` in crate `sovereign_vault_v2_engine`
+ --> $DIR/tests/recovery_ui/recovery_read_only.rs:7:46
+  |
+7 |     let _engine = sovereign_vault_v2_engine::engine;
+  |                                              ^^^^^^ not found in `sovereign_vault_v2_engine`

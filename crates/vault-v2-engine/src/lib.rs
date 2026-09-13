@@ -31,6 +31,12 @@
 /// increment.
 pub const VAULT_V2_FORMAT_VERSION: u32 = 1;
 
+/// Wire protocol version for engine IPC (value-free library surface).
+///
+/// Downstream crates may depend on this constant to prove the protocol crate
+/// resolved; the process engine itself is not linked from the library target.
+pub const ENGINE_PROTOCOL_VERSION: u32 = 1;
+
 /// The SQLCipher release the qualified connection profile is pinned to.
 ///
 /// Verified at runtime against the linked library by a later item, not
@@ -58,5 +64,6 @@ mod tests {
         assert_eq!(PINNED_SQLCIPHER_VERSION, "4.14.0");
         assert_eq!(CIPHER_PAGE_SIZE_BYTES, 4096);
         assert_eq!(CIPHER_COMPATIBILITY, 4);
+        assert_eq!(ENGINE_PROTOCOL_VERSION, 1);
     }
 }

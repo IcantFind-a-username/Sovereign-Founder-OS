@@ -287,6 +287,10 @@ pub(crate) fn open_sqlcipher(
 }
 
 impl HardenedConnection {
+    pub(crate) fn rusqlite_connection(&self) -> &rusqlite::Connection {
+        &self.connection
+    }
+
     /// Which crypto provider SQLCipher is actually using on this connection,
     /// and its version — read from the library rather than inferred from the
     /// build features.
