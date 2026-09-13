@@ -1100,7 +1100,7 @@ while the controller routes eligible design/review cards to the strong role.
   save ordering, the accept/reject rules, and the exact test names are pinned
   by RFC 0007 — use them verbatim.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Reject an old-prefix ledger restore at workspace open.**
+- [x] **P2 | `apps/cli/src/workspace/` | Reject an old-prefix ledger restore at workspace open.**
   Blocked on the audit-ledger anchor entry above. Wire the freshness check
   into workspace open (or `integrity_check`, reporting.rs) so a reverted
   ledger is refused with a clear error, never a silent pass. Done when: a test
