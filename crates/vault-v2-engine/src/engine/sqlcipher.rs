@@ -100,9 +100,7 @@ fn apply_cipher_pragmas_before_first_page(
 }
 
 /// Runtime PRAGMAs verified after the first-page probe, before returning.
-fn apply_runtime_pragmas_after_probe(
-    connection: &rusqlite::Connection,
-) -> Result<(), OpenError> {
+fn apply_runtime_pragmas_after_probe(connection: &rusqlite::Connection) -> Result<(), OpenError> {
     connection
         .pragma_update(None, "journal_mode", "DELETE")
         .map_err(|_| OpenError::ProfileNotApplied)?;
@@ -857,9 +855,7 @@ mod tests {
         let as_text: String = connection
             .query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))
             .expect("read a numeric pragma");
-        as_text
-            .parse()
-            .expect("parse a numeric pragma value")
+        as_text.parse().expect("parse a numeric pragma value")
     }
 
     fn pragma_is_on(connection: &rusqlite::Connection, name: &str) -> bool {
@@ -871,7 +867,10 @@ mod tests {
         let as_text: String = connection
             .query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))
             .expect("read a boolean pragma");
-        matches!(as_text.to_ascii_lowercase().as_str(), "1" | "on" | "true" | "yes")
+        matches!(
+            as_text.to_ascii_lowercase().as_str(),
+            "1" | "on" | "true" | "yes"
+        )
     }
 
     /// Every pinned cipher and runtime PRAGMA is read back from the linked
