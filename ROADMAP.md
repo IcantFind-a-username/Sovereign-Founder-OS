@@ -33,7 +33,7 @@ used only for a named exit criterion with evidence.
 ## Current verified state
 
 The repository is a **Developer Preview / pre-release** with no tagged release.
-A fresh `cargo test --workspace --locked -- --list` enumerates 463 Rust tests.
+A fresh `cargo test --workspace --locked -- --list` enumerates 571 Rust tests.
 Formatting, lint, file-size, locked dependency, TypeScript, and release-build
 gates are configured in the repository.
 
