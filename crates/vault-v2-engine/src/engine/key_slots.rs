@@ -330,8 +330,7 @@ fn decode_u16_decimal(value: &serde_json::Value) -> Result<u16, SlotsParseError>
     u16::try_from(parsed).map_err(|_| SlotsParseError)
 }
 
-#[cfg(test)]
-mod test_support {
+mod fixture_support {
     use super::*;
     use crate::engine::wrappers::{
         wrap_device_dbk, wrap_recovery_dbk, wrap_recovery_kek_with_pwk, DeviceDbkAad, DeviceKek,
@@ -534,8 +533,9 @@ mod test_support {
     }
 }
 
+pub(crate) use fixture_support::build_test_canonical_slots;
 #[cfg(test)]
-pub(crate) use test_support::{build_test_canonical_slots, build_wrapper_golden_v1_slots};
+pub(crate) use fixture_support::build_wrapper_golden_v1_slots;
 
 #[cfg(test)]
 mod tests {

@@ -10,6 +10,8 @@
 pub(crate) mod entropy;
 pub(crate) mod ffi;
 pub(crate) mod key_slots;
+pub(crate) mod legacy;
+pub(crate) mod migration;
 pub(crate) mod platform;
 pub(crate) mod process;
 pub(crate) mod recovery;
@@ -17,5 +19,6 @@ pub(crate) mod recovery_authorizer;
 pub(crate) mod schema;
 pub(crate) mod secret;
 pub(crate) mod sqlcipher;
+pub(crate) mod storage;
 pub(crate) mod wrapper_golden_v1;
 pub(crate) mod wrappers;

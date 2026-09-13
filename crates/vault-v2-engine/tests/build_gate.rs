@@ -110,11 +110,9 @@ fn getrandom_locked_feature_tree_has_no_opt_in_reviewed_features() {
         .args([
             "tree",
             "-p",
-            "getrandom",
+            "getrandom@0.4.3",
             "-e",
             "features",
-            "-p",
-            "sovereign-vault-v2-engine",
             "--locked",
         ])
         .current_dir(workspace)
