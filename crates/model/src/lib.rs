@@ -11,9 +11,14 @@
 //!   carries no authority, holds no keys, and callers must never write it into
 //!   authoritative state without independent review. Nothing here touches the
 //!   vault, policy, or capability layers.
-//! - **Red data never leaves the device.** The gateway refuses to route
-//!   Red-classified content to any provider that is not [`ProviderTrust::Local`],
-//!   and records what was disclosed to whom.
+//! - **Confidentiality routing is label-driven and partially self-reported.**
+//!   [`ModelRequest::data_class`] is whatever the caller declares; this crate
+//!   does not inspect prompt contents to verify it. [`ModelProvider::trust`]
+//!   is each provider's own word. The gateway applies deterministic skips
+//!   (including Red-labeled requests to non-[`ProviderTrust::Local`] providers
+//!   that carry a [`LocalVouch`], and raw requests only to vouched locals) and
+//!   records what was disclosed to whom — but it does not cryptographically
+//!   prove class or locality. Closing that gap is RFC 0004 / v0.2 work.
 //!
 //! ## Honest limits
 //!
@@ -620,5 +625,57 @@ mod tests {
             gateway.complete(&request(DataClass::Green)),
             Err(ModelError::NoProviders)
         );
+    }
+
+    /// A vouched stand-in that nonetheless self-reports cloud trust — models the
+    /// case where this crate accepted a provider as local enough to serve raw
+    /// prompts while the provider still labels itself [`ProviderTrust::Cloud`].
+    struct VouchedCloudTrustStandIn {
+        id: String,
+    }
+
+    impl ModelProvider for VouchedCloudTrustStandIn {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn trust(&self) -> ProviderTrust {
+            ProviderTrust::Cloud
+        }
+
+        fn health(&self) -> Health {
+            Health::Healthy
+        }
+
+        fn complete(&self, request: &ModelRequest) -> Result<String, ProviderError> {
+            Ok(request.prompt.clone())
+        }
+
+        fn local_vouch(&self) -> Option<LocalVouch> {
+            Some(LocalVouch::core_reviewed())
+        }
+    }
+
+    #[test]
+    fn the_gateway_trusts_caller_labels_a_mislabeled_prompt_routes_to_cloud() {
+        // The gateway does not read prompt bodies to infer data class. A caller
+        // can label obviously sensitive content Green and, as long as a vouched
+        // provider is eligible, routing follows the label — here onto a provider
+        // that self-reports Cloud trust. If RFC 0004 later verifies class or
+        // blocks this path, this test will fail: invert the assertions then,
+        // do not delete the test.
+        let gateway = ModelGateway::new(vec![Box::new(VouchedCloudTrustStandIn {
+            id: "vouched-cloud".into(),
+        })]);
+        let request = ModelRequest {
+            task: "draft_outreach".into(),
+            prompt: "SSN 123-45-6789 and full patient record for Dr. Tan".into(),
+            data_class: DataClass::Green,
+            max_output_chars: 4096,
+        };
+        let (response, disclosure) = gateway.complete(&request).unwrap();
+        assert_eq!(response.provider_id, "vouched-cloud");
+        assert_eq!(response.provider_trust, ProviderTrust::Cloud);
+        assert_eq!(disclosure.data_class, DataClass::Green);
     }
 }
