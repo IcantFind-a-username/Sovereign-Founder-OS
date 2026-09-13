@@ -577,4 +577,91 @@ mod tests {
         assert_eq!(reopened.list(), ["a", "b"], "the next put reconciles them");
         assert_eq!(reopened.get("b").unwrap(), b"second entry");
     }
+
+    #[test]
+    fn v1_blob_shape_is_frozen() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        let plaintext = b"v1 shape freeze probe";
+        vault.put("probe", plaintext).unwrap();
+
+        let bytes = std::fs::read(dir.path().join("probe.enc")).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let object = value.as_object().expect("v1 blob must be a JSON object");
+        assert_eq!(
+            object.len(),
+            2,
+            "v1 blob must expose exactly nonce_b64 and ciphertext_b64"
+        );
+        assert!(object.contains_key("nonce_b64"));
+        assert!(object.contains_key("ciphertext_b64"));
+
+        let nonce = STANDARD
+            .decode(object["nonce_b64"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(nonce.len(), NONCE_LEN, "AES-GCM nonce is 12 bytes");
+
+        let ciphertext = STANDARD
+            .decode(object["ciphertext_b64"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            ciphertext.len(),
+            plaintext.len() + 16,
+            "ciphertext carries plaintext plus the 16-byte GCM tag"
+        );
+    }
+
+    /// Pins AES-256-GCM, `vault.key` base64 encoding, and the on-disk JSON blob
+    /// layout. Changing any of them breaks this test deliberately.
+    #[test]
+    fn v1_golden_blob_still_decrypts() {
+        const GOLDEN_KEY_B64: &str = "ESIzRFVmd4iZqrvM3e7/ABAgMEBQYHCAkKCwwNDg8AE=";
+        const GOLDEN_ENTRY_ENC: &str = r#"{
+  "nonce_b64": "F6lWSjdLiNbWvwvE",
+  "ciphertext_b64": "xrHyl4KjhOlDPPnwObrtOAJjQZPDptJLjTNojyA51zUhmTk="
+}"#;
+
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("golden");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("vault.key"), GOLDEN_KEY_B64).unwrap();
+        std::fs::write(root.join("entry.enc"), GOLDEN_ENTRY_ENC).unwrap();
+
+        let vault = Vault::init(&root).unwrap();
+        assert_eq!(vault.get("entry").unwrap(), b"golden plaintext v1");
+    }
+
+    /// THREAT_MODEL.md T10 (recorded decision, 2026-08-26): v1 blobs carry no
+    /// associated data, so swapping one entry's ciphertext onto another still
+    /// decrypts cleanly. If this test starts failing, the v1 freeze was broken —
+    /// that requires a recorded decision, not a silent on-disk format change.
+    #[test]
+    fn a_cross_entry_ciphertext_swap_decrypts_cleanly_v1_freeze() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("a", b"plaintext for a").unwrap();
+        vault.put("b", b"plaintext for b").unwrap();
+
+        std::fs::copy(dir.path().join("a.enc"), dir.path().join("b.enc")).unwrap();
+
+        assert_eq!(vault.get("b").unwrap(), b"plaintext for a");
+    }
+
+    /// THREAT_MODEL.md T10 (recorded decision, 2026-08-26): restoring an older
+    /// copy of the same entry's blob still decrypts to the old plaintext. If this
+    /// test starts failing, the v1 freeze was broken — that requires a recorded
+    /// decision, not a silent on-disk format change.
+    #[test]
+    fn an_older_copy_of_the_same_entry_decrypts_cleanly_v1_freeze() {
+        let dir = tempdir().unwrap();
+        let mut vault = Vault::init(dir.path()).unwrap();
+        vault.put("entry", b"first revision").unwrap();
+        let old_blob = std::fs::read(dir.path().join("entry.enc")).unwrap();
+
+        vault.put("entry", b"second revision").unwrap();
+        assert_eq!(vault.get("entry").unwrap(), b"second revision");
+
+        std::fs::write(dir.path().join("entry.enc"), &old_blob).unwrap();
+        assert_eq!(vault.get("entry").unwrap(), b"first revision");
+    }
 }

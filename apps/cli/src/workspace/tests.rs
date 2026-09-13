@@ -644,6 +644,44 @@ fn export_contains_state_and_verified_chain() {
     assert_eq!(export["workspace"]["venture"]["name"], "Acme");
 }
 
+/// Pin the export boundary (v01-05): business data is cleartext JSON and
+/// `verify_export` authenticates only format, device binding, and the audit
+/// chain — not workspace field values. Failure here means the export boundary
+/// changed (e.g. encryption or value binding was added without updating this pin).
+#[test]
+fn export_boundary_plaintext_and_workspace_not_authenticated() {
+    let (_dir, store) = store();
+    store.set_venture("Acme", "Landing pages").unwrap();
+    let workspace = store.add_customer("Dr. Tan", "", "expo").unwrap();
+    let customer_id = workspace.customers[0].id;
+    let workspace = store
+        .create_document(DocumentKind::Invoice, customer_id, Some(250_000), "en")
+        .unwrap();
+    let document_id = workspace.documents[0].id;
+    let workspace = store.request_send(document_id).unwrap();
+    store.decide(workspace.approvals[0].id, true).unwrap();
+
+    let bundle = store.export().unwrap();
+    let export_bytes = serde_json::to_vec(&bundle).expect("export serializes");
+    let export_text = String::from_utf8(export_bytes).expect("export is utf-8 json");
+    assert!(
+        export_text.contains("Dr. Tan"),
+        "export boundary changed: customer name must appear verbatim in cleartext export bytes"
+    );
+
+    let mut tampered = bundle;
+    tampered["workspace"]["customers"][0]["name"] =
+        serde_json::Value::String("ATTACKER RENAMED".into());
+    tampered["workspace"]["documents"][0]["amount_cents"] = serde_json::json!(999_999_999u64);
+
+    let report = verify_export(&tampered).unwrap();
+    assert!(
+        report.ok,
+        "export boundary changed: mutating workspace fields must not fail verify_export today; notes: {:?}",
+        report.notes
+    );
+}
+
 #[test]
 fn draft_assistant_never_touches_authoritative_business_state() {
     let (_dir, store) = store();
