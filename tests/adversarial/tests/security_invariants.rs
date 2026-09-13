@@ -320,3 +320,36 @@ fn path_traversal_is_rejected_before_file_access() {
     }
     assert!(!temp.path().join("outside.enc").exists());
 }
+
+#[test]
+fn vault_v2_closed_schema() {
+    let adversarial_manifest = include_str!("../Cargo.toml");
+    assert!(
+        !adversarial_manifest.contains("sovereign-vault-v2-engine"),
+        "adversarial tests must not link the private v2 engine crate"
+    );
+    let cli_manifest = include_str!("../../../apps/cli/Cargo.toml");
+    assert!(
+        !cli_manifest.contains("sovereign-vault-v2-engine"),
+        "product CLI must not depend on the private v2 engine during Program 1A"
+    );
+    let schema_source = include_str!("../../../crates/vault-v2-engine/src/engine/schema/mod.rs");
+    for forbidden in [
+        "sovereign_authority",
+        "sovereign_identity",
+        "owner_admission_key",
+        "owner_approval_key",
+        "runtime_authority_key",
+        "session",
+        "pending_effect",
+    ] {
+        assert!(
+            !schema_source.contains(forbidden),
+            "closed schema must not expose a route to {forbidden}"
+        );
+    }
+    assert!(schema_source.contains("vault_metadata_v1"));
+    assert!(schema_source.contains("business_object_v1"));
+    assert!(schema_source.contains("business_chunk_v1"));
+    assert!(schema_source.contains("object_type IN (1, 2)"));
+}

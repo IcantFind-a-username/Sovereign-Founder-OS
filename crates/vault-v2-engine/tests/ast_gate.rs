@@ -83,6 +83,8 @@ const ALLOWED_MACROS: &[&str] = &[
     // or anything — by a path that could alias past this list.
     "assert_not_impl_any",
     "assert_impl_all",
+    // Prepared-parameter SQL in the closed business schema (Task 3).
+    "params",
     // Test-only SQL/open ordering and leakage traces in `engine/sqlcipher.rs`.
     "thread_local",
 ];
@@ -157,6 +159,8 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
             "src/engine/process.rs",
             "src/engine/recovery.rs",
             "src/engine/recovery_authorizer.rs",
+            "src/engine/schema/mod.rs",
+            "src/engine/schema/tests.rs",
             "src/engine/secret.rs",
             "src/engine/sqlcipher.rs",
             "src/engine/wrapper_golden_v1.rs",
