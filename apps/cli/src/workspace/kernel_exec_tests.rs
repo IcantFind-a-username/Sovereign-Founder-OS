@@ -1,6 +1,8 @@
 //! Product send path: compile worker + signed compiled cache (v01-15).
 
 use super::*;
+/// Gauntlet-only signing material (`demo.rs`); product path must not reuse it.
+const DEMO_CACHE_SECRET: [u8; 32] = *b"sovereign-demo-cache-signkey-01!";
 use std::sync::{Mutex, MutexGuard};
 use uuid::Uuid;
 
@@ -93,7 +95,7 @@ fn product_send_populates_workspace_signed_compile_cache() {
     let secret = vault.get("compiled_cache_key").unwrap();
     assert_ne!(
         secret.as_slice(),
-        crate::demo::DEMO_CACHE_SECRET.as_slice(),
+        DEMO_CACHE_SECRET.as_slice(),
         "product cache must not use the demo cache signing key"
     );
 }
