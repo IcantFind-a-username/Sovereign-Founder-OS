@@ -69,6 +69,8 @@ const ALLOWED_MACROS: &[&str] = &[
     // or anything — by a path that could alias past this list.
     "assert_not_impl_any",
     "assert_impl_all",
+    // Test-only SQL/open ordering and leakage traces in `engine/sqlcipher.rs`.
+    "thread_local",
 ];
 
 const ALLOWED_ATTRIBUTES: &[&str] = &[
