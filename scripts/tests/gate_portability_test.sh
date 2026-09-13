@@ -35,7 +35,7 @@ fail() {
   FAILURES=$((FAILURES + 1))
 }
 
-GATE_SCRIPTS="scripts/test_changed.sh scripts/check-file-size.sh scripts/stop_gate.sh"
+GATE_SCRIPTS="scripts/test_changed.sh scripts/check-file-size.sh scripts/stop_gate.sh scripts/qualify-vault-v2.sh"
 
 # ---- 1. no bash-4-only constructs in the gate scripts --------------------
 # Whole-line comments are stripped first: the gate scripts document which
