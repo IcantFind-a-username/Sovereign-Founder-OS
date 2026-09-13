@@ -27,7 +27,13 @@ use sovereign_sandbox::{VerifiedExecutionRequest, VerifiedSandboxExecutor, WasmE
 use sovereign_vault::Vault;
 use uuid::Uuid;
 
-use crate::demo::compile_wat;
+fn compile_wat(source: &str) -> Vec<u8> {
+    wat::parse_str(source).expect("built-in Wasm fixtures are valid WAT")
+}
+
+/// Demo admission anchor for records `sovereign demo` wrote on this machine.
+const DEMO_ADMISSION_ISSUER: &str = "founder-device.local";
+const DEMO_ADMISSION_SECRET: [u8; 32] = *b"sovereign-demo-admission-key-01!";
 
 /// The owner's freshly signed approval: the evidence bytes, the claims
 /// re-verified out of them, and the signer so downstream trust stores can
@@ -370,7 +376,7 @@ impl Store {
 /// Read-only on purpose. A page that lists records must not mint the key
 /// that signs them, so a vault that does not exist yet contributes no owner
 /// anchor rather than being created here.
-pub(crate) fn admission_trust(root: &std::path::Path) -> RoleTrustStore<AdmissionRole> {
+pub fn admission_trust(root: &std::path::Path) -> RoleTrustStore<AdmissionRole> {
     let now_unix = now();
     let mut trust = RoleTrustStore::<AdmissionRole>::new();
     let Ok(validity) = KeyValidity::new(now_unix - 60, now_unix + 3_600) else {
@@ -391,8 +397,8 @@ pub(crate) fn admission_trust(root: &std::path::Path) -> RoleTrustStore<Admissio
         }
     }
     if let Ok(signer) = TypedSigner::<AdmissionRole>::from_secret_bytes(
-        crate::demo::ADMISSION_ISSUER,
-        crate::demo::DEMO_ADMISSION_SECRET,
+        DEMO_ADMISSION_ISSUER,
+        DEMO_ADMISSION_SECRET,
     ) {
         let _ = trust.trust_signer(&signer, validity);
     }

@@ -921,7 +921,7 @@ while the controller routes eligible design/review cards to the strong role.
   revoked the delivery — belongs with the execution-journal entry below,
   which is where Indeterminate records are reconciled.
 
-- [ ] **P2 | `tests/adversarial/` | Pin the transactional/revocation security invariants cross-crate.**
+- [x] **P2 | `tests/adversarial/` | Pin the transactional/revocation security invariants cross-crate.** Landed 2026-09-13.
   Blocked on everything above. Two invariants as adversarial tests, driven
   through the workspace-level path rather than authority internals: (1) no
   interruption point of the consumption bundle leaves a state where the

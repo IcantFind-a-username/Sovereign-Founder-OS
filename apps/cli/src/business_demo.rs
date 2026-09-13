@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Read};
 use tiny_http::{Header, Method, Request, Response, Server};
 
-use crate::workspace::parse_amount_cents;
+use sovereign_cli::workspace::parse_amount_cents;
 
 const MAX_BODY: usize = 32_768;
 const MAX_VIEW: usize = 1_048_576;

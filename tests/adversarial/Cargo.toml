@@ -9,7 +9,10 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+sovereign-cli = { path = "../../apps/cli" }
+sovereign-authority = { workspace = true }
 sovereign-audit-ledger = { workspace = true }
+uuid = { workspace = true }
 sovereign-capability = { workspace = true }
 sovereign-contracts = { workspace = true }
 sovereign-identity = { workspace = true }
@@ -19,3 +22,6 @@ sovereign-vault = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
 tempfile = "3"
+
+[dev-dependencies]
+sovereign-fault-testing = { path = "../../crates/fault-testing" }

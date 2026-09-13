@@ -9,7 +9,7 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::ui::{str_field, uuid_field};
-use crate::workspace::{
+use sovereign_cli::workspace::{
     self, ComplianceSubject, EmployeeStatus, ProjectStatus, RoleId, RunSubject, StoredPreset,
     WorkspaceError,
 };

@@ -266,7 +266,7 @@ Alpha release must pass:
 - [x] Attached Authority Store rejects covered duplicate claims after reopen and token races across threads
 - [x] Attached Authority Store rejects approval reuse after token expiry/purge and store reopen until the signed approval's own expiry
 - [ ] Approval reuse and the full reservation remain rejected across real subprocess validator races/restart, with durable revocation
-- [ ] Transactional authorization-bundle revocation remains rejected across races and restart
+- [x] Transactional authorization-bundle consumption and durable revocation are pinned on the workspace send path (cross-crate adversarial tests); real subprocess validator races and restart remain unproven
 - [ ] Full prompt-injection and data-disclosure paths pass the Alpha gauntlet
 - [ ] Primary model failure does not block data access
 - [x] Current audit-ledger fixture detects hash-chain/signature modification

@@ -21,7 +21,7 @@ use tiny_http::{Header, Method, Response, Server};
 use uuid::Uuid;
 
 use crate::demo;
-use crate::workspace;
+use sovereign_cli::workspace;
 
 // The frontend is deliberately a zero-dependency static bundle: no framework,
 // no npm supply chain, every byte embedded in this binary at compile time and

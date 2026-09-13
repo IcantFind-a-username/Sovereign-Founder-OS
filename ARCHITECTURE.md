@@ -86,13 +86,14 @@ plugin boundary. The application currently creates owner approval evidence
 after an unauthenticated loopback/API decision. Its capability binds document
 and resource preparation, not the final recipient or exact RFC 5322 bytes, and
 the execution journal completes before the trusted host writes the outbox
-file. The Authority Store persists individual filesystem claims, but current
-approval claims retain the verified signed approval expiry. Token-expiry
-purge, store reopen while the approval remains valid, rejection of reuse, and
-purge at approval expiry are tested. The token/idempotency/approval claims are
-still ordered filesystem operations rather than one transaction; revocation,
-a full real-subprocess validator race, and an independently admitted owner
-ceremony remain absent. Core Wasm guests cannot invoke host effects.
+file. The Authority Store persists claims through a transactional consumption
+bundle (token, approval, and idempotency key commit together or roll forward on
+retry) with durable revocation records checked at claim and commit time.
+Token-expiry purge on delivery, store reopen while the approval remains valid,
+rejection of reuse, purge at approval expiry, and cross-crate workspace-path
+adversarial tests for bundle interruption and revoke-vs-dispatch races are
+tested. A full real-subprocess validator race and an independently admitted
+owner ceremony remain absent. Core Wasm guests cannot invoke host effects.
 
 The Model Gateway contains deterministic stand-ins and an unsafe legacy
 classification/trust API; it is not a real Model Mesh. Workflow checkpoints

@@ -7,7 +7,8 @@ mod ui_mvp;
 #[cfg(test)]
 #[path = "ui_tests.rs"]
 mod ui_tests;
-mod workspace;
+
+use sovereign_cli::workspace;
 
 use clap::{Parser, Subcommand};
 use sovereign_audit_ledger::AuditLedger;
