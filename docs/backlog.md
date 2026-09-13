@@ -1198,7 +1198,7 @@ while the controller routes eligible design/review cards to the strong role.
   and re-running `sovereign verify-export` still printed "VERIFIED — this
   bundle is intact and bound to the device that signed it" and exited 0.
 
-- [ ] **P2 | `apps/cli/src/` | The Security Center reports the owner's real admitted plugin as unverified.**
+- [x] **P2 | `apps/cli/src/` | The Security Center reports the owner's real admitted plugin as unverified.** Closed 2026-09-13 (v01-07): obsolete — `admitted_plugins_json` already verifies against `founder-device.workspace` and the demo anchor; `apps/cli/tests/ui_admissions.rs` pins `"verified": true` with issuer `founder-device.workspace` after one approved send.
   `admitted_plugins_json` (ui.rs:511-562) verifies every record under
   `artifacts/admissions/` against `demo_admission_trust()` (ui.rs:564-576),
   which trusts exactly one key: the hard-coded `demo::DEMO_ADMISSION_SECRET`
