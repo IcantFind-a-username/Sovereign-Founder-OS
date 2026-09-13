@@ -1112,7 +1112,7 @@ while the controller routes eligible design/review cards to the strong role.
   rollback limit); and `cargo test -p sovereign-cli` passes. The open-time
   check and the two exact test names are pinned by RFC 0007.
 
-- [ ] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.**
+- [x] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.** (claimed v01-01)
   v0.1 "correct stale UI/docs claims" (ROADMAP.md:182). The crate doc claims
   "Red data never leaves the device" (src/lib.rs:14-16), but `data_class` is
   caller-declared (:52-60), provider trust is self-reported (:118-123), and
@@ -1129,7 +1129,7 @@ while the controller routes eligible design/review cards to the strong role.
   if this test starts failing, the RFC 0004 boundary landed and the test must
   be inverted, not deleted. `cargo test -p sovereign-model` passes.
 
-- [ ] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.**
+- [x] **P2 | `apps/cli/src/` | Stop the CLI claiming locality the gateway cannot enforce.** v01-02 · claimed 2026-09-13.
   `model-check` prints "Red data stays local" (main.rs:295), and
   `draft_assistant` carries a comment that Amber "would never be routed to a
   cloud provider" (ops.rs:122-123) — false: Amber routes to cloud by design
@@ -1180,7 +1180,7 @@ while the controller routes eligible design/review cards to the strong role.
   mode 0600 and the vault root is 0700 after `Vault::init` followed by `put`,
   and `cargo test -p sovereign-vault` passes.
 
-- [ ] **P2 | `apps/cli/src/workspace/` | Pin the export's plaintext-and-unauthenticated boundary with a test.**
+- [x] **P2 | `apps/cli/src/workspace/` | Pin the export's plaintext-and-unauthenticated boundary with a test (v01-05).** Landed 2026-09-13.
   `Store::export` (reporting.rs:289-313) writes the whole business graph as
   cleartext JSON, and `verify_export` (verify.rs:12-120) re-verifies only the
   Ed25519 audit chain and the device binding — the `workspace` object itself is
@@ -1268,7 +1268,7 @@ while the controller routes eligible design/review cards to the strong role.
   the two untagged entries directly below; the decision itself is settled and
   must not be re-opened by the rounds that type it in.
 
-- [ ] **P2 | `THREAT_MODEL.md` | State the v1 entry swap/rollback gap and its freeze decision under T10.**
+- [x] **P2 | `THREAT_MODEL.md` | State the v1 entry swap/rollback gap and its freeze decision under T10.**
   Typing for the decided item above — the wording is settled; do not re-open
   the decision. Insert the following bullet into T10's Mitigations list,
   directly after the existing "Current limitation" bullet (re-wrap lines to
@@ -1288,7 +1288,7 @@ while the controller routes eligible design/review cards to the strong role.
   Done when: the bullet is present under T10, no file outside `THREAT_MODEL.md`
   changes, and `./scripts/test_changed.sh` prints ALL GREEN.
 
-- [ ] **P2 | `crates/vault/` | Pin the frozen v1 blob format and its accepted swap/rollback behavior with tests.**
+- [x] **P2 | `crates/vault/` | Pin the frozen v1 blob format and its accepted swap/rollback behavior with tests.**
   Typing for the decided item above; land the `THREAT_MODEL.md` entry first so
   doc comments can cite it. Four tests, no production code changes:
   1. `v1_blob_shape_is_frozen`: after `put`, parse the written `*.enc` as
