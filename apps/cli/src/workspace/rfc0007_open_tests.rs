@@ -59,8 +59,7 @@ fn a_whole_directory_rollback_is_not_detected_documented_boundary() {
     assert!(full.events().len() >= 2);
 
     let prefix_events = full.events()[..1].to_vec();
-    let prefix =
-        AuditLedger::from_events(prefix_events, device.public_key_b64()).unwrap();
+    let prefix = AuditLedger::from_events(prefix_events, device.public_key_b64()).unwrap();
     prefix.save(&ledger_path, &device).unwrap();
 
     Store::open(dir.path()).expect(
