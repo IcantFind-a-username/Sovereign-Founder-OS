@@ -32,6 +32,7 @@ This page helps contributors find the current source of truth without reading th
 | Study the business demo and component choices | [Founder OS product and research blueprint](product/founder-os-execution-blueprint.zh-CN.md) (Chinese; product vision, verified baseline, source-linked research) |
 | Understand the category positioning | [Why Not Another Agent?](positioning/why-not-another-agent.md) |
 | Trace how the idea evolved | [Historical Chinese design archive](archive/zh/README.md) |
+| Decide whether a preview or `v0.1` tag is allowed | [Developer Preview tag and release policy](release/preview-tag-policy.md) |
 
 ## Document Status
 
@@ -55,6 +56,7 @@ an accepted RFC proposal.
 - [Security reporting](../SECURITY.md)
 - [Language policy](LANGUAGE.md)
 - [License](../LICENSE), [Notice](../NOTICE), and [Trademark policy](../TRADEMARK.md)
+- [Developer Preview tag and release policy](release/preview-tag-policy.md)
 
 ## Current RFCs
 

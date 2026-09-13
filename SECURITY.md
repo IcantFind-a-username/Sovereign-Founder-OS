@@ -31,6 +31,11 @@ Include:
 | Published product release | None yet |
 | Developer Preview / main branch | Best effort |
 
+Developer Preview **tags**, when they exist, use `developer-preview-YYYY.MM.DD.N`
+and are not SemVer product support. Do not mint `v0.1` / `v0.1.0` until the
+owner records that the honest-close exits are met. See
+[preview tag policy](docs/release/preview-tag-policy.md).
+
 ## Security Requirements for Contributors
 
 All pull requests affecting security-critical code must:
