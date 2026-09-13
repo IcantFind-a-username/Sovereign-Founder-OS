@@ -66,6 +66,22 @@ jobs:
       - run: echo sha256:2a2e837a2c8d59ec9af5472ee22d3b04ee463c4e44476ecf993fd1e5ab6ebc7f
 """,
         )
+        self.write(
+            ".github/workflows/developer-preview.yml",
+            """on:
+  push:
+    tags:
+      - "developer-preview-*"
+jobs:
+  draft_release:
+    environment: developer-preview-publish
+    steps:
+      - run: python3 scripts/developer_preview_release.py verify-staging
+      - run: python3 scripts/developer_preview_release.py assert-prerelease
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+      - run: gh release create --draft --prerelease
+""",
+        )
 
     def test_undated_metadata_is_valid_before_candidate_freeze(self) -> None:
         self.assertEqual([], validator.validate_repository(self.root))

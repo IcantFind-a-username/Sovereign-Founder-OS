@@ -1,0 +1,238 @@
+# Developer Preview publication (prerelease binaries only).
+# Policy: docs/release/preview-tag-policy.md
+# SemVer product releases stay disabled in release.yml.
+
+name: Developer Preview Release
+
+on:
+  push:
+    tags:
+      - "developer-preview-*"
+
+permissions: {}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      tag_name: ${{ steps.meta.outputs.tag_name }}
+      commit_sha: ${{ steps.meta.outputs.commit_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Resolve tag and reject forbidden families
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_name="${GITHUB_REF#refs/tags/}"
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
+          python3 scripts/developer_preview_release.py validate-tag \
+            --tag "$tag_name" \
+            --require-utc-today
+          if [[ "$(git cat-file -t "refs/tags/$tag_name")" != tag ]]; then
+            echo "annotated tag required" >&2
+            exit 1
+          fi
+          commit_sha="$(git rev-parse "refs/tags/$tag_name^{commit}")"
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "$commit_sha" origin/main; then
+            echo "tag commit is not reachable from origin/main" >&2
+            exit 1
+          fi
+      - name: Require green CI on tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          commit="${{ steps.meta.outputs.commit_sha }}"
+          mapfile -t pending < <(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$commit/check-runs" --paginate \
+              -q '.check_runs[] | select(.status != "completed") | .name'
+          )
+          if ((${#pending[@]} > 0)); then
+            printf 'incomplete check runs: %s\n' "${pending[*]}" >&2
+            exit 1
+          fi
+          mapfile -t failed < <(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$commit/check-runs" --paginate \
+              -q '.check_runs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name'
+          )
+          if ((${#failed[@]} > 0)); then
+            printf 'failed check runs: %s\n' "${failed[*]}" >&2
+            exit 1
+          fi
+
+  build:
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.gate.outputs.tag_name }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1a3a6d54512beeaffd394f8d516ca16f2c506a20 # 1.97.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - name: File-size guardrail (no god files)
+        run: ./scripts/check-file-size.sh
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Run tests
+        run: cargo test --workspace --locked
+      - name: Type-check frontend (tsc --checkJs, no emit)
+        env:
+          npm_config_ignore_scripts: "true"
+        run: npx -y -p typescript@5.5.4 tsc -p apps/cli/assets/tsconfig.json
+      - name: Audit Rust dependencies
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+      - name: Build Linux x86_64 CLI
+        run: cargo build -p sovereign-cli --release --locked
+      - name: Assemble Developer Preview staging
+        run: |
+          set -euo pipefail
+          staging="$RUNNER_TEMP/developer-preview-staging"
+          mkdir -p "$staging"
+          python3 scripts/developer_preview_release.py assemble-staging \
+            --repository . \
+            --staging "$staging" \
+            --tag "${{ needs.gate.outputs.tag_name }}" \
+            --binary ./target/release/sovereign \
+            --github-repository "$GITHUB_REPOSITORY" \
+            --rustc-version "1.97.0" \
+            --host-triple "$(rustc -vV | sed -n 's/^host: //p')" \
+            --workflow-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          python3 scripts/developer_preview_release.py verify-staging --staging "$staging"
+      - name: Upload staging artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: developer-preview-staging-${{ needs.gate.outputs.tag_name }}
+          path: ${{ runner.temp }}/developer-preview-staging
+          if-no-files-found: error
+          retention-days: 14
+
+  attest:
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download staging artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: developer-preview-staging-${{ needs.gate.outputs.tag_name }}
+          path: staging
+      - name: Attest Developer Preview payloads
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            staging/sovereign-cli-x86_64-unknown-linux-gnu.tar.gz
+            staging/release-manifest.json
+            staging/SHA256SUMS
+
+  draft_release:
+    needs: [gate, build, attest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment: developer-preview-publish
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.gate.outputs.tag_name }}
+          fetch-depth: 0
+      - name: Download staging artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: developer-preview-staging-${{ needs.gate.outputs.tag_name }}
+          path: staging
+      - name: Verify staging before draft upload
+        run: python3 scripts/developer_preview_release.py verify-staging --staging staging
+      - name: Refuse double publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "${{ needs.gate.outputs.tag_name }}" >/dev/null 2>&1; then
+            echo "release already exists for tag" >&2
+            exit 1
+          fi
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          tag_object="$(git rev-parse "refs/tags/${{ needs.gate.outputs.tag_name }}")"
+          commit="$(git rev-parse "refs/tags/${{ needs.gate.outputs.tag_name }}^{commit}")"
+          tree="$(git rev-parse "$commit^{tree}")"
+          python3 scripts/developer_preview_release.py write-notes \
+            --repository . \
+            --tag "${{ needs.gate.outputs.tag_name }}" \
+            --commit "$commit" \
+            --tree "$tree" \
+            --tag-object "$tag_object" \
+            --workflow-run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --output staging/RELEASE_NOTES.md \
+            --allow-overwrite
+      - name: Create draft prerelease (never latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="$(python3 scripts/developer_preview_release.py print-title --tag "${{ needs.gate.outputs.tag_name }}")"
+          gh release create "${{ needs.gate.outputs.tag_name }}" \
+            --draft \
+            --prerelease \
+            --title "$title" \
+            --notes-file staging/RELEASE_NOTES.md \
+            staging/sovereign-cli-x86_64-unknown-linux-gnu.tar.gz \
+            staging/release-manifest.json \
+            staging/SHA256SUMS \
+            staging/VERIFY.md
+
+  publish_release:
+    needs: [gate, draft_release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    environment: developer-preview-publish
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ needs.gate.outputs.tag_name }}
+      - name: Download release assets and rematch hashes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.gate.outputs.tag_name }}"
+          mkdir -p downloaded
+          gh release download "$tag" --dir downloaded --pattern '*'
+          python3 scripts/developer_preview_release.py verify-staging --staging downloaded
+      - name: Publish draft (prerelease only)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ needs.gate.outputs.tag_name }}"
+          gh release edit "$tag" --draft=false
+          gh release view "$tag" --json prerelease,draft,makeLatest > release.json
+          python3 scripts/developer_preview_release.py assert-prerelease --release-json release.json

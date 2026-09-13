@@ -11,6 +11,7 @@ on:
       - "docs/release/**"
       - "scripts/**"
       - ".github/workflows/provenance-dry-run.yml"
+      - ".github/workflows/developer-preview.yml"
 
 permissions:
   contents: read
