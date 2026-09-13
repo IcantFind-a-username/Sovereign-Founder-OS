@@ -144,10 +144,10 @@ secret scanning. Toolchain is pinned: 1.97.0.
     `primary_resource() == None` for a rejection-path test, declare the
     manifest operation's `resource_bindings` as `[]` (an empty array is
     valid) and pass no grants — `prepare_grants` then never sets it.
-13. `sovereign ui` has no `--root` flag yet: to test the app without touching
-    the owner's real data, build it and run the binary with `HOME` pointed at
-    a scratch directory (`dirs::data_local_dir()` follows `HOME` on macOS),
-    e.g. `HOME=/tmp/x ./target/debug/sovereign ui --no-open --port 7791`.
+13. To test the app without touching the owner's real data, pass
+ `sovereign --root <dir> ui …` or point `HOME` at a scratch directory
+ (`dirs::data_local_dir()` follows `HOME` on macOS when `--root` is omitted),
+ e.g. `./target/debug/sovereign --root /tmp/x ui --no-open --port 7791`.
 12. To split an inline `#[cfg(test)] mod tests { … }` out of a growing `.rs`
     file, move the body verbatim into a sibling file and declare
     `#[cfg(test)] mod tests;` — Rust module privacy follows the module tree,

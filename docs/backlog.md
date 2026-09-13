@@ -1499,21 +1499,12 @@ while the controller routes eligible design/review cards to the strong role.
   a stale comment claiming "the seven attacks"; there are ten plus the
   baseline, which is what the interface had said all along.
 
-- [ ] **P3 | `apps/cli/src/` | Add a `--root` flag so the app can run against a throwaway state directory.**
-  `data_dir()` (main.rs:78-82) is the only root resolver —
-  `dirs::data_local_dir()` joined with `sovereign-founder-os` — and nothing
-  overrides it: the top-level `Cli` (main.rs:25-30) carries no global option,
-  `ui` accepts only `--port` and `--no-open` (main.rs:47-54), and every
-  subcommand calls `data_dir()` directly (main.rs:88, 91, 106, 200, 347, 374).
-  Overriding `HOME` for the process is therefore the only way to evaluate,
-  test, or demo without touching real state, which is awkward and easy to
-  forget. One flag covers everything, because the vault (`root/vault`), the
-  ledger (`root/ledger.json`), the outbox (`root/outbox`,
-  workspace/ops.rs:359) and the artifact store (`root/artifacts`) all hang off
-  the same root. Done when: `sovereign --root <dir> <command>` (or a documented
-  environment variable) redirects vault, ledger and outbox together, and a test
-  runs a state-writing command with it set and asserts nothing was created
-  under `dirs::data_local_dir()/sovereign-founder-os`.
+- [x] **P3 | `apps/cli/src/` | Add a `--root` flag so the app can run against a throwaway state directory.**
+  Landed 2026-09-13: global `--root` on `Cli` resolves once per invocation
+  (`resolve_data_root`); state-writing commands (`init`, `status`, `ui`,
+  `integrity`, `demo`, `model-check`, `workflow-demo`) use it instead of
+  `dirs::data_local_dir()/sovereign-founder-os`. A file path fails closed;
+  `apps/cli/tests/root_flag.rs` pins isolation from the default data dir.
 
 - [ ] **P2 | `crates/capability/`, `crates/consultant-playground/`, `apps/cli/src/workspace/` | Split four files before their next change fails the gate.**
   Measured 2026-09-11 against the 1200-line ceiling:
@@ -1754,9 +1745,8 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   Blocked on RFC 0004's boundary (owner consent per request, disclosure
   records, credential broker). Do not add TLS or a cloud adapter before that
   design lands. `needs:fable`
-- [ ] **P3 | `apps/cli/src/` | `--root` flag so `sovereign ui` can run against a throwaway data directory.**
-  Manual and browser testing currently overrides `HOME` to isolate data; a
-  flag is honest and simpler. Keep the CLI pin tests (`cli_tests.rs`) green.
+- [x] **P3 | `apps/cli/src/` | `--root` flag so `sovereign ui` can run against a throwaway data directory.**
+  Closed as duplicate of the global `--root` item above (landed 2026-09-13).
 - [x] **P2 | `crates/consultant-playground/src/server.rs` | The write-timeout test flakes under load.**
   It asserted the blocked write returned inside a 4–7s band with a 7s
   watchdog; idle that lands at ~5.0s, and it failed twice during this
