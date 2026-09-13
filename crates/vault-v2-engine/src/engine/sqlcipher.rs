@@ -356,7 +356,6 @@ mod tests {
     use super::*;
     use static_assertions::assert_not_impl_any;
     use std::fs;
-    use std::os::unix::ffi::OsStrExt;
     use std::path::PathBuf;
 
     assert_not_impl_any!(HardenedConnection: Send, Sync);
@@ -403,6 +402,18 @@ mod tests {
         haystack
             .windows(needle.len())
             .any(|window| window == needle)
+    }
+
+    fn os_str_as_bytes(os: &std::ffi::OsStr) -> &[u8] {
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            os.as_bytes()
+        }
+        #[cfg(windows)]
+        {
+            os.to_str().map(|s| s.as_bytes()).unwrap_or(&[])
+        }
     }
 
     /// Create a database holding the canary, through the factory, and close
@@ -628,6 +639,7 @@ mod tests {
     /// Built from an explicit link rather than relying on how a platform lays
     /// out its temp directory, so it means the same thing on macOS and Linux.
     #[test]
+    #[cfg(unix)]
     fn a_path_through_a_symlink_is_refused_and_creates_nothing() {
         let (_dir, root) = canonical_tempdir();
         let real = root.join("real");
@@ -1014,12 +1026,12 @@ mod tests {
         }
 
         for (_, value) in std::env::vars_os() {
-            if let Some(what) = haystack_contains_key_material(value.as_bytes(), &dbk) {
+            if let Some(what) = haystack_contains_key_material(os_str_as_bytes(&value), &dbk) {
                 panic!("{what} found in environment variable value");
             }
         }
         for argument in std::env::args_os() {
-            if let Some(what) = haystack_contains_key_material(argument.as_bytes(), &dbk) {
+            if let Some(what) = haystack_contains_key_material(os_str_as_bytes(&argument), &dbk) {
                 panic!("{what} found in process argv");
             }
         }

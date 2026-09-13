@@ -33,9 +33,25 @@ use rusqlite::ffi::{
 };
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int, c_void};
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr;
+
+fn path_to_c_string(path: &Path) -> Result<CString, HardeningFailure> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        CString::new(path.as_os_str().as_bytes())
+            .map_err(|_| HardeningFailure::PathNotRepresentable)
+    }
+    #[cfg(windows)]
+    {
+        let utf8 = path
+            .as_os_str()
+            .to_str()
+            .ok_or(HardeningFailure::PathNotRepresentable)?;
+        CString::new(utf8).map_err(|_| HardeningFailure::PathNotRepresentable)
+    }
+}
 
 extern "C" {
     /// SQLCipher: key the named attached database. `p_key` is read for
@@ -84,8 +100,7 @@ pub(crate) fn open_keyed_hardened(
     flags: c_int,
     key: &RawSqlcipherKey,
 ) -> Result<rusqlite::Connection, HardeningFailure> {
-    let c_path = CString::new(path.as_os_str().as_bytes())
-        .map_err(|_| HardeningFailure::PathNotRepresentable)?;
+    let c_path = path_to_c_string(path)?;
     let token = key.token_bytes();
     let token_len = c_int::try_from(token.len()).expect("a 67-byte token fits a c_int");
     let mut db: *mut sqlite3 = ptr::null_mut();
