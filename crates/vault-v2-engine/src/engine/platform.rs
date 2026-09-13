@@ -79,9 +79,8 @@ pub(crate) fn open_qualification_store(
 
 #[cfg(feature = "platform-qualifier")]
 fn qualification_namespace_present() -> Result<(), DeviceStoreError> {
-    let namespace = std::env::var("SFO_VAULT_PLATFORM_NAMESPACE").map_err(|_| {
-        DeviceStoreError::DeviceStoreConfigurationInvalid
-    })?;
+    let namespace = std::env::var("SFO_VAULT_PLATFORM_NAMESPACE")
+        .map_err(|_| DeviceStoreError::DeviceStoreConfigurationInvalid)?;
     if !namespace.starts_with("sfo-ci:") {
         return Err(DeviceStoreError::DeviceStoreConfigurationInvalid);
     }
