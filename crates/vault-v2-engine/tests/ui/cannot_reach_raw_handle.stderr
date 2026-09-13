@@ -1,0 +1,6 @@
+error[E0425]: cannot find type `HardenedConnection` in crate `sovereign_vault_v2_engine`
+ --> $DIR/tests/ui/cannot_reach_raw_handle.rs:7:45
+  |
+7 |     let _handle: sovereign_vault_v2_engine::HardenedConnection;
+  |                                             ^^^^^^^^^^^^^^^^^^ not found in `sovereign_vault_v2_engine`
+

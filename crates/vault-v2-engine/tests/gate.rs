@@ -26,11 +26,17 @@
 //!   classification inspects only the individual `Ident` value — never
 //!   serialized token-stream text.
 //!
-//! v1 deliberately does not yet prove the exactly-two-FFI-entry-points rule or
-//! carry the five `tests/ui/` compile-fail fixtures: those need
-//! `src/engine/ffi.rs` and the engine API to exist, and are a separate queued
-//! item. The gate makes no claim about unsafe code internal to dependencies.
+//! The gate also proves exactly two production unsafe FFI entry points plus the
+//! single `cfg(test)` OpenSSL LOAD_CONFIG negative control (RFC 0005 / Program 1A
+//! plan lines 540-546). The five `tests/ui/` compile-fail fixtures are admitted
+//! as auxiliary roots, not module-closure members.
 
+use crate::ffi_entry::{
+    admitted_extern_symbol, admitted_production_entry_function,
+    admitted_test_only_entry_function, attr_is_cfg_test, path_tail_is_forbidden,
+    use_tree_forbidden_root, use_tree_has_forbidden_glob, FORBIDDEN_FFI_SYMBOLS,
+    FORBIDDEN_USE_ROOTS,
+};
 use proc_macro2::{Delimiter, TokenTree};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -54,6 +60,9 @@ pub struct GateConfig<'a> {
     pub allowed_attributes: &'a [&'a str],
     /// Derive names allowed inside `#[derive(...)]`.
     pub allowed_derives: &'a [&'a str],
+    /// Standalone `.rs` files that are not reached through `mod` resolution but
+    /// are explicitly admitted (for example trybuild UI fixtures).
+    pub auxiliary_roots: &'a [&'a str],
 }
 
 pub struct GateOutcome {
@@ -190,6 +199,8 @@ impl Gate<'_, '_> {
             module_dir: module_dir.to_path_buf(),
             inline_modules: Vec::new(),
             in_boundary,
+            cfg_test_depth: 0,
+            ffi_entry_depth: 0,
         };
         scanner.visit_file(&ast);
     }
@@ -232,14 +243,24 @@ impl Gate<'_, '_> {
                 continue;
             }
             if metadata.is_dir() {
+                if path
+                    .file_name()
+                    .is_some_and(|name| name == "target" || name == ".git")
+                {
+                    continue;
+                }
                 self.walk_directory(&path);
             } else if path.extension().is_some_and(|extension| extension == "rs")
                 && !self.outcome.closure.contains(&relative)
+                && !self
+                    .config
+                    .auxiliary_roots
+                    .contains(&relative.as_str())
             {
                 self.violation(
                     &relative,
                     "orphan: not a configured root, not reached by module resolution, \
-                     and not an admitted include",
+                     not an admitted include, and not an auxiliary fixture root",
                 );
             }
         }
@@ -275,6 +296,10 @@ struct FileScanner<'a, 'b, 'c> {
     module_dir: PathBuf,
     inline_modules: Vec<String>,
     in_boundary: bool,
+    /// Nesting depth inside `#[cfg(test)]` items.
+    cfg_test_depth: usize,
+    /// Nesting depth inside an admitted FFI entry function.
+    ffi_entry_depth: usize,
 }
 
 impl FileScanner<'_, '_, '_> {
@@ -357,7 +382,9 @@ impl FileScanner<'_, '_, '_> {
                     let value = ident.to_string();
                     if value.starts_with("r#") {
                         self.violation(&format!("raw identifier `{value}` in {context} tokens"));
-                    } else if DENIED_TOKEN_IDENTS.contains(&value.as_str()) {
+                    } else if DENIED_TOKEN_IDENTS.contains(&value.as_str())
+                        || FORBIDDEN_FFI_SYMBOLS.contains(&value.as_str())
+                    {
                         self.violation(&format!("forbidden token `{value}` in {context} tokens"));
                     }
                 }
@@ -383,6 +410,37 @@ impl FileScanner<'_, '_, '_> {
                     "attribute `#[{value} …]` smuggled inside macro tokens"
                 ));
             }
+        }
+    }
+
+    fn inside_admitted_ffi_entry(&self) -> bool {
+        self.ffi_entry_depth > 0
+    }
+
+    fn check_forbidden_path(&mut self, path: &syn::Path, context: &str) {
+        if self.inside_admitted_ffi_entry() {
+            return;
+        }
+        if let Some(symbol) = path_tail_is_forbidden(path) {
+            self.violation(&format!(
+                "forbidden FFI symbol `{symbol}` in {context}"
+            ));
+        }
+        if path
+            .segments
+            .first()
+            .is_some_and(|segment| FORBIDDEN_USE_ROOTS.contains(&segment.ident.to_string().as_str()))
+        {
+            self.violation(&format!("forbidden import root in {context}"));
+        }
+    }
+
+    fn check_use_tree(&mut self, tree: &syn::UseTree) {
+        if use_tree_has_forbidden_glob(tree) {
+            self.violation("glob imports are forbidden");
+        }
+        if let Some(root) = use_tree_forbidden_root(tree) {
+            self.violation(&format!("import of `{root}` is forbidden"));
         }
     }
 
@@ -451,6 +509,10 @@ impl<'ast> Visit<'ast> for FileScanner<'_, '_, '_> {
     }
 
     fn visit_item_mod(&mut self, declaration: &'ast syn::ItemMod) {
+        let previous_cfg = self.cfg_test_depth;
+        if attr_is_cfg_test(&declaration.attrs) {
+            self.cfg_test_depth += 1;
+        }
         if declaration.content.is_some() {
             self.inline_modules.push(declaration.ident.to_string());
             visit::visit_item_mod(self, declaration);
@@ -459,6 +521,7 @@ impl<'ast> Visit<'ast> for FileScanner<'_, '_, '_> {
             visit::visit_item_mod(self, declaration);
             self.resolve_module(declaration);
         }
+        self.cfg_test_depth = previous_cfg;
     }
 
     fn visit_item_macro(&mut self, item: &'ast syn::ItemMacro) {
@@ -504,6 +567,10 @@ impl<'ast> Visit<'ast> for FileScanner<'_, '_, '_> {
     fn visit_expr_unsafe(&mut self, expression: &'ast syn::ExprUnsafe) {
         if !self.in_boundary {
             self.violation("unsafe block outside the declared FFI boundary");
+        } else if !self.inside_admitted_ffi_entry() {
+            self.violation(
+                "unsafe block outside the admitted production FFI entry points",
+            );
         }
         visit::visit_expr_unsafe(self, expression);
     }
@@ -512,7 +579,49 @@ impl<'ast> Visit<'ast> for FileScanner<'_, '_, '_> {
         if function.sig.unsafety.is_some() && !self.in_boundary {
             self.violation("unsafe fn outside the declared FFI boundary");
         }
+        let previous_cfg = self.cfg_test_depth;
+        if attr_is_cfg_test(&function.attrs) {
+            self.cfg_test_depth += 1;
+        }
+        let name = function.sig.ident.to_string();
+        let admitted = admitted_production_entry_function(&self.file, &name)
+            || (self.cfg_test_depth > 0 && admitted_test_only_entry_function(&self.file, &name));
+        let previous_entry = self.ffi_entry_depth;
+        if admitted {
+            self.ffi_entry_depth += 1;
+        }
         visit::visit_item_fn(self, function);
+        self.ffi_entry_depth = previous_entry;
+        self.cfg_test_depth = previous_cfg;
+    }
+
+    fn visit_item_use(&mut self, node: &'ast syn::ItemUse) {
+        self.check_use_tree(&node.tree);
+        visit::visit_item_use(self, node);
+    }
+
+    fn visit_item_const(&mut self, constant: &'ast syn::ItemConst) {
+        if self.in_boundary
+            && self.cfg_test_depth == 0
+            && constant.ident == "OPENSSL_INIT_LOAD_CONFIG"
+        {
+            self.violation(
+                "the OpenSSL LOAD_CONFIG constant may not be declared outside `#[cfg(test)]`",
+            );
+        }
+        visit::visit_item_const(self, constant);
+    }
+
+    fn visit_expr_path(&mut self, path: &'ast syn::ExprPath) {
+        self.check_forbidden_path(&path.path, "expression");
+        visit::visit_expr_path(self, path);
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        if let syn::Expr::Path(path) = &*call.func {
+            self.check_forbidden_path(&path.path, "call");
+        }
+        visit::visit_expr_call(self, call);
     }
 
     fn visit_impl_item_fn(&mut self, function: &'ast syn::ImplItemFn) {
@@ -553,6 +662,19 @@ impl<'ast> Visit<'ast> for FileScanner<'_, '_, '_> {
     fn visit_item_foreign_mod(&mut self, foreign: &'ast syn::ItemForeignMod) {
         if !self.in_boundary {
             self.violation("extern block outside the declared FFI boundary");
+        } else {
+            for item in &foreign.items {
+                if let syn::ForeignItem::Fn(function) = item {
+                    let name = function.sig.ident.to_string();
+                    if !admitted_extern_symbol(&self.file, &name) {
+                        self.violation(&format!(
+                            "extern symbol `{name}` is not an admitted FFI declaration"
+                        ));
+                    }
+                } else {
+                    self.violation("only `extern \"C\" fn` declarations are admitted");
+                }
+            }
         }
         visit::visit_item_foreign_mod(self, foreign);
     }

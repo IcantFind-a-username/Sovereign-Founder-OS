@@ -1,0 +1,6 @@
+error[E0425]: cannot find value `open_keyed_hardened` in crate `sovereign_vault_v2_engine`
+ --> $DIR/tests/ui/cannot_call_raw_key_shim.rs:7:40
+  |
+7 |     let _ = sovereign_vault_v2_engine::open_keyed_hardened;
+  |                                        ^^^^^^^^^^^^^^^^^^^ not found in `sovereign_vault_v2_engine`
+

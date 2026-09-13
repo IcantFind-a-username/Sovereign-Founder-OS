@@ -1,0 +1,31 @@
+[workspace]
+
+[package]
+name = "sovereign-vault-v2-engine-ui-harness"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies.sovereign-vault-v2-engine]
+path = "../../.."
+default-features = false
+
+[[bin]]
+name = "trybuild000"
+path = "../cannot_name_db_key.rs"
+
+[[bin]]
+name = "trybuild001"
+path = "../cannot_call_raw_key_shim.rs"
+
+[[bin]]
+name = "trybuild002"
+path = "../cannot_reach_raw_handle.rs"
+
+[[bin]]
+name = "trybuild003"
+path = "../cannot_construct_create_mode.rs"
+
+[[bin]]
+name = "trybuild004"
+path = "../cannot_select_cipher_profile.rs"

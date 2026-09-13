@@ -58,6 +58,19 @@ fn an_unrelated_variable_is_left_alone() {
 }
 
 #[test]
+fn trybuild_encoded_rustflags_are_the_only_admitted_non_empty_encoded_flags() {
+    let trybuild = "--cfg\x1ftrybuild\x1f--verbose\x1f-A\x1fdead_code";
+    assert!(is_trybuild_encoded_rustflags(trybuild));
+    let rejected = rejected_variables(&env(&[("CARGO_ENCODED_RUSTFLAGS", trybuild)]));
+    assert!(rejected.is_empty(), "rejected: {rejected:?}");
+    let rejected = rejected_variables(&env(&[(
+        "CARGO_ENCODED_RUSTFLAGS",
+        "--cfg\x1ftrybuild\x1f-Zunstable-options",
+    )]));
+    assert_eq!(rejected, vec!["CARGO_ENCODED_RUSTFLAGS".to_string()]);
+}
+
+#[test]
 fn an_empty_value_is_not_treated_as_an_override() {
     // Cargo always hands build scripts CARGO_ENCODED_RUSTFLAGS, empty when no
     // flags are set. Rejecting its presence would fail every ordinary build.

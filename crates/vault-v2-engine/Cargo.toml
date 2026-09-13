@@ -39,6 +39,10 @@ path = "tests/build_gate.rs"
 name = "ast_gate"
 path = "tests/ast_gate.rs"
 
+[[test]]
+name = "ui"
+path = "tests/ui.rs"
+
 [dependencies]
 # Exact pins per the Program 1A plan. `bundled-sqlcipher-vendored-openssl`
 # builds both SQLCipher and OpenSSL from vendored source, so the encryption
@@ -58,3 +62,4 @@ tempfile = "3"
 # Compile-time proof that key holders cannot be cloned, printed or
 # serialised. Exact pin per the Program 1A plan.
 static_assertions = "=1.1.0"
+trybuild = "=1.0.116"

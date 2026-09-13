@@ -46,6 +46,14 @@ pub const DEPENDENCY_SHAPING_VARIABLES: &[&str] = &[
 /// Prefixes whose whole family is rejected.
 pub const DEPENDENCY_SHAPING_PREFIXES: &[&str] = &["PKG_CONFIG_"];
 
+/// Encoded rustflags from trybuild 1.0.116 UI fixture builds; the only other
+/// admitted non-empty `CARGO_ENCODED_RUSTFLAGS` shape.
+pub fn is_trybuild_encoded_rustflags(value: &str) -> bool {
+    !value.is_empty()
+        && value.split('\x1f').collect::<Vec<_>>()
+            == ["--cfg", "trybuild", "--verbose", "-A", "dead_code"]
+}
+
 /// Which variables in `environment` are rejected, in the order given.
 ///
 /// Two deliberate rules:
@@ -61,6 +69,9 @@ pub fn rejected_variables(environment: &[(String, String)]) -> Vec<String> {
     let mut rejected = Vec::new();
     for (name, value) in environment {
         if value.trim().is_empty() {
+            continue;
+        }
+        if name == "CARGO_ENCODED_RUSTFLAGS" && is_trybuild_encoded_rustflags(value) {
             continue;
         }
         let shaping = DEPENDENCY_SHAPING_VARIABLES.iter().any(|candidate| {
