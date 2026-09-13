@@ -287,6 +287,16 @@ pub(crate) fn open_sqlcipher(
 }
 
 impl HardenedConnection {
+    pub(crate) fn rusqlite_connection(&self) -> &rusqlite::Connection {
+        &self.connection
+    }
+
+    pub(crate) fn is_db_readonly(&self) -> Result<bool, OpenError> {
+        self.connection
+            .is_readonly("main")
+            .map_err(|_| OpenError::ProfileNotApplied)
+    }
+
     /// Which crypto provider SQLCipher is actually using on this connection,
     /// and its version — read from the library rather than inferred from the
     /// build features.

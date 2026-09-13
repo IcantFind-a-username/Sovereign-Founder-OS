@@ -43,6 +43,10 @@ path = "tests/ast_gate.rs"
 name = "ui"
 path = "tests/ui.rs"
 
+[[test]]
+name = "recovery_ui"
+path = "tests/recovery_ui.rs"
+
 [dependencies]
 # Exact pins per the Program 1A plan. `bundled-sqlcipher-vendored-openssl`
 # builds both SQLCipher and OpenSSL from vendored source, so the encryption
@@ -51,6 +55,17 @@ path = "tests/ui.rs"
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled-sqlcipher-vendored-openssl", "hooks", "limits"] }
 openssl-sys = { version = "=0.9.117", default-features = false }
 zeroize = { version = "=1.9.0", features = ["derive"] }
+# Task 2 — typed dual wrappers (exact pins per Program 1A plan).
+chacha20poly1305 = { version = "=0.11.0", default-features = false, features = ["zeroize"] }
+argon2 = { version = "=0.5.3", default-features = false, features = ["zeroize"] }
+keyring = { version = "=4.1.5", default-features = false, features = ["v1"] }
+getrandom = { version = "=0.4.3", default-features = false }
+serde = { version = "=1.0.228", default-features = false, features = ["derive", "std"] }
+serde_json = { version = "=1.0.150", default-features = false, features = ["std"] }
+serde_json_canonicalizer = "=0.3.2"
+sha2 = { version = "=0.10.9", default-features = false }
+base64 = { version = "=0.22.1", default-features = false, features = ["alloc"] }
+subtle = { version = "=2.6.1", default-features = false }
 
 [dev-dependencies]
 # Exact pins per the Program 1A plan: the source-closure gate classifies

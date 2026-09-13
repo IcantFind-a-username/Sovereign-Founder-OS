@@ -24,6 +24,7 @@ const ROOTS: &[&str] = &[
     "tests/build_gate.rs",
     "tests/ast_gate.rs",
     "tests/public.rs",
+    "tests/recovery_ui.rs",
     "tests/ui.rs",
     "src/main.rs",
 ];
@@ -36,6 +37,7 @@ const AUXILIARY_ROOTS: &[&str] = &[
     "tests/ui/cannot_reach_raw_handle.rs",
     "tests/ui/cannot_construct_create_mode.rs",
     "tests/ui/cannot_select_cipher_profile.rs",
+    "tests/recovery_ui/recovery_read_only.rs",
 ];
 
 /// The two `include!` edges that let the build script's gate logic be the
@@ -147,11 +149,18 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
         vec![
             "build.rs",
             "build_gate.rs",
+            "src/engine/entropy.rs",
             "src/engine/ffi.rs",
+            "src/engine/key_slots.rs",
             "src/engine/mod.rs",
+            "src/engine/platform.rs",
             "src/engine/process.rs",
+            "src/engine/recovery.rs",
+            "src/engine/recovery_authorizer.rs",
             "src/engine/secret.rs",
             "src/engine/sqlcipher.rs",
+            "src/engine/wrapper_golden_v1.rs",
+            "src/engine/wrappers.rs",
             "src/lib.rs",
             "src/main.rs",
             "tests/ast_gate.rs",
@@ -159,6 +168,7 @@ fn recursive_syn_source_closure_is_complete_and_ffi_boundary_is_exact() {
             "tests/ffi_entry.rs",
             "tests/gate.rs",
             "tests/public.rs",
+            "tests/recovery_ui.rs",
             "tests/ui.rs",
         ],
         "the source closure changed — a new file must be a declared target \

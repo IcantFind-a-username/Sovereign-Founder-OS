@@ -29,3 +29,7 @@ path = "../cannot_construct_create_mode.rs"
 [[bin]]
 name = "trybuild004"
 path = "../cannot_select_cipher_profile.rs"
+
+[[bin]]
+name = "recovery_read_only"
+path = "../../recovery_ui/recovery_read_only.rs"
