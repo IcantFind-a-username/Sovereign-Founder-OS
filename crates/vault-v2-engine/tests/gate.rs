@@ -32,10 +32,9 @@
 //! as auxiliary roots, not module-closure members.
 
 use crate::ffi_entry::{
-    admitted_extern_symbol, admitted_production_entry_function,
-    admitted_test_only_entry_function, attr_is_cfg_test, path_tail_is_forbidden,
-    use_tree_forbidden_root, use_tree_has_forbidden_glob, FORBIDDEN_FFI_SYMBOLS,
-    FORBIDDEN_USE_ROOTS,
+    admitted_extern_symbol, admitted_production_entry_function, admitted_test_only_entry_function,
+    attr_is_cfg_test, path_tail_is_forbidden, use_tree_forbidden_root, use_tree_has_forbidden_glob,
+    FORBIDDEN_FFI_SYMBOLS, FORBIDDEN_USE_ROOTS,
 };
 use proc_macro2::{Delimiter, TokenTree};
 use std::collections::BTreeSet;
@@ -252,10 +251,7 @@ impl Gate<'_, '_> {
                 self.walk_directory(&path);
             } else if path.extension().is_some_and(|extension| extension == "rs")
                 && !self.outcome.closure.contains(&relative)
-                && !self
-                    .config
-                    .auxiliary_roots
-                    .contains(&relative.as_str())
+                && !self.config.auxiliary_roots.contains(&relative.as_str())
             {
                 self.violation(
                     &relative,
@@ -422,15 +418,11 @@ impl FileScanner<'_, '_, '_> {
             return;
         }
         if let Some(symbol) = path_tail_is_forbidden(path) {
-            self.violation(&format!(
-                "forbidden FFI symbol `{symbol}` in {context}"
-            ));
+            self.violation(&format!("forbidden FFI symbol `{symbol}` in {context}"));
         }
-        if path
-            .segments
-            .first()
-            .is_some_and(|segment| FORBIDDEN_USE_ROOTS.contains(&segment.ident.to_string().as_str()))
-        {
+        if path.segments.first().is_some_and(|segment| {
+            FORBIDDEN_USE_ROOTS.contains(&segment.ident.to_string().as_str())
+        }) {
             self.violation(&format!("forbidden import root in {context}"));
         }
     }
@@ -568,9 +560,7 @@ impl<'ast> Visit<'ast> for FileScanner<'_, '_, '_> {
         if !self.in_boundary {
             self.violation("unsafe block outside the declared FFI boundary");
         } else if !self.inside_admitted_ffi_entry() {
-            self.violation(
-                "unsafe block outside the admitted production FFI entry points",
-            );
+            self.violation("unsafe block outside the admitted production FFI entry points");
         }
         visit::visit_expr_unsafe(self, expression);
     }

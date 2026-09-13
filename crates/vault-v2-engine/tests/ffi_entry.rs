@@ -28,8 +28,7 @@ pub fn admitted_test_only_entry_function(file: &str, name: &str) -> bool {
 pub fn admitted_extern_symbol(file: &str, name: &str) -> bool {
     matches!(
         (file, name),
-        ("src/engine/process.rs", "OPENSSL_init_crypto")
-            | ("src/engine/ffi.rs", "sqlite3_key_v2")
+        ("src/engine/process.rs", "OPENSSL_init_crypto") | ("src/engine/ffi.rs", "sqlite3_key_v2")
     )
 }
 
