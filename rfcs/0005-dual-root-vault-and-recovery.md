@@ -2,8 +2,11 @@
 
 **Status:** Draft (decided 2026-08-26 — see Design status and acceptance
 gates); approved implementation target; Amendment 1 applied 2026-08-26 (exact
-SQLCipher release selection for Program 1B0 — see Amendments)
-**Implementation:** None
+SQLCipher release selection for Program 1B0 — see Amendments); Amendment 2
+applied 2026-09-14 (recovery re-key ceremony and post-ActiveV2 reversibility —
+see Amendments). Formal `Accepted` remains pending maintainer rationale.
+**Implementation:** Program 1A engine Experimental (non-product); Programs 1B+
+not started
 **Maturity:** Target design; no current protection claim
 **Security impact:** Critical
 
@@ -16,7 +19,7 @@ delta, an adversarial test plan, migration/rollback analysis, independent
 review where a release gate calls for it, and the maintainer's recorded
 acceptance rationale. This section records, as a decision rather than an
 oversight, which of those gates are satisfied and which remain open
-(recorded 2026-08-26).
+(recorded 2026-08-26; Amendment 2 refresh 2026-09-14).
 
 Evidence present and linked:
 
@@ -32,13 +35,20 @@ Evidence present and linked:
 
 Gates outstanding:
 
-1. **Independent review.** None exists.
-   `docs/security/open-source-security-cross-validation.md` is a maintainer
-   research note cross-checking upstream mechanisms; it states itself that it
-   is not a third-party audit and does not satisfy this gate.
+1. **Independent review.** An external design review now exists. It supported
+   the architecture and required protocol-gap fixes before formal `Accepted`.
+   Amendment 2 (2026-09-14) records the normative fixes for that review's
+   items 1–4 (recovery re-key ceremony, post-ActiveV2 reversibility, backup
+   attendance honesty, dual-root failure-domain coupling). Items 5–6 remain
+   open follow-ups and do not block this amendment. The review is a design
+   review, not a third-party audit; it does not itself flip Status to
+   `Accepted`. `docs/security/open-source-security-cross-validation.md`
+   remains a maintainer research note and still does not satisfy this gate
+   by itself.
 2. **Recorded maintainer acceptance.** Accepting a `Security impact: Critical`
    RFC requires the maintainer's recorded rationale (CONTRIBUTING.md); no such
-   record exists yet.
+   record exists yet. Formal `Accepted` awaits that rationale after this
+   amendment lands and is reviewed.
 
 What the `Draft` status licenses and withholds:
 
@@ -115,10 +125,15 @@ separate gates.
 - Normal business writes use database transactions with a fixed SQLCipher
   profile and fail-closed open sequence.
 - Loss of an enrolled device remains recoverable with an offline recovery kit.
-- Device and recovery compromise are independent.
+- Device and recovery *compromise* are independent (distinct wrap keys and
+  unlock ceremonies). They are not independent *failure domains*: the device
+  wrap binds `recovery_slot_commitment`, so recovery-slot corruption fails
+  normal device unlock even when DeviceKEK is intact (see Amendment 2).
 - Password and device-wrapper rotation do not rewrite the database.
-- Recovery unlock is structurally read-only until separately authorized device
-  enrollment completes.
+- Recovery unlock is structurally read-only. New-device registration after a
+  read-only session is a separate owner-authorized re-key ceremony that MUST
+  re-enter the recovery password and MUST NOT use secrets retained from the
+  prior session.
 - Legacy import is explicit, bounded, side-by-side, crash recoverable, and never
   an authentication fallback.
 - Backup is a filtered recovery database, not a copy of the live database.
@@ -328,6 +343,20 @@ substitution of recovery material therefore makes normal device unwrap fail
 instead of silently leaving a workspace without its enrolled recovery route.
 There is deliberately no reciprocal device-slot commitment inside recovery AAD,
 avoiding a circular construction.
+
+This coupling is intentional. Dual-root means two wrap keys and two unlock
+ceremonies, not two independent failure domains. Corruption, deletion, or
+substitution of the recovery slot can fail normal device unlock even when
+DeviceKEK is intact and the SQLCipher database is otherwise readable. The
+current profile default (Amendment 2) is **profile A**: recovery-slot
+corruption with DeviceKEK still present is recovered only by restoring from
+a qualified backup; there is no in-place device-only repair. A separately
+authorized read-only salvage path that unwraps DBK from DeviceKEK and
+reconstructs a recovery slot (**profile B**) is out of scope until a later
+amendment names it. First-ship disaster drills MUST include the case
+“recovery slot corrupted, DeviceKEK still present” and MUST demonstrate
+restore-from-backup under profile A (or the later-named salvage path if a
+superseding amendment selects B).
 
 ## SQLCipher transactional database
 
@@ -960,12 +989,34 @@ connection necessarily retains its private internal key schedule until close;
 the Rust session retains no raw recovery/DBK holder or export/reconstruction
 path. This is a reduced lifetime, not a claim of whole-process secure erasure.
 
-A separately consumed owner-presence authorization may transition it to
-`RecoverySession<DeviceEnrollmentAuthorized>`. That state may only provision
-and verify one native DeviceKEK, prepare its typed DBK wrapper, submit that
-consuming value to Task 4's sole hardened publisher, then close. Normal writes
-require a fresh device-root reopen. Error, expiry, or cancellation returns to
-locked state. Recovery secrets never become an automatic online root.
+The read-only session MUST close before any new-device registration begins.
+Authorization cannot restore password, PWK, RecoveryKEK, or DBK after those
+holders were zeroized. Device registration therefore MUST NOT transition a
+`RecoverySession<ReadOnly>` in place, and MUST NOT rely on secrets retained
+from that prior session (including any SQLCipher connection that still holds
+an internal key schedule).
+
+New-device registration after recovery browse is a distinct, brief ceremony
+that starts from locked state:
+
+1. The operator re-enters the recovery password.
+2. A one-use owner-presence authorization bound to workspace ID, the
+   new-device-registration operation, database and wrapper commitments,
+   format/suite versions, expiry, and a fresh challenge is consumed.
+3. In one short flow the implementation unwraps RecoveryKEK and then DBK,
+   provisions and verifies one native DeviceKEK, prepares its typed DBK
+   wrapper (binding `recovery_slot_commitment` recomputed over the current
+   recovery subrecord), submits that consuming value to Task 4's sole
+   hardened publisher, verifies both routes, then zeroizes password, Argon
+   work area, PWK, RecoveryKEK, and DBK.
+
+That authorized state may be typed
+`RecoverySession<DeviceEnrollmentAuthorized>` only for the duration of this
+ceremony. It may only provision and verify one native DeviceKEK as above; it
+MUST NOT perform business writes. Normal writes require a fresh device-root
+reopen after the ceremony closes. Error, expiry, or cancellation returns to
+locked state and MUST zeroize any ceremony holders. Recovery secrets never
+become an automatic online root.
 
 Password change rewraps the same RecoveryKEK under a new PWK and salt. Recovery
 KEK rotation creates a new RecoveryKEK and rewraps the unchanged DBK. Old
@@ -1088,9 +1139,10 @@ recovery subrecord. Task 2 MUST recompute the recovery commitment and rewrap the
 same DBK under an available DeviceKEK with the new `DeviceDbkAad`, verify both
 routes, and return only the complete prepared value. Task 4 alone may publish
 that value through the atomic protocol above.
-If DeviceKEK is unavailable, the change is forbidden until a one-use owner
-authorization enrolls and verifies a new device route. Recovery-only read
-sessions cannot rotate recovery material.
+If DeviceKEK is unavailable, the change is forbidden until the
+new-device-registration ceremony above enrolls and verifies a new device
+route. Recovery-only read sessions cannot rotate recovery material and
+cannot supply retained secrets to that ceremony.
 
 The workspace-parent `vault.format` is an authenticated-state consistency
 marker, not the product authority. The Program 1C0 owner/workspace registry is
@@ -1123,7 +1175,21 @@ accepts only a `RecoveryQualification` bound to the workspace/database ID,
 activation epoch, schema/registry, platform profile, legacy source-head
 commitment, and backup commitment before advancing the external binding to
 `ActiveV2`. Startup finishes or rolls back a pending transition without allowing either store to
-write. Program 1B0 mechanics, Program 1C0 owner authority, Program 1C1
+write.
+
+Reversibility is stage-bounded. Abort, crash, or owner revoke of `PendingV2`
+MAY restore the external binding to the still-authoritative legacy generation
+as already specified: neither store writes during that pending transition.
+That pre-activation rollback remains the reversible path described above.
+After `ActiveV2` accepts new business writes, the frozen legacy generation is
+stale relative to the live v2 database. Software rollback of the product MUST
+continue to open and serve the v2 data format; otherwise a separate, reviewed
+data-migration RFC is required before any such rollback. Directly re-enabling
+legacy writers after `ActiveV2` business writes — treating the legacy tree as
+current or discarding post-activation v2 commits — is forbidden without that
+migration protocol. This RFC does not define that protocol.
+
+Program 1B0 mechanics, Program 1C0 owner authority, Program 1C1
 identity/role-key handoff, and all other activation gates precede PendingV2;
 Program 1B1 executes inside the frozen transition. There is no custom database
 manifest/head/CURRENT file and no dual authoritative writer.
@@ -1202,9 +1268,22 @@ profile. The device route can read the live DBK but cannot unwrap or derive the
 independent RecoveryKEK. The builder therefore consumes the confirmed recovery
 password locally to unwrap RecoveryKEK, wraps the new snapshot DBK under it,
 and immediately zeroizes password/PWK/RecoveryKEK buffers. The age public
-recipient alone is insufficient. Unattended scheduled backup would require a
-separately reviewed online backup authority/key domain and is not implied by
-Programs 1B0/1B1.
+recipient alone is insufficient.
+
+This profile keeps RecoveryKEK offline: every backup construction in this RFC
+requires the recovery password at that moment. Unattended or scheduled backup
+is NOT implied and MUST NOT be treated as a first-ship capability. An
+unattended path would require a separately reviewed online backup
+authority/key domain (distinct from DeviceKEK and from RecoveryKEK) and a
+later amendment; Programs 1B0/1B1 do not admit that domain.
+
+First ship MUST define founder-visible RPO and RTO expectations — the maximum
+acceptable data-loss window and the restore-time expectation — and MUST
+surface the timestamps of the last successful backup and the last restore
+drill. Those are Target UX requirements (they MAY land with a later product
+milestone such as v0.6) but the honesty requirement belongs to this RFC now:
+the product MUST NOT imply continuous, unattended, or “always recoverable”
+backup while those expectations and timestamps are undefined or hidden.
 
 The core builder additionally consumes an opaque, one-use
 `BackupAuthorization` bound to workspace/source database and epoch, registry
@@ -1237,10 +1316,13 @@ journal state are excluded because they cannot be represented by the backup
 schema. Adding an eligible type requires RFC review.
 
 Clean restore requires age identity plus recovery password, validates the whole
-archive and recovery database before publication, provisions a new device root,
-and starts new authority/membership/session epochs. Unless a surviving admitted
-authority signs continuity, the UI says “verified data rescue under a new
-identity,” not continuous authority or history.
+archive and recovery database before publication, provisions a new device root
+through the same class of brief unwrap–wrap–verify–zeroize ceremony specified
+for post-browse registration (re-enter the recovery password; consume a one-use
+authorization; MUST NOT reuse secrets retained from a prior read-only browse
+of the snapshot), and starts new authority/membership/session epochs. Unless a
+surviving admitted authority signs continuity, the UI says “verified data
+rescue under a new identity,” not continuous authority or history.
 
 ## Whole-workspace activation blocker
 
@@ -1444,7 +1526,9 @@ Implementations MUST NOT:
 - Whole-workspace writer/value inventory with attack tests proving confidential
   canaries do not remain in plaintext persistence, logs, exports, or caches.
 - Dependency/supply-chain review, fuzzing of wrapper/archive/legacy parsers,
-  independent cryptographic/integration review, and recovery drills.
+  independent cryptographic/integration review, and recovery drills,
+  including the Amendment 2 profile-A drill that recovery-slot corruption
+  with DeviceKEK still present is recovered only from backup.
 
 No format path advances to `Current`, and no platform activates v2, until its
 applicable gates pass. Local absence of a Rust toolchain is recorded as an
@@ -1475,8 +1559,12 @@ local pass.
 8. **Default v2 and legacy retirement:** only on qualified platforms, followed
    later by separately authorized logical cleanup.
 
-Stages are reversible except owner-confirmed cleanup. Product and marketing
-labels advance only with evidence for their exact boundary.
+Pre-activation stages (`PendingV2` abort/revoke and earlier) are reversible
+as specified in the activation flow. After `ActiveV2` accepts new business
+writes, software rollback MUST continue to support the v2 data format;
+re-enabling legacy writers without a separate data-migration RFC is
+forbidden. Owner-confirmed cleanup remains irreversible. Product and
+marketing labels advance only with evidence for their exact boundary.
 
 ## Primary references
 
@@ -1545,3 +1633,81 @@ backup stays typed row-by-row into the closed recovery schema. The
 `sqlcipher_export` defensive-mode bypass fixed upstream in `4.15.0` is
 remediated by this upgrade in depth, not relied on: the API stays banned either
 way.
+
+### Amendment 2 (2026-09-14): recovery re-key ceremony and post-ActiveV2 reversibility
+
+This amendment records the normative response to an external design review
+that supported the architecture and required protocol-gap fixes before
+formal `Accepted`. Continuing Program 1A's internal engine remains licensed
+by the existing `Draft` / approved-implementation-target status. Product
+activation gates are unchanged.
+
+**Decision.** Four review items are closed in the body of this RFC:
+
+1. **Recovery session cannot authorize device registration from zeroized
+   keys.** After a `RecoverySession<ReadOnly>` is returned, password / PWK /
+   RecoveryKEK / DBK have already been cleared. A later owner-presence
+   authorization cannot restore them. New-device registration is therefore a
+   distinct short ceremony that starts from locked state: re-enter the
+   recovery password; consume a one-use authorization; in one brief flow
+   unwrap DBK, register/wrap for the new device, verify, and zeroize.
+   Device registration MUST NOT rely on secrets retained from the prior
+   read-only session.
+
+2. **Reversibility is stage-bounded.** Abort/crash/revoke of `PendingV2`
+   remains reversible as already specified. After `ActiveV2` accepts new
+   business writes, software rollback MUST continue to support the v2 data
+   format; otherwise a separate data-migration RFC is required. Directly
+   re-enabling legacy writers after those writes is forbidden without that
+   protocol.
+
+3. **Backup remains an attended RecoveryKEK ceremony.** RecoveryKEK stays
+   offline. Unattended or scheduled backup is not implied and needs a
+   separately reviewed online backup authority. First ship MUST define
+   founder-visible RPO/RTO expectations and MUST surface last-successful-
+   backup and last-restore-drill timestamps (Target UX; MAY be a later
+   product milestone). The honesty requirement is normative now.
+
+4. **Dual-root is not two independent failure domains.** Device wrap binds
+   `recovery_slot_commitment`; recovery-slot corruption can fail normal
+   device unlock even when DeviceKEK is intact. That coupling is
+   intentional. The current profile default is **A**: restore from backup
+   only. A separately authorized read-only salvage path (**B**) is out of
+   scope until a later amendment names it. Disaster drills MUST include
+   “recovery slot corrupted, DeviceKEK still present.”
+
+**What this closes.** The four protocol/honesty gaps above. The Design
+status section now records that an external design review exists; it does
+not treat that review as a third-party audit and does not flip Status to
+`Accepted`.
+
+**What stays blocked.** Formal `Accepted` still requires the maintainer's
+recorded rationale after this amendment is reviewed. Product enrollment,
+`ActiveV2`, Program 1B0 binding admission, and every protection / backup /
+recovery-ready claim remain blocked. Program 1A may continue as an
+internal Experimental engine with no product path.
+
+**Open follow-ups (not solved here).**
+
+5. **SQLCipher pin applicability review.** Amendment 1 selected exactly
+   `4.17.0`. Upstream released `4.19.0` (2026-09-08) with low-risk fixes
+   related to `sqlcipher_export` / hexkey URI. This project bans those
+   entry points, so the new release is not automatically exploitable in
+   this profile. An applicability review plus the Amendment 1
+   dependency-diff evidence is required before freezing the shipping
+   binding combo. Merge that review with the future binding-admission
+   amendment. No silent version bump is authorized by this amendment.
+
+6. **Reduce RFC binding to exact test filenames / “exactly N tests” /
+   download-failure-must-revise-RFC rules.** Move those to versioned
+   implementation plans and verify configs. Exact on-disk format, key
+   purposes, and fail-closed semantics stay in this RFC. The
+   `Implementation:` header drift (`None` while a Program 1A engine
+   exists) is corrected by this amendment to `Program 1A engine
+   Experimental (non-product); Programs 1B+ not started`. Further
+   decoupling of test-inventory language is a later editorial pass.
+
+**Unchanged prohibitions.** This amendment does not enroll a product
+Vault, activate `ActiveV2`, start Program 1B0 code, admit a binding,
+claim protection/backup/recovery readiness, or bump SQLCipher. Status
+remains `Draft`.
