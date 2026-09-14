@@ -1,68 +1,82 @@
 # RFC 0005: Transactional Dual-Root Vault and Recovery
 
-**Status:** Draft (decided 2026-08-26 — see Design status and acceptance
-gates); approved implementation target; Amendment 1 applied 2026-08-26 (exact
-SQLCipher release selection for Program 1B0 — see Amendments); Amendment 2
-applied 2026-09-14 (recovery re-key ceremony and post-ActiveV2 reversibility —
-see Amendments). Formal `Accepted` remains pending maintainer rationale.
+**Status:** Accepted (2026-09-14) — includes Amendment 1 (2026-08-26, SQLCipher
+exactly 4.17.0) and Amendment 2 (2026-09-14, recovery re-key ceremony and
+post-ActiveV2 reversibility); Security impact Critical. See Design status
+and acceptance gates and the Acceptance record.
 **Implementation:** Program 1A engine Experimental (non-product); Programs 1B+
 not started
-**Maturity:** Target design; no current protection claim
+**Maturity:** Target design; no current protection claim (Accepted ≠ implemented)
 **Security impact:** Critical
 
 ## Design status and acceptance gates
 
-The design status of this RFC remains **`Draft`** under roadmap governance
-(`Draft` / `Accepted` / `Rejected` / `Superseded` — there is no intermediate
-status): a security-sensitive RFC reaches `Accepted` only with a threat-model
-delta, an adversarial test plan, migration/rollback analysis, independent
-review where a release gate calls for it, and the maintainer's recorded
-acceptance rationale. This section records, as a decision rather than an
-oversight, which of those gates are satisfied and which remain open
-(recorded 2026-08-26; Amendment 2 refresh 2026-09-14).
+The design status of this RFC is **`Accepted`** (2026-09-14) under roadmap
+governance (`Draft` / `Accepted` / `Rejected` / `Superseded`). This is
+design acceptance of the Target contract, including Amendments 1 and 2.
+It is not an implementation, product-activation, or protection claim.
+`Accepted` ≠ implemented. Maturity remains Target design; there is no
+current protection claim.
 
-Evidence present and linked:
+Gates for **design acceptance** are now closed:
 
-- **Threat-model delta:** the boundary this design changes is stated in
-  [Threat model and trust boundary](#threat-model-and-trust-boundary), and
-  `THREAT_MODEL.md` T10 carries the matching current-limitation and target
-  entries for vault, backup, key compromise, and rollback.
-- **Adversarial test plan:**
-  [Required tests and release gates](#required-tests-and-release-gates).
-- **Migration/rollback analysis:**
-  [Real legacy migration](#real-legacy-migration) and
-  [Rollback and residual leakage](#rollback-and-residual-leakage).
+1. **Threat-model delta, adversarial test plan, and migration/rollback
+   analysis** — already present:
+   - **Threat-model delta:** the boundary this design changes is stated in
+     [Threat model and trust boundary](#threat-model-and-trust-boundary), and
+     `THREAT_MODEL.md` T10 carries the matching current-limitation and target
+     entries for vault, backup, key compromise, and rollback.
+   - **Adversarial test plan:**
+     [Required tests and release gates](#required-tests-and-release-gates).
+   - **Migration/rollback analysis:**
+     [Real legacy migration](#real-legacy-migration) and
+     [Rollback and residual leakage](#rollback-and-residual-leakage).
+2. **Independent design review.** An external design review existed. It
+   supported the architecture and required protocol-gap fixes before formal
+   `Accepted`. Amendment 2 closed items 1–4 (recovery re-key ceremony,
+   post-ActiveV2 reversibility, backup attendance honesty, dual-root
+   failure-domain profile A). Items 5–6 remain follow-ups and do not block
+   design acceptance: SQLCipher 4.19.0 applicability / binding-admission
+   pairing, and moving exact test-inventory language out of the RFC body
+   into versioned plans. The review satisfies the independent-review gate
+   for **design acceptance only**. It is not a third-party cryptographic
+   audit or product-release assurance. Product activation / 1B1
+   qualification still require stronger independent review when those
+   release gates call for it. The research note
+   `docs/security/open-source-security-cross-validation.md` remains
+   non-audit.
+3. **Maintainer Written Acceptance** is recorded below.
 
-Gates outstanding:
+What `Accepted` licenses and withholds (keep this distinction sharp):
 
-1. **Independent review.** An external design review now exists. It supported
-   the architecture and required protocol-gap fixes before formal `Accepted`.
-   Amendment 2 (2026-09-14) records the normative fixes for that review's
-   items 1–4 (recovery re-key ceremony, post-ActiveV2 reversibility, backup
-   attendance honesty, dual-root failure-domain coupling). Items 5–6 remain
-   open follow-ups and do not block this amendment. The review is a design
-   review, not a third-party audit; it does not itself flip Status to
-   `Accepted`. `docs/security/open-source-security-cross-validation.md`
-   remains a maintainer research note and still does not satisfy this gate
-   by itself.
-2. **Recorded maintainer acceptance.** Accepting a `Security impact: Critical`
-   RFC requires the maintainer's recorded rationale (CONTRIBUTING.md); no such
-   record exists yet. Formal `Accepted` awaits that rationale after this
-   amendment lands and is reviewed.
+- **Licenses:** Program 1B0 *design* progression only as each program's own
+  gates allow; speaking of this RFC as Accepted Target design. Program 1A
+  may continue as an internal Experimental engine (`crates/vault-v2-engine`)
+  — non-activated, claiming no protection, reachable from no product UI,
+  with no dependency edge from the shipped CLI.
+- **Does NOT license:** starting Program 1B0 implementation before a
+  follow-up amendment admits a released Rust binding for SQLCipher exactly
+  4.17.0 (or a superseding amendment naming another exact release after
+  applicability review of 4.19.0); product enrollment; workspace
+  migration; format selection; a product dependency edge to the engine;
+  any user-facing protection, backup, or recovery claim; `PendingV2` /
+  `ActiveV2`; founder-data confidentiality claims.
 
-What the `Draft` status licenses and withholds:
+### Acceptance record
 
-- **May be built now:** Program 1A's internal, non-product engine
-  (`crates/vault-v2-engine`), its fixtures, native adapters, recovery
-  read-only path, and side-by-side legacy importer — non-activated, claiming
-  no protection, reachable from no product UI, with no dependency edge from
-  the shipped CLI. This is what "approved implementation target" in the
-  status line licenses, and nothing more.
-- **Must not be built until `Accepted`** (in addition to each program's own
-  gates, including Amendment 1's binding admission): Program 1B0 backup
-  mechanics, product enrollment, workspace migration, v2 selection, a product
-  dependency edge to the engine, and any user-facing "encrypted", "backup",
-  "recovery", or protection claim derived from this design.
+> **Written Acceptance — RFC 0005 (2026-09-14)**  
+> As sole maintainer I accept RFC 0005 (Transactional Dual-Root Vault and Recovery), including Amendment 1 (SQLCipher exactly 4.17.0) and Amendment 2 (recovery re-key ceremony, stage-bounded reversibility, backup attendance honesty, dual-root failure-domain profile A), as the governing Target design for Vault v2.  
+>  
+> **Rationale.** The RFC records a threat-model delta, adversarial test plan, and migration/rollback analysis. An external design review supported the architecture and required protocol-gap fixes before formal acceptance; Amendment 2 (merged as PR #147 / `afba3ab2`) closed those blocking items (1–4). Follow-ups 5–6 (SQLCipher 4.19.0 applicability / binding admission pairing; move exact test-inventory language out of the RFC body) remain open and do not block design acceptance. The public Draft discussion window elapsed since the 2026-08-26 design-status decision. The research note `docs/security/open-source-security-cross-validation.md` remains non-audit; the external design review satisfies the independent-review gate for **design acceptance only**, not as a third-party cryptographic audit or product-release assurance. Product activation / 1B1 qualification still require stronger independent review when those release gates call for it.  
+>  
+> **What acceptance licenses.** Governance permission to treat this RFC as `Accepted` Target design and to implement later programs **only as each program's own gates allow**.  
+>  
+> **What acceptance does not license.** (1) Starting Program 1B0 implementation before a follow-up amendment admits one released Rust binding that bundles the selected SQLCipher release under Amendment 1's four verification requirements — `rusqlite 0.40.2` / SQLCipher 4.14.0 remains the Program 1A-only profile; applicability review of upstream 4.19.0 must accompany any shipping pin. (2) Product enrollment, workspace migration, format selection, a product dependency edge to the engine, or any user-facing protection/backup/recovery claim. (3) `PendingV2` / `ActiveV2` / founder-data confidentiality.  
+>  
+> **Explicit separation:** Accepting RFC 0005 ≠ implementing 1B0 ≠ shipping product ActiveV2.
+
+Recorded by the repository owner / sole maintainer (IcantFind-a-username /
+Yiqun Xu) on 2026-09-14. No co-signers.
 
 ## Summary
 
@@ -1681,11 +1695,12 @@ status section now records that an external design review exists; it does
 not treat that review as a third-party audit and does not flip Status to
 `Accepted`.
 
-**What stays blocked.** Formal `Accepted` still requires the maintainer's
-recorded rationale after this amendment is reviewed. Product enrollment,
-`ActiveV2`, Program 1B0 binding admission, and every protection / backup /
-recovery-ready claim remain blocked. Program 1A may continue as an
-internal Experimental engine with no product path.
+**What stays blocked (as of this amendment).** Formal `Accepted` still
+required the maintainer's recorded rationale after this amendment was
+reviewed. Product enrollment, `ActiveV2`, Program 1B0 binding admission,
+and every protection / backup / recovery-ready claim remain blocked.
+Program 1A may continue as an internal Experimental engine with no
+product path.
 
 **Open follow-ups (not solved here).**
 
@@ -1709,5 +1724,6 @@ internal Experimental engine with no product path.
 
 **Unchanged prohibitions.** This amendment does not enroll a product
 Vault, activate `ActiveV2`, start Program 1B0 code, admit a binding,
-claim protection/backup/recovery readiness, or bump SQLCipher. Status
-remains `Draft`.
+claim protection/backup/recovery readiness, or bump SQLCipher. This
+amendment itself left Status as `Draft`. Formal `Accepted` is recorded
+later the same day in [Acceptance record](#acceptance-record).
