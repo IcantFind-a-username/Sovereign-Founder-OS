@@ -222,12 +222,15 @@ fn every_broker_barrier_is_reachable() {
         (Barrier::AfterLockBeforeRedbOpen, true),
         (Barrier::AfterRedbOpenBeforeBrokerReady, true),
     ];
-    // Every barrier in the enum is either the legacy store one or covered
-    // above, so adding a new one without a case here fails this.
+    // Every barrier in the enum is either the legacy store one, a
+    // `consume_bundle` barrier (covered in sovereign-authority
+    // `subprocess_claims`), or listed above — adding one without updating
+    // those sites fails this.
+    const BUNDLE_CONSUME_BARRIERS: usize = 2;
     assert_eq!(
         Barrier::ALL.len(),
-        broker_barriers.len() + 1,
-        "a barrier was added without a kill-matrix case"
+        broker_barriers.len() + 1 + BUNDLE_CONSUME_BARRIERS,
+        "a barrier was added without a kill-matrix or bundle-subprocess case"
     );
 
     for (barrier, hello) in broker_barriers {

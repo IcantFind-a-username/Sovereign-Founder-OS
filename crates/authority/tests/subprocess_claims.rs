@@ -180,11 +180,6 @@ fn real_subprocess_mixed_claims_record_current_partial_consumption() {
     );
 }
 
-/// The semantic crash. A process is killed at the exact instant the temp file
-/// is written and fsynced and nothing is published. What must be true
-/// afterwards is that a reader sees no record at all — not a truncated one,
-/// not a half-published one — and that the store still works.
-#[test]
 /// F04 (RFC 0003 Amendment 1): revocation that lands after the bundle's
 /// claims but before the commit-time re-check must fail closed. The worker
 /// stops at an exact barrier; the parent revokes while it waits; the worker
@@ -241,8 +236,7 @@ fn revoke_during_bundle_commit_barrier_fails_closed() {
     }
 
     let mut framed = None;
-    let deadline =
-        std::time::Instant::now() + std::time::Duration::from_secs(35);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(35);
     for line in lines {
         if std::time::Instant::now() > deadline {
             break;
@@ -267,15 +261,15 @@ fn revoke_during_bundle_commit_barrier_fails_closed() {
             || std::fs::read_dir(authority_root.join("bundles"))
                 .unwrap()
                 .filter_map(|e| e.ok())
-                .all(|e| {
-                    !e.path()
-                        .extension()
-                        .is_some_and(|ext| ext == "committed")
-                }),
+                .all(|e| { !e.path().extension().is_some_and(|ext| ext == "committed") }),
         "no committed bundle after a revoked commit attempt"
     );
 }
 
+/// The semantic crash. A process is killed at the exact instant the temp file
+/// is written and fsynced and nothing is published. What must be true
+/// afterwards is that a reader sees no record at all — not a truncated one,
+/// not a half-published one — and that the store still works.
 #[test]
 fn kill_after_legacy_temp_sync_before_publish_exposes_no_partial_record() {
     let dir = tempfile::tempdir().unwrap();
@@ -391,9 +385,6 @@ fn bind_idempotency_conflict_worker() {
     ));
 }
 
-/// Consumes a token, announces it, then blocks so the parent can kill it
-/// before it reaches the approval. Bounded, so a parent that never kills
-/// cannot hang the suite.
 #[test]
 #[ignore = "spawned as a child; not a standalone test"]
 fn consume_bundle_worker() {
@@ -413,11 +404,18 @@ fn consume_bundle_worker() {
         id: Uuid::new_v4(),
         expires_at_unix: LATER,
     };
-    frame(classify(
-        store.consume_bundle(token, approval, idempotency, &[0x42_u8; 32], NOW),
-    ));
+    frame(classify(store.consume_bundle(
+        token,
+        approval,
+        idempotency,
+        &[0x42_u8; 32],
+        NOW,
+    )));
 }
 
+/// Consumes a token, announces it, then blocks so the parent can kill it
+/// before it reaches the approval. Bounded, so a parent that never kills
+/// cannot hang the suite.
 #[test]
 #[ignore = "spawned as a child; not a standalone test"]
 fn mixed_claims_worker() {
