@@ -4,7 +4,7 @@
 - **Plan Tasks:** 3–6 in [owner-session / exact-effect v1 plan](../../superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md)
 - **Contract:** [RFC 0006](../../../rfcs/0006-synthetic-owner-session-exact-effect-fixture.md)
 - **Audit baseline (main):** `78c7a7a31a282aa5c8fe6b683e5e38442cfd151e` — merges step-0 product 1C0 owner-admission freeze (#151)
-- **Evidence commit:** `88aee6e` on branch `cursor/runtime-phase1-step1-fixture-evidence-d947`
+- **Evidence commit:** `b95bd2c` (branch `cursor/runtime-phase1-step1-fixture-evidence-d947`; mechanism code unchanged from baseline)
 
 ## Verdict (honest)
 
