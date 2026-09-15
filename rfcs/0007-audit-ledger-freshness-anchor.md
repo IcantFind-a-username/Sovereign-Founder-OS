@@ -1,6 +1,9 @@
 # RFC 0007: Audit-Ledger Freshness Anchor
 
-**Status:** Draft; approved implementation target
+**Status:** Draft; approved implementation target for the v0.1 anchor slice;
+Amendment 1 proposed 2026-09-15 (latest-head / generation protection vs
+signing-key protection). **Amendment 1 is not accepted.** Status remains
+`Draft`; no RP1-06 product qualification is implied.
 **Stage:** v0.1 rollback-anchoring slice
 **Security impact:** High
 **Normative dependencies:** RFC 0003 (device/audit signing), THREAT_MODEL.md T6/T10
@@ -161,3 +164,159 @@ The queued implementation entries are done when these named tests pass:
 The anchor format, the accept/reject rules, and the honest boundary are frozen.
 Weakening the rewind/fork rejection, or restating the boundary as a
 whole-device-rollback defense, is a security-critical amendment to this RFC.
+
+## Amendments
+
+### Amendment 1 (proposed 2026-09-15): latest-head and generation protection vs signing-key protection
+
+**Scope and status.** This amendment is protocol and threat-model design for
+Runtime Phase 1 finding F09 and acceptance row RP1-06 (see
+`docs/security/runtime-phase-1-development-guide.zh-CN.md` on branch
+`docs/runtime-phase-1-guide` when not yet on `main`). It closes a gap in the
+v0.1 anchor slice without retracting what already landed: a device-signed
+`ledger.head` still rejects a rewound or forked ledger **when the anchor on
+disk is strictly newer than the ledger**. It does **not** reject the paired
+restore of an **old** ledger **and** an **old** anchor that were captured
+together — both remain internally consistent and validly signed. Protecting
+the signing key from a ledger-only writer therefore does **not** by itself
+protect **latest** head or generation state. Nothing below is a claim that
+RP1-06 has passed; implementation backlog entries stay blocked until a
+maintainer accepts this amendment with rationale.
+
+#### a. Two protection domains (normative separation)
+
+| Domain | What it protects | What it does not prove |
+| --- | --- | --- |
+| **Signing-key protection** | That `ledger.head` (and ledger events) were signed by the trusted device key and match `{binding, event_count, last_event_hash}` | That the opened workspace is the **latest** state the owner enrolled, not an older snapshot |
+| **Latest-head / generation protection** | That open uses a head **at or above** the highest **enrolled** generation for this workspace binding — no silent downgrade | Whole-device rollback when every secret and enrolled record restores from the same snapshot (Research; unchanged) |
+
+Implementations MUST NOT describe key custody alone (for example moving the
+device key into an RFC 0005 protector) as satisfying RP1-06 or T10
+workspace-relative freshness **until** latest-head / generation rules in this
+amendment are implemented and evidenced.
+
+#### b. Enrolled freshness generation (Target)
+
+The v0.1 anchor body (§ Anchor format) remains unchanged for backward
+compatibility. Amendment 1 adds a **separate enrolled record** (name and
+storage profile are implementation choices; it MUST NOT be implied by
+`ledger.json` or `ledger.head` alone):
+
+```text
+freshness_generation   (u64, strictly monotonic for this workspace_binding while enrolled)
+enrolled_at_unix       (u64, informational)
+workspace_binding      (same trusted device public key b64 as the ledger)
+```
+
+**Enrollment.** The first time a deployment claims workspace-relative
+freshness beyond the v0.1 slice, it MUST persist an enrolled generation (≥ 1)
+in storage that is **not** restored as a unit with an arbitrary old workspace
+tree unless that restore is explicitly classified as limited recovery (§ e).
+Each time the ledger head anchor advances to a new tip that the product treats
+as authoritative, the implementation MUST bump `freshness_generation` and
+persist the enrolled record **before** or **atomically with** treating open as
+successful — never accept a lower generation after a higher one was enrolled.
+
+**Open-time rules (in addition to § Open-time freshness check).** After
+`verify_chain` and anchor verification succeed:
+
+1. If an enrolled record exists for this binding, reject if
+   `anchor_generation < enrolled.freshness_generation` (**generation
+   downgrade**) even when the anchor signature and ledger prefix match.
+2. If an enrolled record exists, reject if the presented anchor does not
+   carry the generation expected for this head (once generation is wired into
+   the anchor sidecar or an adjacent signed field — see § c).
+3. If enrollment was required by product policy and the enrolled record is
+   **missing**, fail closed into **limited recovery** (§ e); do not silently
+   accept the on-disk anchor as “current.”
+
+**Non-downgradeable semantics.** Restoring `ledger.json` and `ledger.head`
+from the same backup without the **current** enrolled generation MUST NOT
+produce a normal open. The honest v0.1 co-located layout may still allow a
+**full-directory** writer to rewrite enrolled state together with the ledger;
+that remains whole-device rollback (Research). The Target is enrolled state
+that survives a workspace-tree-only restore (RFC 0005 device protector, OS
+secure storage, owner-held trust-continuity material, or another profile named
+in the implementation plan).
+
+#### c. Anchor generation binding (Target wire extension)
+
+When generation protection is implemented, the signed anchor commitment MUST
+include `freshness_generation` (u64) in the signed body (sidecar version bump,
+not a change to `AuditEventBody`). The enrolled record and the anchor MUST
+agree on generation for the same `{workspace_binding, event_count,
+last_event_hash}`. A forward extension of the ledger without a matching
+generation bump fails closed.
+
+Until that wire extension ships, implementations MUST document the residual:
+paired old ledger + old anchor acceptance when nothing outside the restored
+tree remembers a higher generation.
+
+#### d. Authority and revocation state (cross-RFC 0003)
+
+Audit-chain verification and anchor freshness MUST NOT be treated as proof
+that **authority consumption, reservations, or revocations** are still valid
+for new effects.
+
+- **Generation invalidation.** When `freshness_generation` advances through
+  recovery, re-enrollment, or any path that replaces enrolled state, all
+  prior consumed-bundle markers, dispatch handles, session epochs, and
+  effect-intent authority bound to the superseded generation MUST be treated
+  as **invalid for new execute paths** without a new owner ceremony — even if
+  `verify_chain` over an old ledger prefix would still pass in isolation.
+- **Recovery isolation.** Recovery protocols MUST align with RFC 0003
+  Amendment 1 roll-forward semantics and Program 2 / RFC 0006 recovery
+  isolation: restoring business data does not automatically restore execution
+  authority; stale grants MUST NOT revive because the audit log looks
+  internally consistent.
+- **Revocation durability.** Durable revocations remain authoritative across
+  crash; they do not override generation downgrade detection — a rewound
+  authority store plus an old anchor is still a security failure, not a
+  silent return to “revoked still revoked, therefore safe to dispatch old
+  grants.”
+
+#### e. Missing anchor and missing enrolled state (fail closed)
+
+| Condition | Required behavior |
+| --- | --- |
+| Non-empty ledger, anchor previously written, `ledger.head` missing | Unchanged: fail closed (§ Non-negotiable invariants). |
+| Enrollment claimed, enrolled generation missing | Fail closed into **limited recovery** — explicit operator/owner mode with narrowed capabilities, diagnostic surfacing, and no default full workspace open. |
+| Enrolled generation present, ledger/anchor pair inconsistent with it | Fail closed; do not pick the “best effort” older head. |
+| Owner completes limited recovery | MUST bump to a **new** generation strictly above any value found in restored artifacts; MUST NOT silently re-use pre-restore grants. |
+
+Limited recovery is not a silent security downgrade: UI and APIs MUST distinguish
+it from normal open (exact strings are product choices; the distinction is
+normative).
+
+#### f. Whole-device rollback (unchanged honesty)
+
+This amendment does **not** expand scope to defeat an actor who restores an
+internally valid full-device snapshot including device key, enrolled
+generation, ledger, anchor, and authority store. THREAT_MODEL.md T10
+Research/deployment-dependent language remains the ceiling. Workspace-relative
+freshness means **protected latest state survives a rollback of the
+replaceable workspace tree**, not that the device proves its own age from
+itself alone.
+
+#### g. Conformance tests (implementation target; names illustrative)
+
+Blocked until Amendment 1 is accepted. Expected additions beyond §
+Conformance tests:
+
+- `paired_old_ledger_and_old_anchor_rejected_when_enrolled_generation_survives`
+- `a_generation_downgrade_is_rejected_even_with_valid_signatures`
+- `missing_enrolled_generation_after_enrollment_enters_limited_recovery`
+- `authority_consume_state_not_assumed_fresh_from_audit_chain_alone`
+- `apps/cli`: `a_paired_workspace_tree_restore_is_refused_when_generation_survives_outside_tree`
+
+Existing v0.1 tests remain required; they document the conditional slice, not
+RP1-06 completion.
+
+#### h. What stays blocked
+
+- Flipping RFC 0007 or this amendment to **Accepted** on the implementation
+  branch.
+- Claiming RP1-06 product qualification or Runtime Phase 1 completion.
+- Using audit freshness alone to authorize effects after restore.
+- Whole-device rollback detection without an external monotonic anchor
+  (Research).
