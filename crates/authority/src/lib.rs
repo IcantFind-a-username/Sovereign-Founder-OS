@@ -325,9 +325,17 @@ impl AuthorityStore {
             now_unix,
         )?;
         self.bundle_check_revocation(token.id, approval.id)?;
+        #[cfg(feature = "fault-injection")]
+        fault_injection::reach(
+            fault_injection::Barrier::AfterBundleRevocationPrecheckBeforeTokenClaim,
+        );
         self.bundle_claim_token(&bundle_hex, token, now_unix)?;
         self.bundle_bind_idempotency(&bundle_hex, idempotency, invocation_fingerprint, now_unix)?;
         self.bundle_claim_approval(&bundle_hex, approval, now_unix)?;
+        #[cfg(feature = "fault-injection")]
+        fault_injection::reach(
+            fault_injection::Barrier::AfterBundleApprovalClaimBeforeCommitRecheck,
+        );
         self.bundle_commit(&bundle_hex, &intent, now_unix)
     }
 

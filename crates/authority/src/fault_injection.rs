@@ -54,6 +54,13 @@ pub enum Barrier {
     AfterLockBeforeRedbOpen,
     /// The database is open; the broker has not reported ready.
     AfterRedbOpenBeforeBrokerReady,
+
+    /// Inside `consume_bundle`: revocation pre-check passed; token claim not
+    /// started. A revoker can publish while the bundle is paused here.
+    AfterBundleRevocationPrecheckBeforeTokenClaim,
+    /// Inside `consume_bundle`: token, idempotency, and approval are claimed
+    /// under this bundle; the commit-time revocation re-check has not run.
+    AfterBundleApprovalClaimBeforeCommitRecheck,
 }
 
 impl Barrier {
@@ -64,6 +71,12 @@ impl Barrier {
             Barrier::AfterAuthenticatedHelloBeforeLock => "AfterAuthenticatedHelloBeforeLock",
             Barrier::AfterLockBeforeRedbOpen => "AfterLockBeforeRedbOpen",
             Barrier::AfterRedbOpenBeforeBrokerReady => "AfterRedbOpenBeforeBrokerReady",
+            Barrier::AfterBundleRevocationPrecheckBeforeTokenClaim => {
+                "AfterBundleRevocationPrecheckBeforeTokenClaim"
+            }
+            Barrier::AfterBundleApprovalClaimBeforeCommitRecheck => {
+                "AfterBundleApprovalClaimBeforeCommitRecheck"
+            }
         }
     }
 
@@ -75,6 +88,8 @@ impl Barrier {
         Barrier::AfterAuthenticatedHelloBeforeLock,
         Barrier::AfterLockBeforeRedbOpen,
         Barrier::AfterRedbOpenBeforeBrokerReady,
+        Barrier::AfterBundleRevocationPrecheckBeforeTokenClaim,
+        Barrier::AfterBundleApprovalClaimBeforeCommitRecheck,
     ];
 }
 
