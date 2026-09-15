@@ -940,7 +940,7 @@ while the controller routes eligible design/review cards to the strong role.
 
 <a id="runtime-owner-task4"></a>
 
-- [ ] **P3 | `scripts/`, `apps/cli/tests/` | Owner-session Task 4 remainder: `check-owner-effect-broker-build.sh` only.**
+- [ ] **P3 | `scripts/`, `apps/cli/tests/` | Owner-session Task 4 remainder: `check-owner-effect-broker-build.sh` only.** IN PROGRESS (2026-09-15)
   The broker chain, `platform_publish.rs`, and `crates/authority/tests/migration.rs`
   landed 2026-09-10 (#59–#66) and were re-verified for Runtime Phase 1 step 1 on
   Linux x86_64 (`78c7a7a`; see
