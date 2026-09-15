@@ -96,6 +96,15 @@ repo audit; every entry below points at verified, real state of the code.
   reserve-to-dispatch; no RP1-02/03 product claim. Docs-only queue close;
   prior report records ALL GREEN. Does not invert F03 or claim RP1-02/03.
 
+- [x] **P1 | `docs/handoff/reports/`, `docs/backlog.md` | Phase 1 step-3: fixture evidence / browser / split / recovery / freshness Tasks 12–15.**
+  Completed 2026-09-16 on baseline `0d7972c` (#154 tip). Delivers
+  [2026-09-16-runtime-phase1-step3-fixture-evidence-recovery-freshness.md](handoff/reports/2026-09-16-runtime-phase1-step3-fixture-evidence-recovery-freshness.md):
+  owner-plan Tasks 12–15; TSV 12/13/15 (22 rows) green; Task 14 has **zero**
+  TSV rows (`--task 14` fail-closed); RFC 0007 Amendment 1 still not Accepted
+  (#150 text only); product journal/SIGKILL/race/freshness-open/checkpoint/F04
+  pins cited not re-implemented. No RP1-04/05/06 product claim. Docs-only
+  queue close. Does not implement Amendment 1 or invert F03.
+
 <a id="runtime-f03-exact-effect-honesty-pin"></a>
 
 - [x] **P2 | `apps/cli/src/workspace/` | Pin F03 / RP1-02 honesty — product approval does not bind final recipient or exact `.eml` bytes.** Landed 2026-09-15.
@@ -961,6 +970,18 @@ while the controller routes eligible design/review cards to the strong role.
   [step-2 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step2-fixture-reservation-exact-effect-evidence.md).
   Done when: optional trybuild goldens exist for payload/root compile-fail,
   or the plan records they stay unregistered.
+
+<a id="runtime-owner-task12-heal"></a>
+
+- [ ] **P3 | `crates/audit-ledger/`, `crates/authority/` | Owner-session Task 12 remainder: terminal-before-append heal + authority `effect_evidence`.**
+  TSV Task 12 is 10 `sovereign-audit-ledger` `effect_v1` rows (value-free
+  projection, chain, conflict, indeterminate never relabelled). Plan extras
+  `crash_after_terminal_before_append_heals_evidence_only` and
+  `crates/authority/tests/effect_evidence.rs` were never registered. Not
+  product RP1-05. See
+  [step-3 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step3-fixture-evidence-recovery-freshness.md).
+  Done when: those tests exist and are TSV-registered, or the plan records
+  they stay unregistered.
 
 <a id="runtime-owner-http"></a>
 
@@ -1908,6 +1929,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 - 2026-09-15: proposed RFC 0007 Amendment 1 (latest-head / `freshness_generation` vs signing-key protection; enrolled non-downgradeable state; limited-recovery failure modes; RFC 0003 authority coupling for RP1-06 / F09). Docs on `rfcs/0007`, `docs/INDEX.md`, handoff report `docs/handoff/reports/2026-09-15-rfc-0007-amendment-1.md`, and a blocked implementation queue entry. Status stays `Draft`; no RP1-06 product claim. Rebased onto main after Phase 1 guide (#149, `d8ffec98`).
 - 2026-09-15: F03 / RP1-02 product honesty pin — `rp1_02_product_approval_does_not_bind_final_recipient_or_exact_eml_bytes` documents that approval binds delivery preparation only; handoff `docs/handoff/reports/2026-09-15-f03-rp1-02-exact-effect-honesty-pin.md`; queued `runtime-f03-exact-effect-product` for Program 2 invert. No RP1-02 product pass.
 - 2026-09-16: Phase 1 step-2 fixture reservation / exact-effect evidence — Tasks 7–11, 50 TSV rows green on baseline `4707835`; no product Exact Effect; #152 F03 pin still true; F04 barrier is filesystem bundle not fixture reserve-to-dispatch; no RP1-02/03 product claim. Queued P3 residuals `runtime-owner-task10-plane` and `runtime-owner-trybuild`.
+- 2026-09-16: Phase 1 step-3 fixture evidence / recovery / freshness — Tasks 12–15 on baseline `0d7972c`; TSV 12/13/15 (22 rows) green; Task 14 zero rows fail-closed; Amendment 1 still not Accepted; product journal/SIGKILL/race/freshness/checkpoint/F04 pins cited. No RP1-04/05/06 claim. Queued P3 `runtime-owner-task12-heal`.
 - 2026-08-23 policy conflict, NOT auto-resolved: this session's `~/.claude/stop-hook-git-check.sh` flagged commits `4ce54fc`/`e5059e7`/`d1a75a9` as "Unverified" and asked to `git commit --amend --reset-author` (identity `Claude <noreply@anthropic.com>`) plus force-push. Declined: this repo's own `CLAUDE.md` explicitly forbids AI attribution and requires the repository owner's identity as author/committer, matching this session's own claim/land instructions and every prior round back to 2026-08-14. Rewriting already-pushed shared-branch history to satisfy an environment-level hook, against a deliberate and repeatedly-applied repo policy, is not a call an unattended session should make unilaterally — left commits as-is. A human needs to decide whether the environment hook or `CLAUDE.md`'s convention should win, and update whichever side is out of date.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
