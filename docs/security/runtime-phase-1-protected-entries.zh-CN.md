@@ -1,6 +1,6 @@
 # Runtime Phase 1 — 受保护入口清单（产品 MVP 快照）
 
-日期：2026-09-16。事实基线：`b6dc508e`。状态：**当前行为记录**；用于 Phase 1 指南 §4 第 0 步与 RP1-01，不构成资格声明。
+日期：2026-09-16。事实基线：`d8ffec98`（入口行为未变；F04 屏障见 authority 测试）。状态：**当前行为记录**；用于 Phase 1 指南 §4 第 0 步与 RP1-01，不构成资格声明。产品 1C0 准入写集与缺口清单见 [设计冻结卡](runtime-phase-1-product-1c0-owner-admission-freeze.zh-CN.md)。
 
 本表列出**今天**可通过 CLI、本地 UI HTTP、或 `Store` 直接触达、并能创建/消费身份类密钥、签署批准、写入 outbox、或改写 authority 状态的路径。Fixture（RFC 0006）与 `legacy-experimental` 配置文件另表；此处仅覆盖默认 `sovereign ui` 产品 MVP 路径。
 
@@ -78,6 +78,7 @@
 
 | 测试 | 证明什么 |
 | --- | --- |
+| `apps/cli/tests/ui_http_boundary.rs`：`an_unauthenticated_local_post_can_approve_today_1c0_pin`、`product_decide_mints_vault_keys_without_owner_admission_1c0_pin` | 诚实旁路：未认证 loopback 批准 + app-local vault 建钥（1C0 落地后 invert） |
 | `tests/adversarial/.../workspace_authority_invariants.rs` | workspace 路径 bundle 中断与撤销竞争 soak |
 | `crates/authority/tests/subprocess_claims.rs`：`revoke_during_bundle_commit_barrier_fails_closed` | F04：commit 前撤销的确定性屏障 |
 | `crates/authority/src/tests.rs`：`a_revoke_vs_consume_race_ends_in_one_durable_outcome` | authority 层撤销 vs consume 结果枚举 |

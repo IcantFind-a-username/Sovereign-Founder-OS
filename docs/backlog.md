@@ -65,6 +65,18 @@ repo audit; every entry below points at verified, real state of the code.
   description in the review and fixture qualification note. Documentation
   completion does not pass any product security gate.
 
+- [x] **P1 | `docs/security/`, `apps/cli/tests/` | Phase 1 step-0: product 1C0 owner-admission design freeze card.**
+  Completed 2026-09-16 (`d8ffec98` baseline). Delivers
+  [runtime-phase-1-product-1c0-owner-admission-freeze.zh-CN.md](security/runtime-phase-1-product-1c0-owner-admission-freeze.zh-CN.md):
+  gap inventory vs RFC 0006, RP1-01 / Program 1C0 admission checklist, write-set
+  (product vs fixture-only vs deferred), explicit non-goals, and reviewer freeze
+  checklist; links from Phase 1 guide §4 step 0, protected-entries, and INDEX.
+  Adds honesty pin
+  `product_decide_mints_vault_keys_without_owner_admission_1c0_pin` beside the
+  existing HTTP approve pin. Does not implement 1C0, Wave D, ActiveV2, 1B0, or
+  claim RP1 product pass. Done when: `./scripts/test_changed.sh` green and doc
+  links resolve.
+
 - [x] **P1 | `crates/capability/` | Uncommitted authority-bundle refactor in `v2.rs` regresses the approval-reuse gate and leaves a dead mapper.**
   Closed 2026-09-11: the working tree this diagnosed is what landed as #90,
   with the regression fixed rather than carried. The entry asked for a
