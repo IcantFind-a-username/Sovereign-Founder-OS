@@ -45,6 +45,15 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [ ] **P1 | `docs/security/`, `docs/INDEX.md`, `docs/backlog.md` | Add the Runtime Phase 1 development and acceptance guide.** IN PROGRESS (2026-09-16)
+  Owner-requested documentation integration: add the kernel review as a
+  design source, write the Phase 1 scope, runtime contracts, dependencies and
+  acceptance map against existing RFCs and queue entries, and link the guide
+  from the documentation index. Keep Runtime in this repository and preserve
+  fixture/product qualification boundaries. Do not duplicate implementation
+  tasks or promote target guarantees to current claims. Done when local links
+  and `git diff --check` pass and `./scripts/test_changed.sh` is ALL GREEN.
+
 - [x] **P1 | `crates/capability/` | Uncommitted authority-bundle refactor in `v2.rs` regresses the approval-reuse gate and leaves a dead mapper.**
   Closed 2026-09-11: the working tree this diagnosed is what landed as #90,
   with the regression fixed rather than carried. The entry asked for a
