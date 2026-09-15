@@ -45,6 +45,26 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+- [x] **P1 | `docs/security/`, `docs/INDEX.md`, `docs/backlog.md` | Add the Runtime Phase 1 development and acceptance guide.** Completed 2026-09-16.
+  Owner-requested documentation integration: add the kernel review as a
+  design source, write the Phase 1 scope, runtime contracts, dependencies and
+  acceptance map against existing RFCs and queue entries, and link the guide
+  from the documentation index. Keep Runtime in this repository and preserve
+  fixture/product qualification boundaries. Do not duplicate implementation
+  tasks or promote target guarantees to current claims. Done when local links
+  and `git diff --check` pass and `./scripts/test_changed.sh` is ALL GREEN.
+  Runtime implementation entry:
+  [Phase 1 development and acceptance guide](security/runtime-phase-1-development-guide.zh-CN.md).
+  Its [F01–F10 map](security/runtime-phase-1-development-guide.zh-CN.md#findings)
+  uses `review:P0/P1` independently of this queue's P1/P2/P3 priorities.
+  Before claiming the mapped implementation entries, reconcile the guide's
+  [contract differences](security/runtime-phase-1-development-guide.zh-CN.md#sequence)
+  in their existing RFC/Program scope; the review does not replace them.
+  The guide defines eight product acceptance rows, maps all ten findings,
+  preserves existing task statuses, and corrects the stale WebAuthn-adapter
+  description in the review and fixture qualification note. Documentation
+  completion does not pass any product security gate.
+
 - [x] **P1 | `crates/capability/` | Uncommitted authority-bundle refactor in `v2.rs` regresses the approval-reuse gate and leaves a dead mapper.**
   Closed 2026-09-11: the working tree this diagnosed is what landed as #90,
   with the regression fixed rather than carried. The entry asked for a
@@ -733,6 +753,8 @@ while the controller routes eligible design/review cards to the strong role.
   `a_bundle_interrupted_after_the_token_claim_resumes_on_retry` for a token
   without an approval.
 
+<a id="runtime-owner-design"></a>
+
 - [x] **P1 | `rfcs/`, `docs/` | Pin the 1C0 mechanism design: admitted owner authenticator, single session, one-use approval issuer.**
   ROADMAP v0.1's largest un-designed block (ROADMAP.md:106, 184-186; exit
   criterion 2 at :196-200). The requirements exist but are scattered:
@@ -849,6 +871,9 @@ while the controller routes eligible design/review cards to the strong role.
 
 
 - [x] **P2 | `crates/owner/` | Owner-session Task 5 remainder: the WebAuthn adapter.** Landed 2026-09-10 as `fixtures/owner-webauthn`, in its own workspace. The 116-package pin — 94 crates and a system OpenSSL binding — stays out of the audited core lock file entirely, the same shape `apps/desktop` already uses for the webview stack. Verified: `Cargo.lock` is unchanged, holds zero webauthn/openssl entries, and the crate is not a core workspace member. CI builds it in its own step, because nothing else can.
+
+<a id="runtime-owner-task4"></a>
+
 - [ ] **P2 | `crates/authority/`, `apps/cli/` | Owner-session Task 4 remainder: migration gate and broker-build check.**
   The broker's core chain landed 2026-09-10 across six slices (#59-#66):
   bootstrap frame, root classification, loopback bind under one fixed
@@ -878,6 +903,8 @@ while the controller routes eligible design/review cards to the strong role.
   `./scripts/owner-auth-origin-preflight.sh --virtual` runs green on Linux, the
   matrix doc exists with the schema and an honest empty-real-matrix note, and
   `./scripts/test_changed.sh` prints ALL GREEN.
+
+<a id="runtime-owner-http"></a>
 
 - [x] **P2 | `apps/cli/src/` | Stand up an HTTP-layer test boundary for the loopback API and pin today's posture.** Landed 2026-09-09 (`apps/cli/tests/ui_http_boundary.rs`, `tests/support/ui_server.rs`).
   There are no HTTP tests at all — ui.rs has no `#[test]` and no
@@ -921,7 +948,9 @@ while the controller routes eligible design/review cards to the strong role.
   revoked the delivery — belongs with the execution-journal entry below,
   which is where Indeterminate records are reconciled.
 
-- [x] **P2 | `tests/adversarial/` | Pin the transactional/revocation security invariants cross-crate.** Landed 2026-09-13.
+<a id="runtime-authority-invariants"></a>
+
+- [x] **P2 | `tests/adversarial/` | Pin the transactional/revocation security invariants cross-crate.** Landed 2026-09-13; F04 deterministic commit barrier added 2026-09-16 (`revoke_during_bundle_commit_barrier_fails_closed` in `crates/authority/tests/subprocess_claims.rs`, `fault-injection` feature).
   Blocked on everything above. Two invariants as adversarial tests, driven
   through the workspace-level path rather than authority internals: (1) no
   interruption point of the consumption bundle leaves a state where the
@@ -994,6 +1023,8 @@ while the controller routes eligible design/review cards to the strong role.
   removal surfaces an error and the file remains listed as present; and
   `cargo test -p sovereign-effects` passes.
 
+<a id="runtime-journal-recovery"></a>
+
 - [x] **P2 | `apps/cli/src/workspace/` | Reconcile the execution journal on open and surface Indeterminate records.** (v01-08)
   Product defect found 2026-08-26: `ExecutionJournal::recover`
   (crates/execution/src/lib.rs:149) is never called by product code, so a
@@ -1008,6 +1039,8 @@ while the controller routes eligible design/review cards to the strong role.
   appears while the outbox and authority store are untouched;
   `recover_is_a_no_op_on_a_clean_journal` passes; and
   `cargo test -p sovereign-cli` passes.
+
+<a id="runtime-checkpoint-gap"></a>
 
 - [x] **P2 | `apps/cli/src/workspace/` | Pin the checkpoint-gap double-burn as recorded behavior.** Landed 2026-09-13.
   A kill between the outbox write and the checkpoint persist (steps 9-11 of
@@ -1025,6 +1058,8 @@ while the controller routes eligible design/review cards to the strong role.
   token records (the pin: a doc comment says plainly that if this count
   changes, the double-burn behavior changed and needs a recorded decision);
   `cargo test -p sovereign-cli` passes.
+
+<a id="runtime-process-kill"></a>
 
 - [x] **P2 | `apps/cli/src/workspace/` | Kill a real send subprocess and prove the workspace reopens fail-closed.** Landed 2026-09-13 (`a_sigkilled_send_leaves_a_fail_closed_workspace_that_reopens_clean`).
   Blocked on the `crates/fault-testing` entry above; the first real
@@ -1044,6 +1079,8 @@ while the controller routes eligible design/review cards to the strong role.
   in `cargo test -p sovereign-cli`, and the worker test is a no-op when its
   env var is absent. Split `tests.rs` first if the addition would cross the
   file-size limit.
+
+<a id="runtime-process-race"></a>
 
 - [x] **P3 | `apps/cli/src/workspace/` | Race two real processes over one delivery.** Landed 2026-09-13 (`two_processes_deciding_the_same_delivery_produce_exactly_one_effect`).
   Blocked on the subprocess-kill entry above (reuses its worker pattern).
@@ -1085,6 +1122,8 @@ while the controller routes eligible design/review cards to the strong role.
   entries below. Done when: the design lands in the governed place, the
   entries are queued, and no code lands in the round.
 
+<a id="runtime-freshness-anchor"></a>
+
 - [x] **P2 | `crates/audit-ledger/` | Persist and verify a device-signed ledger head anchor.**
   Blocked until the freshness-anchor design above is checked off; implement
   exactly its shape — an ambiguity found mid-round is a diagnosis for the
@@ -1100,6 +1139,8 @@ while the controller routes eligible design/review cards to the strong role.
   save ordering, the accept/reject rules, and the exact test names are pinned
   by RFC 0007 — use them verbatim.
 
+<a id="runtime-freshness-open"></a>
+
 - [x] **P2 | `apps/cli/src/workspace/` | Reject an old-prefix ledger restore at workspace open.**
   Blocked on the audit-ledger anchor entry above. Wire the freshness check
   into workspace open (or `integrity_check`, reporting.rs) so a reverted
@@ -1111,6 +1152,8 @@ while the controller routes eligible design/review cards to the strong role.
   its intent is unmistakable, citing the Research-deferred whole-device
   rollback limit); and `cargo test -p sovereign-cli` passes. The open-time
   check and the two exact test names are pinned by RFC 0007.
+
+<a id="runtime-model-boundary"></a>
 
 - [x] **P2 | `crates/model/` | Make the gateway's docs and tests state the self-reported trust boundary honestly.** (claimed v01-01)
   v0.1 "correct stale UI/docs claims" (ROADMAP.md:182). The crate doc claims
@@ -1426,6 +1469,8 @@ while the controller routes eligible design/review cards to the strong role.
   green with the gate active, or the observed offender is recorded in the
   build script's comment and handled by the qualification wrapper below rather
   than by shortening the allowlist.
+
+<a id="runtime-vault-qualification"></a>
 
 - [x] **P2 | `.github/workflows/`, `scripts/` | Add the vault-v2 qualification entry point and its evidence ledger.**
   RFC 0005 Program 1A Task 1's tail: `scripts/qualify-vault-v2.sh` as the sole
@@ -1750,6 +1795,9 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   Add pack data for one more jurisdiction with the same source discipline,
   or record explicitly why not. Done when a customer in that jurisdiction
   yields covered findings rather than the cross-border "needs review".
+
+<a id="runtime-cloud-adapter"></a>
+
 - [ ] **P2 | `crates/model/`, `rfcs/` | Cloud model adapter behind RFC 0004.**
   Blocked on RFC 0004's boundary (owner consent per request, disclosure
   records, credential broker). Do not add TLS or a cloud adapter before that

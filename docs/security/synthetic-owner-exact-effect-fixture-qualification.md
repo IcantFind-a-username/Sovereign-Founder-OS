@@ -78,12 +78,12 @@ platform.
 ## What is not demonstrated
 
 - **Owner admission**, as above.
-- **The WebAuthn adapter.** The ceremony's logic is implemented and tested —
-  the registry takes user-verification, the credential id and the returned
-  handle as inputs — but the adapter that produces those from a browser
-  response is not written. It requires `webauthn-rs`, whose pin resolves 116
-  packages including a binding to the system OpenSSL, and that is an audit
-  decision rather than a coding step.
+- **Real-authenticator qualification and product admission.** The
+  [WebAuthn adapter](../../fixtures/owner-webauthn/src/lib.rs) landed in the
+  separate `fixtures/owner-webauthn` workspace on 2026-09-10. Its own CI/gate
+  builds and tests it; the core workspace does not include its dependency
+  graph. Adapter implementation does not qualify an attended ceremony on a
+  real authenticator, establish who enrolled, or remove any product gate.
 - **Product effects.** No product route, command, or workspace is reachable
   from any of this, and the corpus is a compile-time constant.
 - **Encryption of the fixture store.** Redb is ACID and crash-safe. It is not

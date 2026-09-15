@@ -16,7 +16,7 @@
 //! Requires `--features fault-injection`; without it the barrier does not
 //! exist and `scripts/run-authority-subprocess-claims.sh` is how it is run.
 
-use sovereign_authority::{AuthorityError, AuthorityStore};
+use sovereign_authority::{AuthorityError, AuthorityStore, BundlePart};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::Stdio;
@@ -180,6 +180,92 @@ fn real_subprocess_mixed_claims_record_current_partial_consumption() {
     );
 }
 
+/// F04 (RFC 0003 Amendment 1): revocation that lands after the bundle's
+/// claims but before the commit-time re-check must fail closed. The worker
+/// stops at an exact barrier; the parent revokes while it waits; the worker
+/// then resumes and must not commit.
+#[test]
+fn revoke_during_bundle_commit_barrier_fails_closed() {
+    let dir = tempfile::tempdir().unwrap();
+    AuthorityStore::open(dir.path()).unwrap();
+
+    let mut child = worker(
+        "consume_bundle_worker",
+        dir.path(),
+        Uuid::nil(),
+        Some("AfterBundleApprovalClaimBeforeCommitRecheck"),
+    );
+
+    let stdout = child.stdout.take().expect("worker stdout");
+    let mut lines = BufReader::new(stdout).lines();
+    let mut reached = false;
+    for line in lines.by_ref() {
+        let line = line.unwrap();
+        if line.contains(sovereign_authority::fault_injection::REACHED_PREFIX) {
+            reached = true;
+            break;
+        }
+    }
+    assert!(reached, "the worker never reached the commit barrier");
+
+    let store = AuthorityStore::open(dir.path()).unwrap();
+    let authority_root = dir.path();
+    for subdir in ["tokens", "approvals"] {
+        let path = authority_root.join(subdir);
+        if !path.is_dir() {
+            continue;
+        }
+        for entry in std::fs::read_dir(&path).unwrap().filter_map(|e| e.ok()) {
+            let Some(id) = entry
+                .file_name()
+                .to_str()
+                .and_then(|name| Uuid::parse_str(name).ok())
+            else {
+                continue;
+            };
+            if subdir == "tokens" {
+                store
+                    .revoke_token(id, NOW, LATER)
+                    .expect("revoke token during barrier");
+            } else {
+                store
+                    .revoke_approval(id, NOW, LATER)
+                    .expect("revoke approval during barrier");
+            }
+        }
+    }
+
+    let mut framed = None;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(35);
+    for line in lines {
+        if std::time::Instant::now() > deadline {
+            break;
+        }
+        let line = match line {
+            Ok(line) => line,
+            Err(_) => break,
+        };
+        if let Some(index) = line.find(RESULT) {
+            framed = Some(line[index + RESULT.len()..].trim().to_owned());
+            break;
+        }
+    }
+    child.wait().unwrap();
+    assert_eq!(
+        framed.as_deref(),
+        Some("revoked"),
+        "commit must fail closed once revocation is durable before re-check"
+    );
+    assert!(
+        !authority_root.join("bundles").exists()
+            || std::fs::read_dir(authority_root.join("bundles"))
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .all(|e| { !e.path().extension().is_some_and(|ext| ext == "committed") }),
+        "no committed bundle after a revoked commit attempt"
+    );
+}
+
 /// The semantic crash. A process is killed at the exact instant the temp file
 /// is written and fsynced and nothing is published. What must be true
 /// afterwards is that a reader sees no record at all — not a truncated one,
@@ -249,6 +335,7 @@ fn classify(result: Result<(), AuthorityError>) -> &'static str {
         Err(AuthorityError::AlreadyConsumed) => "already-consumed",
         Err(AuthorityError::IdempotencyReplay) => "replay",
         Err(AuthorityError::IdempotencyConflict) => "conflict",
+        Err(AuthorityError::Revoked) => "revoked",
         Err(_) => "error",
     }
 }
@@ -296,6 +383,34 @@ fn bind_idempotency_conflict_worker() {
     frame(classify(
         store.bind_idempotency(subject, &[9u8; 32], NOW, LATER),
     ));
+}
+
+#[test]
+#[ignore = "spawned as a child; not a standalone test"]
+fn consume_bundle_worker() {
+    let Some((root, _subject)) = worker_context() else {
+        return;
+    };
+    let store = AuthorityStore::open(&root).unwrap();
+    let token = BundlePart {
+        id: Uuid::new_v4(),
+        expires_at_unix: LATER,
+    };
+    let approval = BundlePart {
+        id: Uuid::new_v4(),
+        expires_at_unix: LATER,
+    };
+    let idempotency = BundlePart {
+        id: Uuid::new_v4(),
+        expires_at_unix: LATER,
+    };
+    frame(classify(store.consume_bundle(
+        token,
+        approval,
+        idempotency,
+        &[0x42_u8; 32],
+        NOW,
+    )));
 }
 
 /// Consumes a token, announces it, then blocks so the parent can kill it
