@@ -56,6 +56,12 @@ jobs:
       - name: Subprocess claims
         run: ./scripts/run-authority-subprocess-claims.sh --iterations 5
 
+      # Dedicated same-CARGO_TARGET_DIR image: the fixture binary, no sibling
+      # broker artifact, broker_bootstrap against that image, then a separate
+      # default/release build whose help/symbols lack the hidden mode.
+      - name: Same-target broker build
+        run: ./scripts/check-owner-effect-broker-build.sh
+
       # The boundary gates. They run in the local gate on every session too;
       # here they run against a clean checkout, where a stale artefact cannot
       # make one of them pass.

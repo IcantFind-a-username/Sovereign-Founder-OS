@@ -940,17 +940,12 @@ while the controller routes eligible design/review cards to the strong role.
 
 <a id="runtime-owner-task4"></a>
 
-- [ ] **P3 | `scripts/`, `apps/cli/tests/` | Owner-session Task 4 remainder: `check-owner-effect-broker-build.sh` only.**
-  The broker chain, `platform_publish.rs`, and `crates/authority/tests/migration.rs`
-  landed 2026-09-10 (#59–#66) and were re-verified for Runtime Phase 1 step 1 on
-  Linux x86_64 (`78c7a7a`; see
-  [step-1 fixture evidence](handoff/reports/2026-09-15-runtime-phase1-step1-fixture-owner-session-evidence.md)).
-  Fifty-one Task-4 manifest rows plus six migration tests cover the mechanism;
-  `scripts/check-owner-effect-profile-builds.sh`, `broker_bootstrap` integration
-  tests, and `.github/workflows/owner-effect-fixture.yml` substitute until the
-  plan's dedicated same-`CARGO_TARGET_DIR` build script exists. Done when:
-  `scripts/check-owner-effect-broker-build.sh` passes in CI and
-  `./scripts/test_changed.sh` is ALL GREEN.
+- [x] **P3 | `scripts/`, `apps/cli/tests/` | Owner-session Task 4 remainder: `check-owner-effect-broker-build.sh` only.**
+  Landed 2026-09-15: `scripts/check-owner-effect-broker-build.sh` (fresh
+  `CARGO_TARGET_DIR` fixture image, no sibling broker artifact, same-target
+  `broker_bootstrap`, separate default/release help+symbol exclusion). Cheap
+  stub self-test is always-on; the real two-compile gate runs when fixture
+  sources move and in `owner-effect-fixture` CI. No product Exact Effect.
 
 <a id="runtime-owner-task10-plane"></a>
 
@@ -1916,6 +1911,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-15: owner-session Task 4 remainder — `scripts/check-owner-effect-broker-build.sh` (same-`CARGO_TARGET_DIR` fixture image, no sibling broker artifact, `broker_bootstrap` 6 passed, default/release help+symbols lack hidden mode). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate. No product Exact Effect / RP1 claim.
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
 - 2026-08-15: split `physical_boundary.rs` (1192 lines) into `physical_boundary_manifest.rs` + `physical_boundary_source.rs`, with shared lexer/JSON-parser/fixture helpers moved to `tests/support/*.rs` and included per binary via `#[path]`. Same 8 tests pass, `check-file-size.sh`/clippy/fmt/full gate all green.
 - 2026-08-15: added the `sovereign-vault-v2-engine` workspace member — skeleton only, no cryptography, no connection type, no raw handle, `#![forbid(unsafe_code)]` until the FFI item deliberately lifts it in `src/engine/ffi.rs`. `publish = false` and all four target auto-discovery flags off, so a file dropped into `src/bin` or `tests/` cannot silently join the FFI boundary that the later AST gate must enumerate exhaustively. `build.rs` rejects 23 dependency-shaping variables plus the whole `PKG_CONFIG_*` family, including target-prefixed forms such as `X86_64_UNKNOWN_LINUX_GNU_OPENSSL_DIR`; an empty value is not treated as an override, because Cargo always hands build scripts an (often empty) `CARGO_ENCODED_RUSTFLAGS` and rejecting its presence would fail every ordinary build. The gate's logic lives in `build_gate.rs`, `include!`d by both the build script and its test, so the code under test is the code that runs. Verified end to end, not just by unit test: `OPENSSL_DIR=/opt/attacker cargo build -p sovereign-vault-v2-engine --locked` fails with the refusal message and a clean rebuild recovers. `src/lib.rs` carries only the format version and the pinned cipher-profile constants, with the honest note that a constant proves nothing about what actually got linked — that verification belongs to a later item. Filed the P2 above: this gate is now in the workspace build path, so a CI runner exporting `PKG_CONFIG_PATH` or `RUSTFLAGS` would fail the whole repository's build, and that has only been checked on macOS so far.
