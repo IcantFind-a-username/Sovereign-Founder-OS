@@ -133,6 +133,27 @@ while IFS= read -r f; do
 done <<EOF
 $CHANGED
 EOF
+
+# Same-image broker gate: a fresh CARGO_TARGET_DIR cannot use the session
+# cache, so this is not always-on. Run it when the fixture image, its
+# bootstrap tests, the feature edge, or the gate itself moved.
+NEED_BROKER_BUILD=0
+while IFS= read -r f; do
+  case "$f" in
+  scripts/check-owner-effect-broker-build.sh | scripts/tests/check-owner-effect-broker-build.sh)
+    NEED_BROKER_BUILD=1
+    ;;
+  .github/workflows/owner-effect-fixture.yml | apps/cli/tests/broker_bootstrap.rs | apps/cli/src/main.rs | apps/cli/Cargo.toml)
+    NEED_BROKER_BUILD=1
+    ;;
+  crates/authority/src/broker/* | crates/authority/Cargo.toml | Cargo.toml | Cargo.lock)
+    NEED_BROKER_BUILD=1
+    ;;
+  esac
+done <<EOF
+$CHANGED
+EOF
+
 # any runtime-crate change also runs the cross-crate security invariants
 if [ -n "$PKGS" ]; then
   add_pkg "sovereign-adversarial-tests"
@@ -151,6 +172,12 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
     ./scripts/tests/run-owner-effect-tests.sh
   run_step "owner-effect-regression-selftest" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/run-owner-effect-regression.sh
+  # The same-target broker build is two clean CARGO_TARGET_DIR compiles;
+  # that is not cheap enough for every session. Its self-test (stub cargo,
+  # no rustc) is, and is what keeps the gate from rotting into a script
+  # nobody runs. The real build is queued below when fixture sources move.
+  run_step "owner-effect-broker-build-selftest" env GATE_SELFTEST_RUNNING=1 \
+    ./scripts/tests/check-owner-effect-broker-build.sh
   # The supervisor MAC is what separates the fixture broker's parent from any
   # other local process. A silent dependency bump changes that code path
   # without changing a line here, so the reviewed graph is checked every run.
@@ -188,6 +215,9 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
     --manifest-path fixtures/owner-webauthn/Cargo.toml --locked
   run_step "qualify-vault-v2-selftest" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/qualify_vault_v2_test.sh
+fi
+if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ] && [ "$NEED_BROKER_BUILD" -eq 1 ]; then
+  run_step "owner-effect-broker-build" ./scripts/check-owner-effect-broker-build.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check
