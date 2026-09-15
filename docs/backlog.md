@@ -949,13 +949,12 @@ while the controller routes eligible design/review cards to the strong role.
 
 <a id="runtime-owner-task10-plane"></a>
 
-- [ ] **P3 | `scripts/`, `crates/capability/` | Owner-session Task 10 remainder: `check-owner-effect-authority-plane.sh`.**
-  IN PROGRESS (2026-09-15). Missing `scripts/check-owner-effect-authority-plane.sh`.
-  Capability still depends on authority and `with_authority_store` remains.
-  Not product graph inversion / RP1-03. See
-  [step-2 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step2-fixture-reservation-exact-effect-evidence.md).
-  Done when: the plane script exists and the fixture graph check is
-  independently gated. Does not invert product RP1-03.
+- [x] **P3 | `scripts/`, `crates/capability/` | Owner-session Task 10 remainder: `check-owner-effect-authority-plane.sh`.**
+  Landed 2026-09-15: `scripts/check-owner-effect-authority-plane.sh` (metadata +
+  `cargo tree` profiles, no `capability → authority`, no `with_authority_store`,
+  inverted `authority → capability`). Cheap stub self-test is always-on; the
+  real metadata/tree gate runs when plane sources move and in
+  `owner-effect-fixture` CI. Fixture graph only — no product RP1-03.
 
 <a id="runtime-owner-trybuild"></a>
 
@@ -1911,6 +1910,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-15: owner-session Task 10 remainder — `scripts/check-owner-effect-authority-plane.sh` (fixture graph inverted: no `capability → authority`, `with_authority_store` removed, `authority → capability` + fixture feature forwarding). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate; Task 10 TSV still 7/7; Task 2 durable-approval rows moved to `sovereign-authority` / `approval_v2_integration`. No product Exact Effect / RP1-03 claim.
 - 2026-09-15: owner-session Task 4 remainder — `scripts/check-owner-effect-broker-build.sh` (same-`CARGO_TARGET_DIR` fixture image, no sibling broker artifact, `broker_bootstrap` 6 passed, default/release help+symbols lack hidden mode). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate. No product Exact Effect / RP1 claim.
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.
 - 2026-08-15: split `physical_boundary.rs` (1192 lines) into `physical_boundary_manifest.rs` + `physical_boundary_source.rs`, with shared lexer/JSON-parser/fixture helpers moved to `tests/support/*.rs` and included per binary via `#[path]`. Same 8 tests pass, `check-file-size.sh`/clippy/fmt/full gate all green.
