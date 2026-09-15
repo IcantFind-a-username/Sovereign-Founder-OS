@@ -171,8 +171,7 @@ whole-device-rollback defense, is a security-critical amendment to this RFC.
 
 **Scope and status.** This amendment is protocol and threat-model design for
 Runtime Phase 1 finding F09 and acceptance row RP1-06 (see
-`docs/security/runtime-phase-1-development-guide.zh-CN.md` on branch
-`docs/runtime-phase-1-guide` when not yet on `main`). It closes a gap in the
+`docs/security/runtime-phase-1-development-guide.zh-CN.md`). It closes a gap in the
 v0.1 anchor slice without retracting what already landed: a device-signed
 `ledger.head` still rejects a rewound or forked ledger **when the anchor on
 disk is strictly newer than the ledger**. It does **not** reject the paired
