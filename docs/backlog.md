@@ -950,9 +950,9 @@ while the controller routes eligible design/review cards to the strong role.
 <a id="runtime-owner-task10-plane"></a>
 
 - [ ] **P3 | `scripts/`, `crates/capability/` | Owner-session Task 10 remainder: `check-owner-effect-authority-plane.sh`.**
-  Missing `scripts/check-owner-effect-authority-plane.sh`. Capability still
-  depends on authority and `with_authority_store` remains. Not product graph
-  inversion / RP1-03. See
+  IN PROGRESS (2026-09-15). Missing `scripts/check-owner-effect-authority-plane.sh`.
+  Capability still depends on authority and `with_authority_store` remains.
+  Not product graph inversion / RP1-03. See
   [step-2 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step2-fixture-reservation-exact-effect-evidence.md).
   Done when: the plane script exists and the fixture graph check is
   independently gated. Does not invert product RP1-03.
