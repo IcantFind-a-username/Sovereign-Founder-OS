@@ -90,7 +90,7 @@ Authority、approval、audit、credential 与业务 Vault DBK 是不同密钥/�
 
 | 顺序 | 工作与完成物 | 复用的规范 / 任务 | 开始下一步之前 |
 | --- | --- | --- | --- |
-| 0 | 冻结首个部署、[受保护入口清单][protected-entries]、产品 owner admission、权限隔离及状态转换差异 | Program 1C、Program 2；[已有 1C0 设计记录][q-owner]；RFC 0003 / 0006 / 0007 的差异见下节 | 将缺失的产品设计与必要 amendment 放回原 Program 归属；经所需审查后冻结写集和失败用例 |
+| 0 | 冻结首个部署、[受保护入口清单][protected-entries]、产品 owner admission、权限隔离及状态转换差异 | Program 1C、Program 2；[已有 1C0 设计记录][q-owner]；[产品 1C0 owner-admission 设计冻结卡][product-1c0-freeze]；RFC 0003 / 0006 / 0007 的差异见下节 | 将缺失的产品设计与必要 amendment 放回原 Program 归属；经所需审查后冻结写集和失败用例 |
 | 1 | 完成/核实 fixture 的 owner session、单写者与认证器机制 | [16-task owner/exact-effect plan][owner-plan]：Tasks 3–6；[Task 4 remainder][q-task4]；[HTTP boundary][q-http] | Fixture credential 不能作为产品 admission；WebAuthn adapter 已位于独立 workspace，真实 authenticator 资格另验 |
 | 2 | 验证原子预留、精确 payload、撤销裁决与封闭 writer | 同一 plan Tasks 7–11；[跨 crate 事务/撤销项][q-authority]；Program 2 | 保留 legacy store 与 fixture coordinator 的区别；产品实现先具备第 0 步的合同和适用存储门 |
 | 3 | 完成证据核实、浏览器攻击、产品/fixture 分离、恢复、freshness 与各崩溃窗口 | 同一 plan Tasks 12–15；[journal 恢复][q-recovery]、[真实进程强杀][q-kill]、[进程竞争][q-race]、[锚点][q-anchor]、[open-time 检查][q-freshness-open] | 先修订 freshness 的配对回滚边界；不得以旧 checkpoint 重执行行为代替 unknown 规则 |
@@ -220,3 +220,4 @@ Owner/authority 非默认 fixture 的回归须使用现有 checked runner，例�
 [q-vault]: ../backlog.md#runtime-vault-qualification
 [q-cloud]: ../backlog.md#runtime-cloud-adapter
 [protected-entries]: runtime-phase-1-protected-entries.zh-CN.md
+[product-1c0-freeze]: runtime-phase-1-product-1c0-owner-admission-freeze.zh-CN.md

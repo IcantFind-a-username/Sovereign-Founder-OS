@@ -45,6 +45,40 @@ fn an_unauthenticated_local_post_can_approve_today_1c0_pin() {
     );
 }
 
+/// Approving through the real HTTP surface creates the vault and owner signing
+/// material on first send, with no WebAuthn, enrollment, or session — the
+/// app-local owner signer path Program 1C0 must replace.
+///
+/// **When this test fails, vault keys are no longer auto-minted on anonymous
+/// approve (or the send path moved). Update or invert alongside the HTTP pin
+/// above; do not delete without a 1C0 replacement test.**
+#[test]
+fn product_decide_mints_vault_keys_without_owner_admission_1c0_pin() {
+    let server = UiServer::start();
+    assert!(
+        server.find_file("vault.key").is_none(),
+        "a fresh ui server must not have created a vault yet"
+    );
+
+    let approval_id = pending_approval(&server);
+    let decided = server.post(
+        "/api/workspace/decide",
+        &json!({ "approval_id": approval_id, "approve": true }),
+    );
+    assert_eq!(decided.status, 200);
+    let state = decided.json();
+    assert_eq!(state["ok"], true, "decide: {state}");
+
+    let vault_key = server
+        .find_file("vault.key")
+        .expect("approve minted vault.key via owner_secret without admission");
+    assert!(
+        vault_key.is_file(),
+        "vault.key must be a real file, not a directory: {}",
+        vault_key.display()
+    );
+}
+
 /// A request that reaches the loopback port with someone else's `Host` is
 /// refused: a browser on this machine can be pointed at 127.0.0.1 by a remote
 /// page, but it still sends that page's `Host`.
