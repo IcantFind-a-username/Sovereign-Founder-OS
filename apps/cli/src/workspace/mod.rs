@@ -60,6 +60,8 @@ mod erp_tests;
 #[cfg(test)]
 mod execution_journal_tests;
 #[cfg(test)]
+mod f03_rp1_02_exact_effect_honesty_pin_tests;
+#[cfg(test)]
 mod kernel_exec_tests;
 #[cfg(test)]
 mod privacy_tests;
