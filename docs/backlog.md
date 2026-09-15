@@ -77,6 +77,17 @@ repo audit; every entry below points at verified, real state of the code.
   claim RP1 product pass. Done when: `./scripts/test_changed.sh` green and doc
   links resolve.
 
+- [x] **P1 | `docs/handoff/reports/`, `docs/backlog.md` | Phase 1 step-1: fixture owner-session Tasks 3–6 evidence.**
+  Completed 2026-09-15 on `78c7a7a` (#151 tip). Delivers
+  [2026-09-15-runtime-phase1-step1-fixture-owner-session-evidence.md](handoff/reports/2026-09-15-runtime-phase1-step1-fixture-owner-session-evidence.md):
+  audit of RFC 0006 / owner-plan Tasks 3–6 (subprocess claims, single-writer
+  broker, migration gate, sovereign-owner session, exact approval bridge),
+  exact commands + SHAs, manifest row counts, and honest fixture-vs-product
+  residuals (`check-owner-effect-broker-build.sh` still absent; real WebAuthn
+  matrix empty; product 1C0 still gated by step-0 freeze). No Wave D, ActiveV2,
+  1B0, or RP1 product pass. Done when: `./scripts/test_changed.sh` green and
+  the report's listed verification commands pass on Linux x86_64.
+
 <a id="runtime-f03-exact-effect-honesty-pin"></a>
 
 - [x] **P2 | `apps/cli/src/workspace/` | Pin F03 / RP1-02 honesty — product approval does not bind final recipient or exact `.eml` bytes.** Landed 2026-09-15.
@@ -912,35 +923,17 @@ while the controller routes eligible design/review cards to the strong role.
 
 <a id="runtime-owner-task4"></a>
 
-- [ ] **P2 | `crates/authority/`, `apps/cli/` | Owner-session Task 4 remainder: migration gate and broker-build check.**
-  The broker's core chain landed 2026-09-10 across six slices (#59-#66):
-  bootstrap frame, root classification, loopback bind under one fixed
-  monotonic deadline, launch-key supervisor handshake, process lock, redb
-  store reachable only with the lock, and per-connection credentials. Fifty
-  tests, all registered in `scripts/owner-effect-tests.tsv`.
-  Still open from the plan's Task 4: `platform_publish.rs` and the
-  Linux-x86_64-only synthetic migration gate (`crates/authority/tests/migration.rs`),
-  and `scripts/check-owner-effect-broker-build.sh`. A `BrokerClient` in the CLI
-  was written and removed — nothing in the product starts a broker yet, so it
-  would have been unreachable code holding a launch key; the end-to-end tests
-  implement the parent's half against the protocol instead, which is stronger.
- Landed 2026-09-10. Verified green on macOS 26.5/arm64 with Chrome 152; **not yet run on Linux**, so the Linux half of the acceptance is open — the harness handles the root-sandbox case but no Linux run is recorded. The preflight also settled a design question RFC 0006 did not: an IP address cannot be a WebAuthn RP ID, so the browser must reach the fixture as `http://localhost:7787` while the socket still binds 127.0.0.1.
-  Blocked on nothing but pairs with the runners entry above. Deliver
-  `scripts/owner-auth-origin-preflight.sh` plus a zero-dependency
-  `scripts/owner-auth-origin-preflight.mjs` that binds only `127.0.0.1:7787`,
-  serves embedded same-origin preflight JS, sets and re-verifies the exact
-  `__Host-sfo_fixture_session` cookie, drives WebAuthn create/get, and emits
-  canonical value-free JSON with exact OS/browser/authenticator/origin ids; it
-  also starts a malicious second-port server to demonstrate host-wide cookie
-  receipt/overwrite and characterize same-user-handle credential replacement,
-  proving any such assertion is rejected at port 7787 for wrong origin. Plus
-  `docs/security/owner-auth-mechanism-matrix.md` with the frozen entry schema
-  (virtual rows `protocol_fixture_only`, real rows `mechanism_qualified_only`,
-  an empty real matrix allowed and leaving the mechanism unqualified). No
-  production owner/session code and no remote script. Done when:
-  `./scripts/owner-auth-origin-preflight.sh --virtual` runs green on Linux, the
-  matrix doc exists with the schema and an honest empty-real-matrix note, and
-  `./scripts/test_changed.sh` prints ALL GREEN.
+- [ ] **P3 | `scripts/`, `apps/cli/tests/` | Owner-session Task 4 remainder: `check-owner-effect-broker-build.sh` only.**
+  The broker chain, `platform_publish.rs`, and `crates/authority/tests/migration.rs`
+  landed 2026-09-10 (#59–#66) and were re-verified for Runtime Phase 1 step 1 on
+  Linux x86_64 (`78c7a7a`; see
+  [step-1 fixture evidence](handoff/reports/2026-09-15-runtime-phase1-step1-fixture-owner-session-evidence.md)).
+  Fifty-one Task-4 manifest rows plus six migration tests cover the mechanism;
+  `scripts/check-owner-effect-profile-builds.sh`, `broker_bootstrap` integration
+  tests, and `.github/workflows/owner-effect-fixture.yml` substitute until the
+  plan's dedicated same-`CARGO_TARGET_DIR` build script exists. Done when:
+  `scripts/check-owner-effect-broker-build.sh` passes in CI and
+  `./scripts/test_changed.sh` is ALL GREEN.
 
 <a id="runtime-owner-http"></a>
 
