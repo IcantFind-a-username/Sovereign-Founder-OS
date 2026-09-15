@@ -7,8 +7,14 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+# Empty forwarding hook so authority's `owner-effect-fixture` can name this
+# crate's same feature after the Task 10 graph inversion. No code is gated
+# here yet; the feature exists so Cargo can forward it without a cycle.
+owner-effect-fixture = []
+
 [dependencies]
-sovereign-authority = { workspace = true }
 sovereign-contracts = { workspace = true }
 sovereign-identity = { workspace = true }
 sovereign-artifact = { workspace = true }
@@ -19,7 +25,3 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
 serde_json_canonicalizer = { workspace = true }
-
-[dev-dependencies]
-sovereign-fault-testing = { path = "../fault-testing" }
-tempfile = "3"

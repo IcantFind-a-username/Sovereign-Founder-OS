@@ -24,7 +24,7 @@ use sovereign_identity::{
 };
 use sovereign_policy::{AuthenticatedPolicyContextV2, PolicyAuthorizationV2, PolicyEngine};
 use sovereign_sandbox::{
-    CompileWorker, CompiledCache, VerifiedExecutionRequest, VerifiedSandboxExecutor,
+    CompileWorker, CompiledCache, SandboxError, VerifiedExecutionRequest, VerifiedSandboxExecutor,
     WasmExecutionResult,
 };
 use sovereign_vault::Vault;
@@ -286,27 +286,25 @@ impl Store {
         )
         .map_err(kernel)?
         .with_approval_trust(approval_trust, OWNER_APPROVAL_ISSUER)
-        .map_err(kernel)?
-        .with_authority_store({
-            let store = sovereign_authority::AuthorityStore::open(self.root.join("authority"))
-                .map_err(kernel)?;
-            // Consumed claims are kept so a replay is recognised as one, and
-            // they stop being useful the moment the authority they record
-            // has expired — after that they are only growth. Nothing in the
-            // product had ever called this, so every claim a founder's
-            // machine ever made was still on disk.
-            //
-            // Here rather than on workspace open: `Store::open` runs on
-            // every request, and a directory scan per request to tidy
-            // records that age in hours is the wrong trade. A delivery is
-            // rare and already pays for crypto and a sandbox.
-            //
-            // A failed purge does not fail the delivery. Housekeeping is not
-            // a gate, and a store too unhealthy to purge will fail the claims
-            // below on its own — which is the check that matters.
-            let _ = purge_authority_claims(&store, now());
-            store
-        });
+        .map_err(kernel)?;
+        let store = sovereign_authority::AuthorityStore::open(self.root.join("authority"))
+            .map_err(kernel)?;
+        // Consumed claims are kept so a replay is recognised as one, and
+        // they stop being useful the moment the authority they record
+        // has expired — after that they are only growth. Nothing in the
+        // product had ever called this, so every claim a founder's
+        // machine ever made was still on disk.
+        //
+        // Here rather than on workspace open: `Store::open` runs on
+        // every request, and a directory scan per request to tidy
+        // records that age in hours is the wrong trade. A delivery is
+        // rare and already pays for crypto and a sandbox.
+        //
+        // A failed purge does not fail the delivery. Housekeeping is not
+        // a gate, and a store too unhealthy to purge will fail the claims
+        // below on its own — which is the check that matters.
+        let _ = purge_authority_claims(&store, now());
+        let approval_expires_at_unix = approval.claims.expires_at_unix;
         let now_unix = now();
         let worker = delivery_compile_worker();
         let compiled_cache = self.open_workspace_compiled_cache(now_unix, validity)?;
@@ -319,7 +317,7 @@ impl Store {
                     .map_err(kernel)?,
             );
         executor
-            .execute_approved(
+            .execute_approved_with_claim(
                 VerifiedExecutionRequest {
                     token,
                     invocation,
@@ -330,6 +328,11 @@ impl Store {
                     policy_decision: decision,
                 },
                 Some(&approval.evidence),
+                |authorized| {
+                    store
+                        .claim_verified(authorized, Some(approval_expires_at_unix), now_unix)
+                        .map_err(|error| SandboxError::DurableClaimFailed(error.to_string()))
+                },
             )
             .map_err(kernel)
     }

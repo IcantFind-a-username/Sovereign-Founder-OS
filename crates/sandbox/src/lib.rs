@@ -8,8 +8,8 @@ use chrono::Utc;
 use sovereign_artifact::{AdmittedArtifact, Digest, OperationSelector, PreparedInvocation};
 use sovereign_capability::approval::SignedApprovalV1;
 use sovereign_capability::v2::{
-    CapabilityTokenV2, CapabilityV2Error, CapabilityV2ValidationContext, CapabilityValidatorV2,
-    TrustedClock as CapabilityV2Clock,
+    AuthorizedCapabilityV2, CapabilityTokenV2, CapabilityV2Error, CapabilityV2ValidationContext,
+    CapabilityValidatorV2, TrustedClock as CapabilityV2Clock,
 };
 use sovereign_capability::{CapabilityError, CapabilityValidator, ValidationContext};
 use sovereign_contracts::CapabilityToken;
@@ -86,6 +86,8 @@ pub enum SandboxError {
     ExecutionIntentNotPersisted,
     #[error("execution journal unavailable: {0}")]
     ExecutionJournalUnavailable(String),
+    #[error("durable authority claim failed: {0}")]
+    DurableClaimFailed(String),
 }
 
 impl SandboxError {
@@ -291,6 +293,21 @@ impl<C: CapabilityV2Clock> VerifiedSandboxExecutor<C> {
         request: VerifiedExecutionRequest<'_>,
         approval: Option<&SignedApprovalV1>,
     ) -> Result<WasmExecutionResult, SandboxError> {
+        self.execute_approved_with_claim(request, approval, |_| Ok(()))
+    }
+
+    /// Like [`Self::execute_approved`], then a durable claim after journal
+    /// intent and pure verification, before the guest runs. The product
+    /// delivery path uses this so capability stays store-free.
+    pub fn execute_approved_with_claim<F>(
+        &mut self,
+        request: VerifiedExecutionRequest<'_>,
+        approval: Option<&SignedApprovalV1>,
+        claim: F,
+    ) -> Result<WasmExecutionResult, SandboxError>
+    where
+        F: FnOnce(&AuthorizedCapabilityV2) -> Result<(), SandboxError>,
+    {
         // Local admission is required before anything else is even attempted
         // (RFC 0002 step 8: only the admitted handle may enter the execution
         // path). Fail closed *before* the journal opens or the one-use
@@ -343,15 +360,26 @@ impl<C: CapabilityV2Clock> VerifiedSandboxExecutor<C> {
             },
             approval,
         );
-        if let Err(error) = authorized {
-            // Authorization denied: nothing executed. Record a terminal
-            // Failed so recovery never sees this as indeterminate.
+        let authorized = match authorized {
+            Err(error) => {
+                // Authorization denied: nothing executed. Record a terminal
+                // Failed so recovery never sees this as indeterminate.
+                if let Some(guard) = guard {
+                    let _ = guard.finish(ExecutionOutcome::Failed {
+                        code: "authorization_denied".into(),
+                    });
+                }
+                return Err(error.into());
+            }
+            Ok(authorized) => authorized,
+        };
+        if let Err(error) = claim(&authorized) {
             if let Some(guard) = guard {
                 let _ = guard.finish(ExecutionOutcome::Failed {
-                    code: "authorization_denied".into(),
+                    code: "durable_claim_denied".into(),
                 });
             }
-            return Err(error.into());
+            return Err(error);
         }
 
         if let Some(guard) = &guard {

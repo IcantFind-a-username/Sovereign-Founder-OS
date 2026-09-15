@@ -621,6 +621,51 @@ impl AuthorityStore {
         }
     }
 
+    /// Durable half of what used to live on capability's
+    /// `with_authority_store`: claim a purely verified Capability V2.
+    /// Approval expiry is required when the authorized token carries
+    /// approval evidence, and forbidden when it does not.
+    pub fn claim_verified(
+        &self,
+        authorized: &sovereign_capability::v2::AuthorizedCapabilityV2,
+        approval_expires_at_unix: Option<i64>,
+        now_unix: i64,
+    ) -> Result<(), AuthorityError> {
+        let fingerprint = *authorized
+            .invocation_fingerprint()
+            .map_err(|_| AuthorityError::CorruptRecord)?
+            .as_bytes();
+        let token = BundlePart {
+            id: authorized.token_id(),
+            expires_at_unix: authorized.expires_at_unix(),
+        };
+        match (authorized.approval_id(), approval_expires_at_unix) {
+            (Some(approval_id), Some(approval_expires_at_unix)) => self.consume_bundle(
+                token,
+                BundlePart {
+                    id: approval_id,
+                    expires_at_unix: approval_expires_at_unix,
+                },
+                BundlePart {
+                    id: authorized.idempotency_key(),
+                    expires_at_unix: authorized.expires_at_unix(),
+                },
+                &fingerprint,
+                now_unix,
+            ),
+            (None, None) => {
+                self.consume_token(token.id, now_unix, token.expires_at_unix)?;
+                self.bind_idempotency(
+                    authorized.idempotency_key(),
+                    &fingerprint,
+                    now_unix,
+                    token.expires_at_unix,
+                )
+            }
+            _ => Err(AuthorityError::CorruptRecord),
+        }
+    }
+
     fn claim(&self, directory: &Path, id: Uuid, record: AuthorityRecord) -> Result<(), ClaimError> {
         let final_path = directory.join(id.to_string());
         match publish_record(directory, &final_path, &record).map_err(ClaimError::Store)? {
