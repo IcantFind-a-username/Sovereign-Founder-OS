@@ -2571,9 +2571,11 @@ dependencies = [
  "sovereign-identity",
  "sovereign-owner",
  "sovereign-policy",
+ "sovereign-sandbox",
  "static_assertions",
  "tempfile",
  "uuid",
+ "wat",
 ]
 
 [[package]]

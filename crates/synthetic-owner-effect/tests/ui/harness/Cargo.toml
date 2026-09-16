@@ -35,3 +35,11 @@ path = "../cannot_destructure_authority_reserved.rs"
 [[bin]]
 name = "trybuild003"
 path = "../cannot_reconstruct_authority_reserved.rs"
+
+[[bin]]
+name = "trybuild004"
+path = "../cannot_reuse_reserved_handle_after_move.rs"
+
+[[bin]]
+name = "trybuild005"
+path = "../cannot_manufacture_concurrent_cloned_handles.rs"

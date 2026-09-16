@@ -15,9 +15,9 @@ use sovereign_capability::v2::{
 };
 use sovereign_identity::{ApprovalRole, AuthorityRole, KeyValidity, RoleTrustStore, TypedSigner};
 use sovereign_synthetic_owner_effect::{
-    persist_prepared, EffectIntentId, FixtureOwner, FixtureRoute, IntentState, OwnerSurface,
-    PreparedSnapshot, ReservationContext, ReservationView, ReserveError, SessionBinding,
-    SessionTokens, FIXTURE_AUDIENCE, FIXTURE_ISSUER, FIXTURE_VENTURE, TOKEN_LEN,
+    persist_prepared, DispatchLiveContext, EffectIntentId, FixtureOwner, FixtureRoute, IntentState,
+    OwnerSurface, PreparedSnapshot, ReservationContext, ReservationView, ReserveError,
+    SessionBinding, SessionTokens, FIXTURE_AUDIENCE, FIXTURE_ISSUER, FIXTURE_VENTURE, TOKEN_LEN,
 };
 use uuid::Uuid;
 
@@ -40,6 +40,7 @@ pub struct Harness {
     now: Instant,
 }
 
+#[allow(dead_code)]
 pub struct Issued {
     pub intent_id: EffectIntentId,
     pub context: ReservationContext,
@@ -315,6 +316,7 @@ pub fn refuse<T>(result: Result<T, ReserveError>, why: &str) -> ReserveError {
     }
 }
 
+#[allow(dead_code)]
 pub fn none_of_the_reservation(view: &ReservationView) -> bool {
     !view.approval_claimed
         && !view.token_claimed
@@ -322,6 +324,7 @@ pub fn none_of_the_reservation(view: &ReservationView) -> bool {
         && view.intent_state != Some(IntentState::AuthorityReserved)
 }
 
+#[allow(dead_code)]
 pub fn all_of_the_reservation(
     view: &ReservationView,
     intent_id: EffectIntentId,
@@ -333,4 +336,15 @@ pub fn all_of_the_reservation(
         && view.intent_state == Some(IntentState::AuthorityReserved)
         && view.approval_expires_at_unix == Some(approval_expires_at_unix)
         && view.authority_uses_remaining == 7
+}
+
+#[allow(dead_code)]
+pub fn live_context(issued: &Issued) -> DispatchLiveContext {
+    DispatchLiveContext {
+        now_unix: issued.context.now_unix,
+        session_id: issued.context.session_id,
+        logout_epoch: issued.context.logout_epoch,
+        signer_epoch: issued.context.signer_epoch,
+        fixture_generation: issued.context.fixture_generation,
+    }
 }

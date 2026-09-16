@@ -311,6 +311,25 @@ impl WasmSandbox {
         )
     }
 
+    /// Import-free Core Wasm v2 for the upper fixture coordinator.
+    ///
+    /// Delivers authenticated canonical input into guest memory, links no host
+    /// functions, and refuses any guest import before instantiation. The
+    /// trusted coordinator alone owns publication; this path never touches
+    /// the filesystem.
+    pub fn execute_import_free_core_v2(
+        &self,
+        module_bytes: &[u8],
+        canonical_input: &[u8],
+    ) -> Result<WasmExecutionResult, SandboxError> {
+        self.execute_entrypoint_with_runtime(
+            module_bytes,
+            DEFAULT_ENTRYPOINT,
+            ExecutionRuntime::WasmtimeVerifiedPureComputeV2,
+            Some(canonical_input),
+        )
+    }
+
     /// Shared execution preamble: the epoch deadline worker must be alive and
     /// the single-execution gate must be free. Both backends go through this.
     fn acquire_execution_slot(&self) -> Result<MutexGuard<'_, ()>, SandboxError> {
