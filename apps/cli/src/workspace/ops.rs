@@ -302,6 +302,17 @@ impl Store {
     /// broker. Any failure in the chain leaves the approval pending (fail
     /// closed); delivery to the customer stays the founder's own action.
     pub fn decide(&self, approval_id: Uuid, approve: bool) -> Result<Workspace, WorkspaceError> {
+        // Unknown ids and already-decided approvals are fail-closed reads.
+        // The writer lock serializes mutation of a still-pending approval so
+        // two tools cannot both enter the durable send path. A NotFound
+        // lookup must not depend on immediately reacquiring that lock —
+        // overlayfs/close-time flock release can return WouldBlock and
+        // collapse into Invalid("another workspace writer is already active").
+        {
+            let workspace = self.load()?;
+            Self::require_pending(&workspace, approval_id)?;
+        }
+
         let _lock = super::process_lock::acquire(&self.root).map_err(|error| match error {
             super::process_lock::LockError::AlreadyRunning => {
                 WorkspaceError::Invalid("another workspace writer is already active".into())
@@ -312,10 +323,7 @@ impl Store {
         })?;
 
         let mut workspace = self.load()?;
-        let approval = workspace.approval(approval_id)?;
-        if approval.status != ApprovalStatus::Pending {
-            return Err(WorkspaceError::Invalid("approval already decided".into()));
-        }
+        let approval = Self::require_pending(&workspace, approval_id)?;
         let document_id = approval.document_id;
         workspace.document(document_id)?;
 
@@ -342,6 +350,17 @@ impl Store {
             }],
         )?;
         Ok(workspace)
+    }
+
+    fn require_pending(
+        workspace: &Workspace,
+        approval_id: Uuid,
+    ) -> Result<&Approval, WorkspaceError> {
+        let approval = workspace.approval(approval_id)?;
+        if approval.status != ApprovalStatus::Pending {
+            return Err(WorkspaceError::Invalid("approval already decided".into()));
+        }
+        Ok(approval)
     }
 
     /// Revoke an approved send: delete the composed `.eml` from the local

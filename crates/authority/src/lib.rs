@@ -100,6 +100,10 @@ pub enum AuthorityError {
     CorruptRecord,
     #[error("authority store unavailable: {0}")]
     Unavailable(String),
+    /// RFC 0007 Amendment 1 §d: generation advanced or the store is not bound
+    /// to the enrolled generation. A verified audit chain is not execute authority.
+    #[error("authority is invalid for this freshness generation")]
+    StaleGeneration,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -113,6 +117,9 @@ struct AuthorityRecord {
     bundle_hex: Option<String>,
     consumed_at_unix: i64,
     expires_at_unix: i64,
+    /// Generation that published this record. Absent on pre-Amendment-1 rows.
+    #[serde(default)]
+    freshness_generation: Option<u64>,
 }
 
 /// One part of an authority bundle: the subject id being claimed and its own
@@ -137,6 +144,8 @@ struct BundleIntentRecord {
     invocation_fingerprint_hex: String,
     created_at_unix: i64,
     expires_at_unix: i64,
+    #[serde(default)]
+    freshness_generation: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -149,6 +158,8 @@ struct BundleCommittedRecord {
     created_at_unix: i64,
     expires_at_unix: i64,
     consumed_at_unix: i64,
+    #[serde(default)]
+    freshness_generation: Option<u64>,
 }
 
 trait Expiring {
@@ -234,6 +245,7 @@ impl AuthorityStore {
                 bundle_hex: None,
                 consumed_at_unix: now_unix,
                 expires_at_unix,
+                freshness_generation: None,
             },
         )
         .map_err(|error| match error {
@@ -259,6 +271,7 @@ impl AuthorityStore {
                 bundle_hex: None,
                 consumed_at_unix: now_unix,
                 expires_at_unix,
+                freshness_generation: None,
             },
         )
         .map_err(|error| match error {
@@ -287,6 +300,7 @@ impl AuthorityStore {
                 bundle_hex: None,
                 consumed_at_unix: now_unix,
                 expires_at_unix,
+                freshness_generation: None,
             },
         ) {
             Ok(()) => Ok(()),
@@ -378,11 +392,13 @@ impl AuthorityStore {
             invocation_fingerprint_hex: hex::encode(invocation_fingerprint),
             created_at_unix: now_unix,
             expires_at_unix,
+            freshness_generation: self.freshness_generation()?,
         };
         let final_path = self.bundles.join(bundle_hex);
         match publish_record(&self.bundles, &final_path, &record)? {
             None => Ok(record),
             Some(existing) => {
+                self.reject_stale_generation(existing.freshness_generation)?;
                 let same_identity = existing.token_id == record.token_id
                     && existing.approval_id == record.approval_id
                     && existing.idempotency_key == record.idempotency_key
@@ -428,10 +444,12 @@ impl AuthorityStore {
             bundle_hex: Some(bundle_hex.to_string()),
             consumed_at_unix: now_unix,
             expires_at_unix: token.expires_at_unix,
+            freshness_generation: None,
         };
         match self.claim(&self.tokens, token.id, record) {
             Ok(()) => Ok(()),
             Err(ClaimError::Exists(existing)) => {
+                self.reject_stale_generation(existing.freshness_generation)?;
                 if existing.bundle_hex.as_deref() == Some(bundle_hex) {
                     Ok(())
                 } else {
@@ -458,20 +476,24 @@ impl AuthorityStore {
             bundle_hex: Some(bundle_hex.to_string()),
             consumed_at_unix: now_unix,
             expires_at_unix: idempotency.expires_at_unix,
+            freshness_generation: None,
         };
         match self.claim(&self.idempotency, idempotency.id, record) {
             Ok(()) => Ok(()),
-            Err(ClaimError::Exists(existing)) => match existing.fingerprint_hex.as_deref() {
-                Some(existing_hex) if existing_hex == fingerprint_hex => {
-                    if existing.bundle_hex.as_deref() == Some(bundle_hex) {
-                        Ok(())
-                    } else {
-                        Err(AuthorityError::IdempotencyReplay)
+            Err(ClaimError::Exists(existing)) => {
+                self.reject_stale_generation(existing.freshness_generation)?;
+                match existing.fingerprint_hex.as_deref() {
+                    Some(existing_hex) if existing_hex == fingerprint_hex => {
+                        if existing.bundle_hex.as_deref() == Some(bundle_hex) {
+                            Ok(())
+                        } else {
+                            Err(AuthorityError::IdempotencyReplay)
+                        }
                     }
+                    Some(_) => Err(AuthorityError::IdempotencyConflict),
+                    None => Err(AuthorityError::CorruptRecord),
                 }
-                Some(_) => Err(AuthorityError::IdempotencyConflict),
-                None => Err(AuthorityError::CorruptRecord),
-            },
+            }
             Err(ClaimError::Store(error)) => Err(error),
         }
     }
@@ -490,10 +512,12 @@ impl AuthorityStore {
             bundle_hex: Some(bundle_hex.to_string()),
             consumed_at_unix: now_unix,
             expires_at_unix: approval.expires_at_unix,
+            freshness_generation: None,
         };
         match self.claim(&self.approvals, approval.id, record) {
             Ok(()) => Ok(()),
             Err(ClaimError::Exists(existing)) => {
+                self.reject_stale_generation(existing.freshness_generation)?;
                 if existing.bundle_hex.as_deref() == Some(bundle_hex) {
                     Ok(())
                 } else {
@@ -523,11 +547,15 @@ impl AuthorityStore {
             created_at_unix: intent.created_at_unix,
             expires_at_unix: intent.expires_at_unix,
             consumed_at_unix: now_unix,
+            freshness_generation: self.freshness_generation()?,
         };
         let final_path = self.bundles.join(format!("{bundle_hex}.committed"));
         match publish_record(&self.bundles, &final_path, &record)? {
             None => Ok(()),
-            Some(_existing) => Err(AuthorityError::AlreadyConsumed),
+            Some(existing) => {
+                self.reject_stale_generation(existing.freshness_generation)?;
+                Err(AuthorityError::AlreadyConsumed)
+            }
         }
     }
 
@@ -597,13 +625,15 @@ impl AuthorityStore {
         now_unix: i64,
         expires_at_unix: i64,
     ) -> Result<RevocationOutcome, AuthorityError> {
-        let record = AuthorityRecord {
+        let mut record = AuthorityRecord {
             kind: kind.into(),
             fingerprint_hex: None,
             bundle_hex: None,
             consumed_at_unix: now_unix,
             expires_at_unix,
+            freshness_generation: None,
         };
+        record.freshness_generation = self.freshness_generation()?;
         let final_path = revocation_dir.join(id.to_string());
         match publish_record(revocation_dir, &final_path, &record)? {
             Some(_existing) => Ok(RevocationOutcome::AlreadyRevoked),
@@ -690,11 +720,21 @@ impl AuthorityStore {
         }
     }
 
-    fn claim(&self, directory: &Path, id: Uuid, record: AuthorityRecord) -> Result<(), ClaimError> {
+    fn claim(
+        &self,
+        directory: &Path,
+        id: Uuid,
+        mut record: AuthorityRecord,
+    ) -> Result<(), ClaimError> {
+        record.freshness_generation = self.freshness_generation().map_err(ClaimError::Store)?;
         let final_path = directory.join(id.to_string());
         match publish_record(directory, &final_path, &record).map_err(ClaimError::Store)? {
             None => Ok(()),
-            Some(existing) => Err(ClaimError::Exists(existing)),
+            Some(existing) => {
+                self.reject_stale_generation(existing.freshness_generation)
+                    .map_err(ClaimError::Store)?;
+                Err(ClaimError::Exists(existing))
+            }
         }
     }
 }
@@ -859,9 +899,11 @@ fn sync_directory(directory: &Path) {
 #[cfg(not(unix))]
 fn sync_directory(_directory: &Path) {}
 
-fn unavailable(error: impl std::fmt::Display) -> AuthorityError {
+pub(crate) fn unavailable(error: impl std::fmt::Display) -> AuthorityError {
     AuthorityError::Unavailable(error.to_string())
 }
+
+pub mod generation;
 
 #[cfg(feature = "owner-effect-fixture")]
 pub mod broker;

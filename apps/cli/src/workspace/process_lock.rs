@@ -20,7 +20,16 @@ pub enum LockError {
 }
 
 pub struct HeldLock {
-    _file: File,
+    file: File,
+}
+
+impl Drop for HeldLock {
+    fn drop(&mut self) {
+        // Closing the fd also releases the advisory lock. Unlock first so a
+        // same-process reacquire immediately after drop is not WouldBlock on
+        // filesystems that delay close-time release (GHA overlayfs).
+        let _ = self.file.unlock();
+    }
 }
 
 pub fn acquire(root: &Path) -> Result<HeldLock, LockError> {
@@ -34,8 +43,34 @@ pub fn acquire(root: &Path) -> Result<HeldLock, LockError> {
     }
     let file = options.open(&path).map_err(|_| LockError::Unavailable)?;
     match file.try_lock() {
-        Ok(()) => Ok(HeldLock { _file: file }),
+        Ok(()) => Ok(HeldLock { file }),
         Err(std::fs::TryLockError::WouldBlock) => Err(LockError::AlreadyRunning),
         Err(_) => Err(LockError::Unavailable),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn dropping_the_lock_releases_it_for_immediate_reacquire() {
+        let dir = tempdir().unwrap();
+        for _ in 0..64 {
+            let held = acquire(dir.path()).expect("acquire");
+            drop(held);
+            acquire(dir.path()).expect("reacquire after drop must succeed");
+        }
+    }
+
+    #[test]
+    fn a_second_holder_is_already_running() {
+        let dir = tempdir().unwrap();
+        let _first = acquire(dir.path()).expect("first acquire succeeds");
+        assert!(
+            matches!(acquire(dir.path()), Err(LockError::AlreadyRunning)),
+            "a second holder must get AlreadyRunning, not a generic failure"
+        );
     }
 }

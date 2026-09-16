@@ -4,7 +4,12 @@ use std::path::{Path, PathBuf};
 
 use crate::{hash_bytes, AuditLedger, LedgerError, GENESIS_HASH};
 
-pub const LEDGER_HEAD_VERSION: u16 = 1;
+/// v0.1 sidecar body: `{version, workspace_binding, event_count, last_event_hash}`.
+pub const LEDGER_HEAD_VERSION_V1: u16 = 1;
+/// Amendment 1: v1 fields plus signed `freshness_generation`.
+pub const LEDGER_HEAD_VERSION_V2: u16 = 2;
+/// Default writes without an enrolled generation stay on the v0.1 body.
+pub const LEDGER_HEAD_VERSION: u16 = LEDGER_HEAD_VERSION_V1;
 
 /// Path to the freshness anchor beside `ledger.json`.
 pub fn ledger_head_path(ledger_path: &Path) -> PathBuf {
@@ -12,12 +17,16 @@ pub fn ledger_head_path(ledger_path: &Path) -> PathBuf {
 }
 
 /// Signed freshness-anchor body (RFC 0007). Field order is load-bearing for hashing.
+/// `freshness_generation` is omitted from the hashed v1 body (`skip_serializing_if`)
+/// so existing v0.1 signatures stay valid.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LedgerHeadBody {
     pub version: u16,
     pub workspace_binding: String,
     pub event_count: u64,
     pub last_event_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub freshness_generation: Option<u64>,
 }
 
 /// On-disk anchor: body fields plus a device signature over the body hash.
@@ -27,6 +36,8 @@ pub struct LedgerHead {
     pub workspace_binding: String,
     pub event_count: u64,
     pub last_event_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub freshness_generation: Option<u64>,
     pub device_signature: String,
 }
 
@@ -39,12 +50,25 @@ impl LedgerHead {
         let event_count = ledger.events().len() as u64;
         let last_event_hash = ledger.last_hash();
         Ok(Self {
-            version: LEDGER_HEAD_VERSION,
+            version: LEDGER_HEAD_VERSION_V1,
             workspace_binding,
             event_count,
             last_event_hash,
+            freshness_generation: None,
             device_signature: String::new(),
         })
+    }
+
+    /// Amendment 1 v2 sidecar: v0.1 fields plus the enrolled generation.
+    /// Does not change `AuditEventBody`.
+    pub fn from_ledger_with_generation(
+        ledger: &AuditLedger,
+        freshness_generation: u64,
+    ) -> Result<Self, LedgerError> {
+        let mut head = Self::from_ledger(ledger)?;
+        head.version = LEDGER_HEAD_VERSION_V2;
+        head.freshness_generation = Some(freshness_generation);
+        Ok(head)
     }
 
     pub fn body(&self) -> LedgerHeadBody {
@@ -53,6 +77,7 @@ impl LedgerHead {
             workspace_binding: self.workspace_binding.clone(),
             event_count: self.event_count,
             last_event_hash: self.last_event_hash.clone(),
+            freshness_generation: self.freshness_generation,
         }
     }
 
@@ -66,8 +91,9 @@ impl LedgerHead {
     }
 
     pub fn verify_device_signature(&self) -> Result<(), LedgerError> {
-        if self.version != LEDGER_HEAD_VERSION {
-            return Err(LedgerError::InvalidAnchor);
+        match (self.version, self.freshness_generation) {
+            (LEDGER_HEAD_VERSION_V1, None) | (LEDGER_HEAD_VERSION_V2, Some(_)) => {}
+            _ => return Err(LedgerError::InvalidAnchor),
         }
         let hash = hash_head_body(&self.body());
         DeviceIdentity::verify_legacy_v1(
@@ -143,7 +169,7 @@ fn verify_against_anchor(ledger: &AuditLedger, anchor: &LedgerHead) -> Result<()
     Ok(())
 }
 
-fn write_atomic_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_atomic_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
     let temp_path = path.with_extension("tmp");
     let result = (|| {

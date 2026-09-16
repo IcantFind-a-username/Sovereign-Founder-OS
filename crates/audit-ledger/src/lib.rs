@@ -6,11 +6,18 @@ use sovereign_identity::DeviceIdentity;
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod generation;
 pub mod head;
 
+pub use generation::{
+    claim_enrollment, enrolled_freshness_path, enrollment_claimed_path, enrollment_is_claimed,
+    load_enrolled, persist_enrolled, recover_enrolled_generation, verify_freshness_and_generation,
+    verify_generation, EnrolledFreshness, FreshnessDisposition, ENROLLED_FRESHNESS_FILENAME,
+    ENROLLMENT_CLAIMED_FILENAME,
+};
 pub use head::{
     hash_head_body, ledger_head_path, verify_freshness, LedgerHead, LedgerHeadBody,
-    LEDGER_HEAD_VERSION,
+    LEDGER_HEAD_VERSION, LEDGER_HEAD_VERSION_V1, LEDGER_HEAD_VERSION_V2,
 };
 
 pub const GENESIS_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -41,6 +48,12 @@ pub enum LedgerError {
     InvalidAnchor,
     #[error("freshness anchor device binding does not match the ledger")]
     AnchorDeviceMismatch,
+    #[error("freshness generation was downgraded below the enrolled generation")]
+    GenerationDowngrade,
+    #[error("freshness anchor generation does not match the enrolled record")]
+    GenerationMismatch,
+    #[error("enrolled freshness generation is invalid")]
+    InvalidEnrolledGeneration,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,6 +215,29 @@ impl AuditLedger {
     /// mid-save leaves the previous complete chain — never a truncated one.
     /// Persist the chain, then the device-signed freshness anchor (`ledger.head`).
     pub fn save(&self, path: &std::path::Path, device: &DeviceIdentity) -> Result<(), LedgerError> {
+        self.persist_with_generation(path, device, None)
+    }
+
+    /// Persist the chain and a v2 anchor bound to `freshness_generation`.
+    /// The enrolled record is a separate store — this only binds the sidecar.
+    pub fn save_with_generation(
+        &self,
+        path: &std::path::Path,
+        device: &DeviceIdentity,
+        freshness_generation: u64,
+    ) -> Result<(), LedgerError> {
+        if freshness_generation < 1 {
+            return Err(LedgerError::InvalidEnrolledGeneration);
+        }
+        self.persist_with_generation(path, device, Some(freshness_generation))
+    }
+
+    fn persist_with_generation(
+        &self,
+        path: &std::path::Path,
+        device: &DeviceIdentity,
+        freshness_generation: Option<u64>,
+    ) -> Result<(), LedgerError> {
         let json = serde_json::to_vec_pretty(&self.events)?;
         write_atomic(path, &json)?;
         if let Some(key) = self.trusted_device_public_key_b64() {
@@ -210,10 +246,15 @@ impl AuditLedger {
             }
         }
         let mut head = LedgerHead {
-            version: LEDGER_HEAD_VERSION,
+            version: if freshness_generation.is_some() {
+                LEDGER_HEAD_VERSION_V2
+            } else {
+                LEDGER_HEAD_VERSION_V1
+            },
             workspace_binding: device.public_key_b64().to_owned(),
             event_count: self.events().len() as u64,
             last_event_hash: self.last_hash(),
+            freshness_generation,
             device_signature: String::new(),
         };
         head.sign(device)?;
