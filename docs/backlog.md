@@ -967,15 +967,18 @@ while the controller routes eligible design/review cards to the strong role.
 
 <a id="runtime-owner-task12-heal"></a>
 
-- [ ] **P3 | `crates/audit-ledger/`, `crates/authority/` | Owner-session Task 12 remainder: terminal-before-append heal + authority `effect_evidence`.**
-  TSV Task 12 is 10 `sovereign-audit-ledger` `effect_v1` rows (value-free
-  projection, chain, conflict, indeterminate never relabelled). Plan extras
-  `crash_after_terminal_before_append_heals_evidence_only` and
-  `crates/authority/tests/effect_evidence.rs` were never registered. Not
-  product RP1-05. See
-  [step-3 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step3-fixture-evidence-recovery-freshness.md).
-  Done when: those tests exist and are TSV-registered, or the plan records
-  they stay unregistered.
+- [x] **P3 | `crates/audit-ledger/`, `crates/authority/` | Owner-session Task 12 remainder: terminal-before-append heal + authority `effect_evidence`.**
+  Landed 2026-09-16. `crates/authority/src/effect_evidence.rs` +
+  `--test effect_evidence`: value-free terminal cursor, append after
+  terminal, heal never retries dispatch. TSV Task 12 is 18 rows (10
+  `effect_v1` unchanged + 8 authority, including
+  `crash_after_terminal_before_append_heals_evidence_only` under
+  `owner-effect-fixture,fault-injection`). Plan note records stay-unregistered
+  extras (signed event IDs / public-key signer, HTTP login reconcile,
+  scanner extension, filesystem `AuthorityStore` two-phase helper). Not
+  product RP1-05.
+  Run-log: `./scripts/run-owner-effect-tests.sh --task 12` OK — 18 rows;
+  `./scripts/test_changed.sh` ALL GREEN.
 
 <a id="runtime-owner-http"></a>
 
@@ -1910,6 +1913,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: owner-session Task 12 remainder — authority `effect_evidence` + 8 TSV rows (heal / crash-before-append). Projection tests stay in audit-ledger `effect_v1` (10). Stay-unregistered: signed event IDs, HTTP login reconcile, scanner extension. Not RP1-05. See plan Task 12 heal note.
 - 2026-09-15: owner-session Task 10 remainder — `scripts/check-owner-effect-authority-plane.sh` (fixture graph inverted: no `capability → authority`, `with_authority_store` removed, `authority → capability` + fixture feature forwarding). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate; Task 10 TSV still 7/7; Task 2 durable-approval rows moved to `sovereign-authority` / `approval_v2_integration`. No product Exact Effect / RP1-03 claim.
 - 2026-09-15: owner-session Task 4 remainder — `scripts/check-owner-effect-broker-build.sh` (same-`CARGO_TARGET_DIR` fixture image, no sibling broker artifact, `broker_bootstrap` 6 passed, default/release help+symbols lack hidden mode). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate. No product Exact Effect / RP1 claim.
 - probe 2026-08-15T05:50:38Z: container diagnostics — clone was ABSENT at session start (container provisioned with empty /home/user; repo attached+cloned in-session via add_repo). fetch/checkout OK after widening the shallow clone single-branch refspec (first `git checkout -B feature/auto-iterate origin/feature/auto-iterate` failed: "fatal: 'origin/feature/auto-iterate' is not a commit"). VERIFY_OK, push OK.

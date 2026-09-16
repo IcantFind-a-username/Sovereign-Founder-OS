@@ -49,6 +49,20 @@ impl EffectIntentId {
     pub fn file_stem(&self) -> String {
         self.0.simple().to_string()
     }
+
+    /// Rebuild from the stem `file_stem` produced. The stem is already
+    /// public — this is not an accessor for the inner value.
+    pub fn from_file_stem(stem: &str) -> Option<Self> {
+        Uuid::try_parse(stem).ok().map(Self)
+    }
+
+    pub(crate) fn as_uuid(self) -> Uuid {
+        self.0
+    }
+
+    pub(crate) fn from_uuid(id: Uuid) -> Self {
+        Self(id)
+    }
 }
 
 impl std::fmt::Debug for EffectIntentId {

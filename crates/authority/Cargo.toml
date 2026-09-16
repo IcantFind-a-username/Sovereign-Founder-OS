@@ -17,12 +17,20 @@ default = []
 fault-injection = []
 # RFC 0006's synthetic broker. Non-default for the same reason: a default
 # build must contain no broker mode and no entry point.
-owner-effect-fixture = ["dep:hmac", "dep:redb", "sovereign-capability/owner-effect-fixture"]
+owner-effect-fixture = [
+    "dep:hmac",
+    "dep:redb",
+    "dep:sovereign-audit-ledger",
+    "sovereign-capability/owner-effect-fixture",
+    "sovereign-audit-ledger/owner-effect-fixture",
+]
 
 [dependencies]
 # Inverted after Task 10: capability no longer depends on authority.
 # Durable claims consume a purely verified capability.
 sovereign-capability = { workspace = true }
+# Fixture-only: the value-free evidence chain. Absent from a default build.
+sovereign-audit-ledger = { workspace = true, optional = true }
 hex = { workspace = true }
 # Exact-pinned and optional: it exists only for the fixture broker's supervisor
 # MAC, and `scripts/check-owner-effect-crypto-profile.sh` fails unless the
@@ -101,4 +109,8 @@ required-features = ["owner-effect-fixture"]
 
 [[test]]
 name = "migration"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "effect_evidence"
 required-features = ["owner-effect-fixture"]

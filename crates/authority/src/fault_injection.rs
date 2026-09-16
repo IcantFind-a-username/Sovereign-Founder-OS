@@ -61,6 +61,11 @@ pub enum Barrier {
     /// Inside `consume_bundle`: token, idempotency, and approval are claimed
     /// under this bundle; the commit-time revocation re-check has not run.
     AfterBundleApprovalClaimBeforeCommitRecheck,
+
+    /// Terminal coordinator outcome is durable; evidence has not been
+    /// appended. Heal must write the missing projection and must not retry
+    /// the effect.
+    AfterTerminalCommitBeforeEvidenceAppend,
 }
 
 impl Barrier {
@@ -77,6 +82,9 @@ impl Barrier {
             Barrier::AfterBundleApprovalClaimBeforeCommitRecheck => {
                 "AfterBundleApprovalClaimBeforeCommitRecheck"
             }
+            Barrier::AfterTerminalCommitBeforeEvidenceAppend => {
+                "AfterTerminalCommitBeforeEvidenceAppend"
+            }
         }
     }
 
@@ -90,6 +98,7 @@ impl Barrier {
         Barrier::AfterRedbOpenBeforeBrokerReady,
         Barrier::AfterBundleRevocationPrecheckBeforeTokenClaim,
         Barrier::AfterBundleApprovalClaimBeforeCommitRecheck,
+        Barrier::AfterTerminalCommitBeforeEvidenceAppend,
     ];
 }
 
