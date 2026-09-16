@@ -406,7 +406,7 @@ fn consume_bundle_worker() {
     };
     frame(classify(store.consume_bundle(
         token,
-        approval,
+        Some(approval),
         idempotency,
         &[0x42_u8; 32],
         NOW,

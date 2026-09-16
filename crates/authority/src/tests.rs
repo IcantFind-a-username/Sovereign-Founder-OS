@@ -194,16 +194,24 @@ fn a_retried_bundle_after_any_interruption_completes_without_burning_claims() {
         let approval = part(NOW + 60);
         let idempotency = part(NOW + 60);
         let fingerprint = [0x42_u8; 32];
-        let bundle_hex = compute_bundle_hex(token.id, approval.id, idempotency.id, &fingerprint);
+        let bundle_hex =
+            compute_bundle_hex(token.id, Some(approval.id), idempotency.id, &fingerprint);
 
         if stop_after_step >= 1 {
             store
-                .bundle_publish_intent(&bundle_hex, token, approval, idempotency, &fingerprint, NOW)
+                .bundle_publish_intent(
+                    &bundle_hex,
+                    token,
+                    Some(approval),
+                    idempotency,
+                    &fingerprint,
+                    NOW,
+                )
                 .unwrap();
         }
         if stop_after_step >= 2 {
             store
-                .bundle_check_revocation(token.id, approval.id)
+                .bundle_check_revocation(token.id, Some(approval.id))
                 .unwrap();
         }
         if stop_after_step >= 3 {
@@ -221,11 +229,32 @@ fn a_retried_bundle_after_any_interruption_completes_without_burning_claims() {
         }
 
         assert_eq!(
-            store.consume_bundle(token, approval, idempotency, &fingerprint, NOW + 1),
+            store.consume_bundle(token, Some(approval), idempotency, &fingerprint, NOW + 1),
             Ok(()),
             "retry after stopping at step {stop_after_step} must complete, not burn"
         );
     }
+}
+
+#[test]
+fn a_two_part_bundle_interrupted_after_the_token_claim_resumes_on_retry() {
+    let dir = tempdir().unwrap();
+    let store = AuthorityStore::open(dir.path()).unwrap();
+    let token = part(NOW + 60);
+    let idempotency = part(NOW + 60);
+    let fingerprint = [0x21_u8; 32];
+    let bundle_hex = compute_bundle_hex(token.id, None, idempotency.id, &fingerprint);
+
+    store
+        .bundle_publish_intent(&bundle_hex, token, None, idempotency, &fingerprint, NOW)
+        .unwrap();
+    store.bundle_claim_token(&bundle_hex, token, NOW).unwrap();
+
+    assert_eq!(
+        store.consume_bundle(token, None, idempotency, &fingerprint, NOW + 1),
+        Ok(()),
+        "a two-part retry must resume after the token claim instead of burning it"
+    );
 }
 
 #[test]
@@ -248,7 +277,7 @@ fn racing_bundles_over_the_same_token_have_exactly_one_winner() {
                     let idempotency = part(NOW + 60);
                     let fingerprint = [i; 32];
                     store
-                        .consume_bundle(token, approval, idempotency, &fingerprint, NOW)
+                        .consume_bundle(token, Some(approval), idempotency, &fingerprint, NOW)
                         .is_ok() as usize
                 })
             })
@@ -276,7 +305,7 @@ fn racing_retries_of_the_same_bundle_authorize_exactly_once() {
                 scope.spawn(move || {
                     let store = AuthorityStore::open(&root).unwrap();
                     store
-                        .consume_bundle(token, approval, idempotency, &fingerprint, NOW)
+                        .consume_bundle(token, Some(approval), idempotency, &fingerprint, NOW)
                         .is_ok() as usize
                 })
             })
@@ -295,12 +324,19 @@ fn a_reopened_store_answers_a_partial_bundle_identically() {
     let approval = part(NOW + 60);
     let idempotency = part(NOW + 60);
     let fingerprint = [0x11_u8; 32];
-    let bundle_hex = compute_bundle_hex(token.id, approval.id, idempotency.id, &fingerprint);
+    let bundle_hex = compute_bundle_hex(token.id, Some(approval.id), idempotency.id, &fingerprint);
 
     {
         let store = AuthorityStore::open(dir.path()).unwrap();
         store
-            .bundle_publish_intent(&bundle_hex, token, approval, idempotency, &fingerprint, NOW)
+            .bundle_publish_intent(
+                &bundle_hex,
+                token,
+                Some(approval),
+                idempotency,
+                &fingerprint,
+                NOW,
+            )
             .unwrap();
         store.bundle_claim_token(&bundle_hex, token, NOW).unwrap();
         // "Crash" here: the store handle is dropped without committing.
@@ -315,7 +351,7 @@ fn a_reopened_store_answers_a_partial_bundle_identically() {
     assert_eq!(
         reopened.consume_bundle(
             token,
-            foreign_approval,
+            Some(foreign_approval),
             foreign_idempotency,
             &[0x22; 32],
             NOW + 1
@@ -326,7 +362,7 @@ fn a_reopened_store_answers_a_partial_bundle_identically() {
     // The original consumer's own retry against the reopened store
     // completes the bundle it had already partly claimed.
     assert_eq!(
-        reopened.consume_bundle(token, approval, idempotency, &fingerprint, NOW + 2),
+        reopened.consume_bundle(token, Some(approval), idempotency, &fingerprint, NOW + 2),
         Ok(())
     );
 }
@@ -339,15 +375,19 @@ fn a_foreign_uncommitted_bundle_denies_other_consumers() {
     let approval_a = part(NOW + 60);
     let idempotency_a = part(NOW + 60);
     let fingerprint_a = [0x33_u8; 32];
-    let bundle_hex_a =
-        compute_bundle_hex(token.id, approval_a.id, idempotency_a.id, &fingerprint_a);
+    let bundle_hex_a = compute_bundle_hex(
+        token.id,
+        Some(approval_a.id),
+        idempotency_a.id,
+        &fingerprint_a,
+    );
 
     // Bundle A claims the token but never commits (simulated crash).
     store
         .bundle_publish_intent(
             &bundle_hex_a,
             token,
-            approval_a,
+            Some(approval_a),
             idempotency_a,
             &fingerprint_a,
             NOW,
@@ -360,7 +400,7 @@ fn a_foreign_uncommitted_bundle_denies_other_consumers() {
     let approval_b = part(NOW + 60);
     let idempotency_b = part(NOW + 60);
     assert_eq!(
-        store.consume_bundle(token, approval_b, idempotency_b, &[0x44; 32], NOW + 1),
+        store.consume_bundle(token, Some(approval_b), idempotency_b, &[0x44; 32], NOW + 1),
         Err(AuthorityError::AlreadyConsumed)
     );
 }
@@ -375,7 +415,7 @@ fn purge_removes_expired_bundles_and_their_claims() {
     let fingerprint = [0x55_u8; 32];
 
     store
-        .consume_bundle(token, approval, idempotency, &fingerprint, NOW)
+        .consume_bundle(token, Some(approval), idempotency, &fingerprint, NOW)
         .unwrap();
 
     let removed = store.purge_expired(NOW + 31).unwrap();
@@ -386,7 +426,7 @@ fn purge_removes_expired_bundles_and_their_claims() {
 
     // Everything purged: the exact same bundle can be authorized again.
     assert_eq!(
-        store.consume_bundle(token, approval, idempotency, &fingerprint, NOW + 32),
+        store.consume_bundle(token, Some(approval), idempotency, &fingerprint, NOW + 32),
         Ok(())
     );
 }
@@ -422,7 +462,7 @@ fn a_revoked_token_fails_closed_across_reopen() {
                 id: token,
                 expires_at_unix: NOW + 60
             },
-            approval,
+            Some(approval),
             idempotency,
             &[0x66; 32],
             NOW + 3
@@ -456,7 +496,7 @@ fn revoking_a_consumed_claim_reports_the_distinct_outcome() {
     let idempotency = part(NOW + 60);
     let fingerprint = [0x88_u8; 32];
     store
-        .consume_bundle(bundle_token, approval, idempotency, &fingerprint, NOW)
+        .consume_bundle(bundle_token, Some(approval), idempotency, &fingerprint, NOW)
         .unwrap();
     assert_eq!(
         store.revoke_token(bundle_token.id, NOW + 1, bundle_token.expires_at_unix),
@@ -475,7 +515,7 @@ fn revoking_a_consumed_claim_reports_the_distinct_outcome() {
     let uncommitted_fingerprint = [0x99_u8; 32];
     let uncommitted_bundle_hex = compute_bundle_hex(
         uncommitted_token.id,
-        uncommitted_approval.id,
+        Some(uncommitted_approval.id),
         uncommitted_idempotency.id,
         &uncommitted_fingerprint,
     );
@@ -483,7 +523,7 @@ fn revoking_a_consumed_claim_reports_the_distinct_outcome() {
         .bundle_publish_intent(
             &uncommitted_bundle_hex,
             uncommitted_token,
-            uncommitted_approval,
+            Some(uncommitted_approval),
             uncommitted_idempotency,
             &uncommitted_fingerprint,
             NOW,
@@ -518,7 +558,7 @@ fn a_revoke_vs_consume_race_ends_in_one_durable_outcome() {
             let consume = scope.spawn(move || {
                 AuthorityStore::open(&root_a).unwrap().consume_bundle(
                     token,
-                    approval,
+                    Some(approval),
                     idempotency,
                     &fingerprint,
                     NOW,
