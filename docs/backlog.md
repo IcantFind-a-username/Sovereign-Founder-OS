@@ -959,6 +959,7 @@ while the controller routes eligible design/review cards to the strong role.
 <a id="runtime-owner-trybuild"></a>
 
 - [ ] **P3 | `crates/authority/` | Optional trybuild payload/root compile-fail goldens.**
+  IN PROGRESS (2026-09-16)
   Privacy is currently structural (`pub(crate)` bytes + Debug redaction), not
   a consumer compile-fail golden. Not product Exact Effect. See
   [step-2 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step2-fixture-reservation-exact-effect-evidence.md).
