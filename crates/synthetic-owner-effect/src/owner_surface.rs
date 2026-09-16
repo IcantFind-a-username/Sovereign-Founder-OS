@@ -3,6 +3,7 @@
 //! Reuses `crates/owner` as a library. Empty-registry enrolment is first
 //! writer wins and is not owner admission. Restart drops this state.
 
+use std::collections::HashMap;
 use std::time::Instant;
 
 use serde_json::{json, Value};
@@ -11,6 +12,10 @@ use sovereign_owner::config::{CeremonyConfig, CEREMONY_TIMEOUT, ORIGIN, RP_ID};
 use sovereign_owner::registry::{CeremonyError, Registry};
 use sovereign_owner::session::{SessionError, SessionTokens, Sessions, TOKEN_LEN};
 use uuid::Uuid;
+
+use crate::effect::{json_preview, unix_now, EffectCoordinator, SessionBinding};
+use crate::grant::FreshUvGrant;
+use crate::sealed::EffectIntentId;
 
 pub const SESSION_COOKIE: &str = "__Host-sfo_fixture_session";
 pub const CSRF_HEADER: &str = "x-sfo-csrf";
@@ -23,11 +28,22 @@ pub enum FixtureRoute {
     LoginStart,
     LoginFinish,
     Logout,
+    Prepare,
+    Preview,
+    ApproveStart,
+    ApproveFinish,
 }
 
 impl FixtureRoute {
     pub fn is_pre_session(self) -> bool {
-        !matches!(self, FixtureRoute::Logout)
+        matches!(
+            self,
+            FixtureRoute::Shell
+                | FixtureRoute::RegisterStart
+                | FixtureRoute::RegisterFinish
+                | FixtureRoute::LoginStart
+                | FixtureRoute::LoginFinish
+        )
     }
 }
 
@@ -45,6 +61,14 @@ pub enum OwnerError {
     SessionIdle,
     CsrfMismatch,
     BadBody,
+    HeaderInjection,
+    GenericInput,
+    UnknownIntent,
+    IntentMismatch,
+    GrantReplay,
+    EpochMismatch,
+    CoordinatorUnavailable,
+    SessionAlone,
 }
 
 impl OwnerError {
@@ -62,6 +86,14 @@ impl OwnerError {
             Self::SessionIdle => "E-SESSION-IDLE",
             Self::CsrfMismatch => "E-CSRF-MISMATCH",
             Self::BadBody => "E-BAD-BODY",
+            Self::HeaderInjection => "E-HEADER-INJECTION",
+            Self::GenericInput => "E-GENERIC-INPUT",
+            Self::UnknownIntent => "E-UNKNOWN-INTENT",
+            Self::IntentMismatch => "E-INTENT-MISMATCH",
+            Self::GrantReplay => "E-GRANT-REPLAY",
+            Self::EpochMismatch => "E-EPOCH-MISMATCH",
+            Self::CoordinatorUnavailable => "E-COORDINATOR-UNAVAILABLE",
+            Self::SessionAlone => "E-SESSION-ALONE",
         }
     }
 }
@@ -114,6 +146,15 @@ impl OwnerResponse {
 pub struct OwnerSurface {
     registry: Registry,
     sessions: Sessions,
+    session_meta: HashMap<[u8; TOKEN_LEN], SessionMeta>,
+    logout_epoch: u64,
+    effects: EffectCoordinator,
+}
+
+struct SessionMeta {
+    session_id: Uuid,
+    subject: Uuid,
+    credential_id: Vec<u8>,
 }
 
 impl Default for OwnerSurface {
@@ -127,6 +168,10 @@ impl OwnerSurface {
         Self {
             registry: Registry::new(CeremonyConfig::frozen(), Qualification::ProtocolFixtureOnly),
             sessions: Sessions::new(),
+            session_meta: HashMap::new(),
+            logout_epoch: 0,
+            effects: EffectCoordinator::new(1, [0u8; 16])
+                .expect("closed-profile publisher must generate"),
         }
     }
 
@@ -140,6 +185,41 @@ impl OwnerSurface {
 
     pub fn sessions_mut(&mut self) -> &mut Sessions {
         &mut self.sessions
+    }
+
+    pub fn effects(&self) -> &EffectCoordinator {
+        &self.effects
+    }
+
+    pub fn bind_live_signer(&mut self, signer_epoch: [u8; 16], generation: u64) {
+        self.effects = EffectCoordinator::new(generation, signer_epoch)
+            .expect("closed-profile publisher must generate");
+    }
+
+    pub fn logout_epoch(&self) -> u64 {
+        self.logout_epoch
+    }
+
+    pub fn session_binding(
+        &mut self,
+        presented: &SessionTokens,
+        now: Instant,
+    ) -> Result<SessionBinding, OwnerError> {
+        let subject = self.sessions.authenticate(presented, now)?;
+        let meta = self
+            .session_meta
+            .get(&presented.cookie)
+            .ok_or(OwnerError::SessionUnknown)?;
+        if meta.subject != subject {
+            return Err(OwnerError::SessionUnknown);
+        }
+        Ok(SessionBinding {
+            session_id: meta.session_id,
+            subject: meta.subject,
+            credential_id: meta.credential_id.clone(),
+            logout_epoch: self.logout_epoch,
+            fixture_generation: self.effects.generation(),
+        })
     }
 
     pub fn dispatch(
@@ -167,7 +247,25 @@ impl OwnerSurface {
                 Some(tokens) => self.logout(tokens, now),
                 None => OwnerResponse::error(OwnerError::SessionUnknown),
             },
+            FixtureRoute::Prepare
+            | FixtureRoute::Preview
+            | FixtureRoute::ApproveStart
+            | FixtureRoute::ApproveFinish => match presented {
+                Some(tokens) => self.dispatch_effect(route, body, tokens, now),
+                None => OwnerResponse::error(OwnerError::SessionUnknown),
+            },
         }
+    }
+
+    fn remember_session(&mut self, tokens: &SessionTokens, subject: Uuid, credential_id: Vec<u8>) {
+        self.session_meta.insert(
+            tokens.cookie,
+            SessionMeta {
+                session_id: Uuid::new_v4(),
+                subject,
+                credential_id,
+            },
+        );
     }
 
     fn register_start(&mut self, now: Instant) -> OwnerResponse {
@@ -196,6 +294,7 @@ impl OwnerSurface {
             Ok(facts) => facts,
             Err(error) => return OwnerResponse::error(error),
         };
+        let credential_id = facts.credential_id.clone();
         match self.registry.finish_registration(
             now,
             facts.ceremony_id,
@@ -207,6 +306,7 @@ impl OwnerSurface {
                 let tokens = self
                     .sessions
                     .issue(bootstrap.enrolment_winner(), now, &mut random);
+                self.remember_session(&tokens, bootstrap.enrolment_winner(), credential_id);
                 let mut response = OwnerResponse::json(
                     200,
                     json!({
@@ -258,6 +358,7 @@ impl OwnerSurface {
         ) {
             Ok(subject) => {
                 let tokens = self.sessions.issue(subject, now, &mut random);
+                self.remember_session(&tokens, subject, facts.credential_id);
                 let mut response = OwnerResponse::json(
                     200,
                     json!({
@@ -276,11 +377,103 @@ impl OwnerSurface {
         match self.sessions.authenticate(presented, now) {
             Ok(_) => {
                 self.sessions.log_out(&presented.cookie);
+                self.session_meta.remove(&presented.cookie);
+                self.logout_epoch = self.logout_epoch.saturating_add(1);
                 self.registry.abort_pending();
                 OwnerResponse::json(200, json!({ "ok": true }))
             }
             Err(error) => OwnerResponse::error(error.into()),
         }
+    }
+
+    fn dispatch_effect(
+        &mut self,
+        route: FixtureRoute,
+        body: &[u8],
+        presented: &SessionTokens,
+        now: Instant,
+    ) -> OwnerResponse {
+        let session = match self.session_binding(presented, now) {
+            Ok(session) => session,
+            Err(error) => return OwnerResponse::error(error),
+        };
+        match route {
+            FixtureRoute::Prepare => match self.effects.prepare(&session, body, unix_now()) {
+                Ok((intent_id, preview)) => OwnerResponse::json(
+                    200,
+                    json!({
+                        "intent_id": intent_id.file_stem(),
+                        "preview": json_preview(preview),
+                    }),
+                ),
+                Err(error) => OwnerResponse::error(error),
+            },
+            FixtureRoute::Preview => match parse_intent_id(body) {
+                Ok(intent_id) => match self.effects.preview(intent_id) {
+                    Ok(preview) => OwnerResponse::json(200, json_preview(preview)),
+                    Err(error) => OwnerResponse::error(error),
+                },
+                Err(error) => OwnerResponse::error(error),
+            },
+            FixtureRoute::ApproveStart => match parse_intent_id(body) {
+                Ok(intent_id) => match self.effects.start_approval(&session, intent_id, now) {
+                    Ok(ceremony_id) => OwnerResponse::json(
+                        200,
+                        json!({
+                            "ceremony_id": ceremony_id.to_string(),
+                            "timeout_seconds": CEREMONY_TIMEOUT.as_secs(),
+                        }),
+                    ),
+                    Err(error) => OwnerResponse::error(error),
+                },
+                Err(error) => OwnerResponse::error(error),
+            },
+            FixtureRoute::ApproveFinish => {
+                match self.effects.finish_approval(&session, body, now) {
+                    Ok(_grant) => OwnerResponse::json(200, json!({ "granted": true })),
+                    Err(error) => OwnerResponse::error(error),
+                }
+            }
+            _ => OwnerResponse::error(OwnerError::BadBody),
+        }
+    }
+
+    pub fn prepare_effect(
+        &mut self,
+        presented: &SessionTokens,
+        body: &[u8],
+        now: Instant,
+    ) -> Result<(EffectIntentId, crate::sealed::FixturePreview), OwnerError> {
+        let session = self.session_binding(presented, now)?;
+        self.effects.prepare(&session, body, unix_now())
+    }
+
+    pub fn start_effect_approval(
+        &mut self,
+        presented: &SessionTokens,
+        intent_id: EffectIntentId,
+        now: Instant,
+    ) -> Result<Uuid, OwnerError> {
+        let session = self.session_binding(presented, now)?;
+        self.effects.start_approval(&session, intent_id, now)
+    }
+
+    pub fn finish_effect_approval(
+        &mut self,
+        presented: &SessionTokens,
+        body: &[u8],
+        now: Instant,
+    ) -> Result<FreshUvGrant, OwnerError> {
+        let session = self.session_binding(presented, now)?;
+        self.effects.finish_approval(&session, body, now)
+    }
+
+    pub fn require_session(
+        &mut self,
+        presented: &SessionTokens,
+        now: Instant,
+    ) -> Result<SessionBinding, OwnerError> {
+        self.session_binding(presented, now)
     }
 }
 
@@ -318,4 +511,14 @@ fn parse_uv_facts(body: &[u8]) -> Result<UvFacts, OwnerError> {
         user_handle,
         user_verified,
     })
+}
+
+fn parse_intent_id(body: &[u8]) -> Result<EffectIntentId, OwnerError> {
+    let value: Value = serde_json::from_slice(body).map_err(|_| OwnerError::BadBody)?;
+    let text = value
+        .get("intent_id")
+        .and_then(Value::as_str)
+        .ok_or(OwnerError::BadBody)?;
+    let uuid = Uuid::try_parse(text).map_err(|_| OwnerError::BadBody)?;
+    Ok(EffectIntentId::from_uuid(uuid))
 }

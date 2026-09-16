@@ -146,7 +146,8 @@ repo audit; every entry below points at verified, real state of the code.
   **Design Accept ≠ product Exact Effect.** No product Current, no 1C0, no
   `low_risk_effectful` admission, no RP1 / ActiveV2 / Wave D completion.
   Named tests and compile-fail fixtures are in `crates/capability/tests/`.
-  v01-D02 and v01-D03 landed; v01-D04…D07 stay unclaimed in
+  v01-D02…D04 landed; v01-D05…D07 stay
+  unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="v01-d02-fixture-boundary"></a>
@@ -159,7 +160,8 @@ repo audit; every entry below points at verified, real state of the code.
   and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
   effect behavior.** One public listener story at the compiled origin later.
   **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
-  RP1. v01-D03 landed below; v01-D04…D07 stay unclaimed in
+  RP1. v01-D03 and v01-D04 landed; v01-D05…D07 stay
+  unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="v01-d03-unqualified-uv-sessions"></a>
@@ -174,8 +176,25 @@ repo audit; every entry below points at verified, real state of the code.
   trust record. Reuses `crates/owner` session/registry as a library; empty
   default / fail-closed product admission unchanged. **Design Accept ≠
   product Current.** Not 1C0, Exact Effect, ActiveV2, RP1, or RFC 0003
-  approval emission (that is D04). Named tests in
+  approval emission (that is D04).   Named tests in
   `crates/synthetic-owner-effect/tests/{unqualified_uv_sessions,signer_epoch,cross_port_residuals}.rs`.
+
+<a id="v01-d04-seal-intent-bridge-uv"></a>
+
+- [x] **P1 | fixture package `sovereign-synthetic-owner-effect` + `crates/capability` issuance of the closed profile (fixture feature only) | v01-D04 — Seal intent and bridge fresh UV to RFC 0003.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D03 (`b8cadc6`). Random intent before content access; fixed CRLF RFC
+  5322 bytes inside the coordinator; private sealed payload; synthetic
+  preview. `FreshUvGrant` (non-cloneable) → only
+  `ApprovalBridge::approve_invocation` emits RFC 0003 evidence. Exact
+  Capability V2 claims use wire tokens `low_risk_effectful` + `core_wasm` +
+  `write_rfc5322`. Product issuance stays `pure_compute`. **Design Accept ≠
+  product Current.** Not 1C0, Exact Effect, ActiveV2, RP1, dispatch,
+  reservation, or product `low_risk_effectful` admission. Named tests in
+  `crates/synthetic-owner-effect/tests/exact_uv_approval.rs` plus
+  `crates/capability/tests/closed_profile_issuance.rs`. v01-D05…D07 stay
+  unclaimed in
+  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="runtime-f03-exact-effect-product"></a>
 

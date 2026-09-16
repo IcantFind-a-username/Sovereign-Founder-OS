@@ -20,6 +20,12 @@ mod approval_bridge;
 #[cfg(feature = "owner-effect-fixture")]
 mod boundary;
 #[cfg(feature = "owner-effect-fixture")]
+mod closed_profile;
+#[cfg(feature = "owner-effect-fixture")]
+mod effect;
+#[cfg(feature = "owner-effect-fixture")]
+mod grant;
+#[cfg(feature = "owner-effect-fixture")]
 mod http;
 #[cfg(feature = "owner-effect-fixture")]
 mod listener;
@@ -27,6 +33,8 @@ mod listener;
 mod owner_boot;
 #[cfg(feature = "owner-effect-fixture")]
 mod owner_surface;
+#[cfg(feature = "owner-effect-fixture")]
+mod sealed;
 #[cfg(feature = "owner-effect-fixture")]
 mod trust_persist;
 
@@ -38,6 +46,10 @@ pub use approval_bridge::{
 #[cfg(feature = "owner-effect-fixture")]
 pub use boundary::{BoundaryError, ProcessBoundary};
 #[cfg(feature = "owner-effect-fixture")]
+pub use effect::{EffectCoordinator, SessionBinding, FIXTURE_AUDIENCE, FIXTURE_VENTURE};
+#[cfg(feature = "owner-effect-fixture")]
+pub use grant::FreshUvGrant;
+#[cfg(feature = "owner-effect-fixture")]
 pub use http::{check_request, handle_stream, route_path};
 #[cfg(feature = "owner-effect-fixture")]
 pub use listener::{bind_public_origin, LISTEN_PORT, ORIGIN, RP_ID};
@@ -47,6 +59,8 @@ pub use owner_boot::{FixtureOwner, LockedSigner};
 pub use owner_surface::{
     FixtureRoute, OwnerError, OwnerResponse, OwnerSurface, CSRF_HEADER, SESSION_COOKIE,
 };
+#[cfg(feature = "owner-effect-fixture")]
+pub use sealed::{EffectIntentId, FixturePreview, SealedPayload, COORDINATOR_REF, FIXTURE_DATE};
 #[cfg(feature = "owner-effect-fixture")]
 pub use sovereign_owner::http_guard::{Method, Reject, Request, MAX_BODY_BYTES};
 #[cfg(feature = "owner-effect-fixture")]

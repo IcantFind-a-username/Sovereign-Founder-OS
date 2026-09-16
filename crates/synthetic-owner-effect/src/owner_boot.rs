@@ -51,10 +51,14 @@ impl LockedSigner {
                 .map_err(|_| BoundaryError::StoreUnavailable)?
         };
         let _ = record;
+        let epoch = self.bridge.signer_epoch();
+        let generation = self.boundary.generation();
+        let mut surface = OwnerSurface::new();
+        surface.bind_live_signer(epoch, generation);
         Ok(FixtureOwner {
             boundary: self.boundary,
             bridge: self.bridge,
-            surface: OwnerSurface::new(),
+            surface,
         })
     }
 }

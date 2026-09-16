@@ -724,6 +724,12 @@ fn validate_claim_lifetime(
 }
 
 fn validate_supported_invocation(prepared: &PreparedInvocation) -> Result<(), CapabilityV2Error> {
+    #[cfg(feature = "owner-effect-fixture")]
+    if prepared.artifact().manifest().is_closed_fixture_profile() {
+        let primary_resource = required_primary_resource(prepared)?;
+        validate_identifier(primary_resource, CapabilityV2Error::MissingPrimaryResource)?;
+        return Ok(());
+    }
     if prepared.artifact().manifest().risk_class() != RiskClass::PureCompute {
         return Err(CapabilityV2Error::UnsupportedRiskClass);
     }
