@@ -48,6 +48,7 @@ sovereign-vault = { path = "crates/vault" }
 sovereign-vault-v2-engine = { path = "crates/vault-v2-engine" }
 sovereign-workflow = { path = "crates/workflow" }
 sovereign-sandbox = { path = "crates/sandbox" }
+sovereign-owner = { path = "crates/owner" }
 sovereign-synthetic-owner-effect = { path = "crates/synthetic-owner-effect" }
 
 serde = { version = "1", features = ["derive"] }

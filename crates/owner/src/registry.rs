@@ -102,6 +102,12 @@ impl Registry {
         self.credential.as_ref()
     }
 
+    /// Drop every in-flight ceremony without touching the stored credential.
+    /// Logout must not leave a challenge that can be finished afterwards.
+    pub fn abort_pending(&mut self) {
+        self.pending.clear();
+    }
+
     /// Begin a registration. Refused once anything is registered — the
     /// refusal is here as well as at the finish, so a caller cannot even
     /// obtain a challenge to work against.

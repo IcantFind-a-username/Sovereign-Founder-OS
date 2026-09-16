@@ -128,7 +128,7 @@ repo audit; every entry below points at verified, real state of the code.
   **Design Accept ≠ product Exact Effect.** No product Current, no 1C0, no
   `low_risk_effectful` admission, no RP1 / ActiveV2 / Wave D completion.
   Named tests and compile-fail fixtures are in `crates/capability/tests/`.
-  v01-D03…D07 stay unclaimed in
+  v01-D02 and v01-D03 landed; v01-D04…D07 stay unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="v01-d02-fixture-boundary"></a>
@@ -141,8 +141,23 @@ repo audit; every entry below points at verified, real state of the code.
   and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
   effect behavior.** One public listener story at the compiled origin later.
   **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
-  RP1. v01-D03…D07 stay unclaimed in
+  RP1. v01-D03 landed below; v01-D04…D07 stay unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+
+<a id="v01-d03-unqualified-uv-sessions"></a>
+
+- [x] **P1 | fixture package `sovereign-synthetic-owner-effect` + reuse `crates/owner` | v01-D03 — Unqualified WebAuthn UV, session, CSRF, signer epoch.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D02 (`0f576bd`). Closed `/api/fixture/auth/{register,login,logout}`
+  routes, one-credential registry, mechanism matrix row (empty real matrix
+  allowed), memory sessions, middleware, logout. After lock and before redb:
+  ephemeral `TypedSigner<ApprovalRole>`, random signer epoch, closed
+  `ApprovalBridge`. Persist only the labelled `unqualified_fixture` public
+  trust record. Reuses `crates/owner` session/registry as a library; empty
+  default / fail-closed product admission unchanged. **Design Accept ≠
+  product Current.** Not 1C0, Exact Effect, ActiveV2, RP1, or RFC 0003
+  approval emission (that is D04). Named tests in
+  `crates/synthetic-owner-effect/tests/{unqualified_uv_sessions,signer_epoch,cross_port_residuals}.rs`.
 
 <a id="runtime-f03-exact-effect-product"></a>
 
@@ -1982,6 +1997,8 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
   MVP routes.
 
 ## Run log
+
+- 2026-09-16: v01-D03 unqualified owner UV sessions — fixture package reuses `crates/owner` registry/session; closed v2 auth routes; memory sessions/CSRF; lock→`TypedSigner<ApprovalRole>`→redb public trust only; historical keys verify-only. Named tests in `unqualified_uv_sessions` / `signer_epoch` / `cross_port_residuals`. **Design Accept ≠ product Current.** No 1C0 / Exact Effect / RFC 0003 `approve_invocation` (D04).
 
 - 2026-09-16: Vault 1B0 binding-admission evidence (docs-only) —
   `docs/handoff/reports/2026-09-16-vault-1b0-binding-admission-evidence.md`.

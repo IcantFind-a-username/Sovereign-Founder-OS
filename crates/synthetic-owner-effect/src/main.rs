@@ -16,31 +16,28 @@ fn main() -> ExitCode {
         }
     };
 
-    let boundary = match ProcessBoundary::acquire(&parsed.root) {
-        Ok(boundary) => boundary,
+    let owner = match ProcessBoundary::acquire(&parsed.root)
+        .and_then(|boundary| boundary.with_signer())
+        .and_then(|locked| locked.persist())
+    {
+        Ok(owner) => owner,
         Err(error) => {
             let _ = writeln!(std::io::stderr(), "{error}");
             return ExitCode::from(exit_status(error));
         }
     };
 
-    match boundary.hold_store(|_store| {
-        // Touch the needle so a product binary that accidentally linked this
-        // crate cannot claim the constant was eliminated as unused.
-        std::hint::black_box(RELEASE_EXCLUSION_NEEDLE);
-        let mut stdout = std::io::stdout();
-        let _ = writeln!(stdout, "boundary-ready");
-        let _ = stdout.flush();
-        if parsed.hold {
-            std::thread::sleep(Duration::from_secs(30));
-        }
-    }) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            let _ = writeln!(std::io::stderr(), "{error}");
-            ExitCode::from(exit_status(error))
-        }
+    // Touch the needles so a product binary that accidentally linked this
+    // crate cannot claim the constants were eliminated as unused.
+    std::hint::black_box(RELEASE_EXCLUSION_NEEDLE);
+    std::hint::black_box(owner.bridge());
+    let mut stdout = std::io::stdout();
+    let _ = writeln!(stdout, "boundary-ready");
+    let _ = stdout.flush();
+    if parsed.hold {
+        std::thread::sleep(Duration::from_secs(30));
     }
+    ExitCode::SUCCESS
 }
 
 struct Args {
@@ -75,5 +72,6 @@ fn exit_status(error: sovereign_synthetic_owner_effect::BoundaryError) -> u8 {
         AlreadyRunning => 4,
         LockUnavailable => 5,
         StoreUnavailable => 6,
+        SignerUnavailable => 7,
     }
 }

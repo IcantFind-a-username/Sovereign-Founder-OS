@@ -31,6 +31,7 @@ pub enum BoundaryError {
     AlreadyRunning,
     LockUnavailable,
     StoreUnavailable,
+    SignerUnavailable,
 }
 
 impl BoundaryError {
@@ -40,6 +41,7 @@ impl BoundaryError {
             Self::AlreadyRunning => "E-BROKER-ALREADY-RUNNING",
             Self::LockUnavailable => "E-LOCK-UNAVAILABLE",
             Self::StoreUnavailable => "E-STORE-UNAVAILABLE",
+            Self::SignerUnavailable => "E-SIGNER-UNAVAILABLE",
         }
     }
 }
@@ -105,5 +107,12 @@ impl ProcessBoundary {
     ) -> Result<R, BoundaryError> {
         let store = self.open_store()?;
         Ok(body(&store))
+    }
+
+    /// Generate the ephemeral approval signer. Must run after the lock is
+    /// held and before redb opens: the caller still has a `ProcessBoundary`
+    /// with no store.
+    pub fn with_signer(self) -> Result<crate::LockedSigner, BoundaryError> {
+        crate::LockedSigner::from_boundary(self)
     }
 }
