@@ -1,7 +1,8 @@
 //! Closed v2 auth and effect-prepare/preview/approve routes.
 //!
-//! Dispatch and reconcile are D05/D06 and remain unknown. Unknown paths are
-//! refused before headers are trusted.
+//! Dispatch and reconcile are D06 and remain unknown. Unknown paths are
+//! refused before headers are trusted. Reservation is an in-process typed
+//! call, not a second listener.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;

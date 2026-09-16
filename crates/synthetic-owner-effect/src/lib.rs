@@ -34,6 +34,10 @@ mod owner_boot;
 #[cfg(feature = "owner-effect-fixture")]
 mod owner_surface;
 #[cfg(feature = "owner-effect-fixture")]
+mod reserve;
+#[cfg(feature = "owner-effect-fixture")]
+mod reserved;
+#[cfg(feature = "owner-effect-fixture")]
 mod sealed;
 #[cfg(feature = "owner-effect-fixture")]
 mod trust_persist;
@@ -59,6 +63,15 @@ pub use owner_boot::{FixtureOwner, LockedSigner};
 pub use owner_surface::{
     FixtureRoute, OwnerError, OwnerResponse, OwnerSurface, CSRF_HEADER, SESSION_COOKIE,
 };
+#[cfg(feature = "owner-effect-fixture")]
+pub use reserve::{
+    inspect_reservation, persist_prepared, reserve_exact_authority, revoke_approval, revoke_token,
+    with_failpoint, IntentState, PreparedSnapshot, ReservationContext, ReservationFailpoint,
+    ReservationView, ReserveError, BARRIER_AFTER_COMMIT, BARRIER_BEFORE_COMMIT, KILL_BARRIER_ENV,
+    KILL_REACHED_PREFIX, SYNTHETIC_NODE_INITIAL_USES,
+};
+#[cfg(feature = "owner-effect-fixture")]
+pub use reserved::AuthorityReservedEffect;
 #[cfg(feature = "owner-effect-fixture")]
 pub use sealed::{EffectIntentId, FixturePreview, SealedPayload, COORDINATOR_REF, FIXTURE_DATE};
 #[cfg(feature = "owner-effect-fixture")]

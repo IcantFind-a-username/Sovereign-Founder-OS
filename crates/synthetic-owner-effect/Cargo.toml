@@ -49,6 +49,26 @@ name = "exact_uv_approval"
 path = "tests/exact_uv_approval.rs"
 required-features = ["owner-effect-fixture"]
 
+[[test]]
+name = "reserve_atomicity"
+path = "tests/reserve_atomicity.rs"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "reserve_races"
+path = "tests/reserve_races.rs"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "reserve_kill"
+path = "tests/reserve_kill.rs"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "reserve_compile_fail"
+path = "tests/reserve_compile_fail.rs"
+required-features = ["owner-effect-fixture"]
+
 [dependencies]
 sovereign-authority = { workspace = true }
 sovereign-capability = { workspace = true }

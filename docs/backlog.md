@@ -146,7 +146,7 @@ repo audit; every entry below points at verified, real state of the code.
   **Design Accept ≠ product Exact Effect.** No product Current, no 1C0, no
   `low_risk_effectful` admission, no RP1 / ActiveV2 / Wave D completion.
   Named tests and compile-fail fixtures are in `crates/capability/tests/`.
-  v01-D02…D04 landed; v01-D05 is in progress below; v01-D06…D07 stay
+  v01-D02…D05 landed; v01-D06…D07 stay
   unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
@@ -160,7 +160,7 @@ repo audit; every entry below points at verified, real state of the code.
   and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
   effect behavior.** One public listener story at the compiled origin later.
   **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
-  RP1. v01-D03 and v01-D04 landed; v01-D05 is in progress below;
+  RP1. v01-D03…D05 landed;
   v01-D06…D07 stay
   unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
@@ -193,24 +193,28 @@ repo audit; every entry below points at verified, real state of the code.
   product Current.** Not 1C0, Exact Effect, ActiveV2, RP1, dispatch,
   reservation, or product `low_risk_effectful` admission. Named tests in
   `crates/synthetic-owner-effect/tests/exact_uv_approval.rs` plus
-  `crates/capability/tests/closed_profile_issuance.rs`. v01-D05 is in
-  progress below; v01-D06…D07 stay unclaimed in
+  `crates/capability/tests/closed_profile_issuance.rs`. v01-D05 landed
+  below; v01-D06…D07 stay unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="v01-d05-reserve-exact-authority"></a>
 
-- [ ] **P1 | fixture coordinator `sovereign-synthetic-owner-effect` | v01-D05 — Reserve every authority fact in one redb transaction.**
-  IN PROGRESS (2026-09-16). Licensed by RFC 0002 Amendment 1. Depends on
-  v01-D01 + v01-D04 (`13a150f`). Sole write-transaction helper consumes
-  opaque `VerifiedCapabilityV2` / `VerifiedApprovalV1` by value and
-  atomically commits approval claim (carry already-Current signed approval
-  expiry), token claim, idempotency binding to `effect_intent_id`,
-  synthetic authority-node use/decrement, and `Prepared ->
-  AuthorityReserved`. Returns privately constructible
-  `AuthorityReservedEffect`. Never call the legacy consuming validator
-  first; never duplicate crypto checks. **Design Accept ≠ product
-  Current.** Not 1C0, Exact Effect, ActiveV2, RP1, publish/write `.eml`
-  (D06), or product AuthorityStore rewrite.
+- [x] **P1 | fixture coordinator `sovereign-synthetic-owner-effect` | v01-D05 — Reserve every authority fact in one redb transaction.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D01 + v01-D04 (`13a150f`). Sole write-transaction helper
+  `reserve_exact_authority` consumes opaque `VerifiedCapabilityV2` /
+  `VerifiedApprovalV1` by value and, in one `OwnedStore.write` (Immediate
+  + two-phase), rechecks bindings then atomically commits approval claim
+  (carry already-Current signed approval expiry), token claim, idempotency
+  binding to `effect_intent_id`, synthetic authority-node use/decrement,
+  and `Prepared -> AuthorityReserved`. Returns privately constructible
+  `AuthorityReservedEffect` (no Clone/Serialize/Debug, no reconstruction
+  accessor). Never calls the legacy consuming validator; never duplicates
+  crypto checks. **Design Accept ≠ product Current.** Not 1C0, Exact
+  Effect, ActiveV2, RP1, publish/write `.eml` (D06), or product
+  AuthorityStore rewrite. Named tests in
+  `crates/synthetic-owner-effect/tests/{reserve_atomicity,reserve_races,reserve_kill,reserve_compile_fail}.rs`.
+  Full cross-process validator race remains Target.
 
 <a id="runtime-f03-exact-effect-product"></a>
 
@@ -2051,6 +2055,16 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: v01-D05 reserve exact authority atomically — fixture
+  coordinator `reserve_exact_authority` consumes opaque proofs by value and
+  commits approval/token/idempotency/synthetic-node/intent in one redb
+  write. Named tests: failpoint rollback, process-kill before/after
+  commit, same-process reservation race (one winner), idempotent replay,
+  different-intent conflict, expiry/logout/signer-epoch/revocation races,
+  compile-fail construct/clone/serialize/debug/destructure/reconstruct.
+  **Design Accept ≠ product Current.** No 1C0 / Exact Effect / ActiveV2 /
+  RP1 / publish `.eml` (D06). Full cross-process validator race remains
+  Target.
 - 2026-09-16: v01-D03 unqualified owner UV sessions — fixture package reuses `crates/owner` registry/session; closed v2 auth routes; memory sessions/CSRF; lock→`TypedSigner<ApprovalRole>`→redb public trust only; historical keys verify-only. Named tests in `unqualified_uv_sessions` / `signer_epoch` / `cross_port_residuals`. **Design Accept ≠ product Current.** No 1C0 / Exact Effect / RFC 0003 `approve_invocation` (D04).
 - 2026-09-16: RFC 0004 legacy Amber/Green public-egress bypass closed on the
   supported model-gateway API (v0.2 privacy slice 1). Caller `DataClass`
