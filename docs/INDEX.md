@@ -23,7 +23,7 @@ This page helps contributors find the current source of truth without reading th
 | Make a first contribution | [CONTRIBUTING.md](../CONTRIBUTING.md) and current open issues |
 | Work a relayed task card as an AI worker session | [Handoff protocol](handoff/README.md), then [`docs/backlog.md`](backlog.md) and [`CLAUDE.md`](../CLAUDE.md) |
 | Understand the founder MVP that ships in `sovereign ui` | [Founder MVP design record](superpowers/specs/2026-09-10-founder-mvp-consultant-core-v1-design.md) |
-| See what live local-model script verification actually proved (and what it did not) | [ROADMAP — Live local model verification](../ROADMAP.md#live-local-model-verification) and [2026-09-11 handoff report](handoff/reports/2026-09-11-live-model-verification.md) |
+| See what the synthetic owner-effect fixture actually qualified (and did not) | [v01-D07 limitations / evidence note](handoff/reports/2026-09-16-v01-d07-synthetic-exact-effect-qualification.md) (fixture qualification only; not product Exact Effect, 1C0, or Phase D Current) |
 | Understand product direction | [README.md](../README.md) and [MANIFESTO.md](../MANIFESTO.md) |
 | Change runtime architecture | [ARCHITECTURE.md](../ARCHITECTURE.md) and the relevant [RFC](../rfcs/) |
 | Develop and accept Runtime Phase 1 | [Runtime Phase 1 development and acceptance guide](security/runtime-phase-1-development-guide.zh-CN.md) (Chinese; Target; contracts, existing task map, and product qualification gates); [Product 1C0 owner-admission design freeze](security/runtime-phase-1-product-1c0-owner-admission-freeze.zh-CN.md) (Chinese; Step 0 write-set and RP1-01 prerequisites) |

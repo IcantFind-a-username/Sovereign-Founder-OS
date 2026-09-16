@@ -146,9 +146,7 @@ repo audit; every entry below points at verified, real state of the code.
   **Design Accept ≠ product Exact Effect.** No product Current, no 1C0, no
   `low_risk_effectful` admission, no RP1 / ActiveV2 / Wave D completion.
   Named tests and compile-fail fixtures are in `crates/capability/tests/`.
-  v01-D02…D05 landed; v01-D06…D07 stay
-  unclaimed in
-  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+  v01-D02…D07 landed as fixture qualification (not product Exact Effect).
 
 <a id="v01-d02-fixture-boundary"></a>
 
@@ -160,10 +158,7 @@ repo audit; every entry below points at verified, real state of the code.
   and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
   effect behavior.** One public listener story at the compiled origin later.
   **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
-  RP1. v01-D03…D05 landed;
-  v01-D06…D07 stay
-  unclaimed in
-  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+  RP1. v01-D03…D07 landed as fixture qualification (not product Exact Effect).
 
 <a id="v01-d03-unqualified-uv-sessions"></a>
 
@@ -194,8 +189,7 @@ repo audit; every entry below points at verified, real state of the code.
   reservation, or product `low_risk_effectful` admission. Named tests in
   `crates/synthetic-owner-effect/tests/exact_uv_approval.rs` plus
   `crates/capability/tests/closed_profile_issuance.rs`. v01-D05 and
-  v01-D06 landed; v01-D07 stays unclaimed in
-  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+  v01-D06 landed; v01-D07 landed as fixture qualification (not product Exact Effect).
 
 <a id="v01-d05-reserve-exact-authority"></a>
 
@@ -229,8 +223,20 @@ repo audit; every entry below points at verified, real state of the code.
   product Current.** Not 1C0, Exact Effect product, ActiveV2, RP1, SMTP,
   or product outbox. Named tests in
   `crates/synthetic-owner-effect/tests/{publish_once,publish_compile_fail}.rs`.
-  v01-D07 (qualification soak / limitations note) stays unclaimed in
-  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+
+<a id="v01-d07-qualify-synthetic-exact-effect"></a>
+
+- [x] **P2 | fixture tests + a limitations note | v01-D07 — Qualification and honest handoff.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D06 (`3a96f90`). Soak 25 real process-kill/reopen iterations on each
+  of five crash boundaries and 100 same-process reservation / logout /
+  dispatch races, recorded in
+  [the v01-D07 limitations note](handoff/reports/2026-09-16-v01-d07-synthetic-exact-effect-qualification.md).
+  Virtual-browser matrix gained a linux Chrome/148 `protocol_fixture_only`
+  row; attended real matrix stays empty. **Design Accept ≠ product Current.**
+  Not 1C0, Exact Effect product, ActiveV2, RP1, email, owner-continuity,
+  Vault, or E2EE. Full cross-process validator race remains Target. Wave D
+  is fixture-qualified, not product Exact Effect / Phase D Current.
 
 <a id="runtime-f03-exact-effect-product"></a>
 
@@ -2071,6 +2077,15 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: v01-D07 qualify synthetic exact-effect evidence — soak 25
+  real process-kill/reopen iterations on five crash boundaries and 100
+  same-process reservation/logout/dispatch races; linux Chrome/148 virtual
+  matrix row; attended real matrix empty; limitations note
+  `docs/handoff/reports/2026-09-16-v01-d07-synthetic-exact-effect-qualification.md`.
+  **Design Accept ≠ product Current.** Wave D is fixture-qualified, not
+  product Exact Effect / Phase D Current. Full cross-process validator
+  race remains Target. No email / owner-continuity / 1C0 / 1C1 / Vault /
+  E2EE claim.
 - 2026-09-16: v01-D06 publish exact local outbox once — fixture coordinator
   consumes `AuthorityReservedEffect` by value, runs import-free Core Wasm,
   commits `Dispatching` before filesystem I/O, publishes

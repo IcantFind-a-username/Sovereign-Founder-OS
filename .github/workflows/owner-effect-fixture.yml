@@ -38,6 +38,12 @@ jobs:
             -p sovereign-synthetic-owner-effect \
             --no-default-features --features owner-effect-fixture --locked
 
+      # v2 fixture soak sample. Full qualification is ≥25 crash / ≥100 race
+      # (scripts/run-synthetic-owner-effect-soak.sh); five here is the same
+      # CI compromise as the v1 kill matrix. Zero/skipped tests fail the script.
+      - name: v2 fixture soak sample
+        run: ./scripts/run-synthetic-owner-effect-soak.sh --crash-iterations 3 --race-iterations 5
+
       # The barriers live behind a second feature, so the kill matrix needs
       # both. This is also the only place the two-feature combination is
       # exercised by tests rather than only compiled.

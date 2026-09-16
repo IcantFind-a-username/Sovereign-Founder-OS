@@ -110,7 +110,7 @@ fn hit(stage: ReservationFailpoint) -> Result<(), ReserveError> {
     Ok(())
 }
 
-fn kill_barrier(name: &'static str) {
+pub(crate) fn kill_barrier(name: &'static str) {
     let Ok(requested) = std::env::var(KILL_BARRIER_ENV) else {
         return;
     };

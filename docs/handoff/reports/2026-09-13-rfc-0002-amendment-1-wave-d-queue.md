@@ -247,6 +247,13 @@ Suggested commit: `feat(fixture): publish exact local outbox once`
 
 Suggested commit: `docs(fixture): qualify synthetic exact-effect evidence`
 
+**Status 2026-09-16:** v01-D01…v01-D07 are implemented. That is **fixture
+qualification** of a synthetic unqualified plaintext path, recorded in
+[`2026-09-16-v01-d07-synthetic-exact-effect-qualification.md`](2026-09-16-v01-d07-synthetic-exact-effect-qualification.md).
+It is **not** product Exact Effect, Phase D Current, 1C0 Current, ActiveV2,
+or RP1. Full cross-process validator race remains Target. Wave E and a
+preview tag remain out of scope.
+
 ---
 
 ## 5. Forbidden list
