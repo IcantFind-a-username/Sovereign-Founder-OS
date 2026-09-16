@@ -47,7 +47,10 @@ struct Cli {
 enum Commands {
     /// Initialize local device identity, vault, and ledger
     Init,
-    /// Run the story-driven secure kernel demo (real signatures, real denials)
+    /// Run the story-driven secure kernel demo (real signatures, real denials).
+    ///
+    /// Default root is `<data-dir>/demo`, not the Workspace product root.
+    /// Pass `--root` to choose a different directory.
     Demo {
         /// Run straight through without pausing between acts
         #[arg(long)]
@@ -129,6 +132,19 @@ pub(crate) fn resolve_data_root(root: Option<&std::path::Path>) -> Result<PathBu
     }
 }
 
+/// Demo never shares the product Workspace root unless `--root` is explicit.
+///
+/// Without an override the story runner writes under a marked `demo/`
+/// subdirectory of `default_data_dir()`, so its ledger, vault, and
+/// admission records cannot land in the owner's tamper-evident store.
+pub(crate) fn resolve_demo_root(root: Option<&std::path::Path>) -> Result<PathBuf, String> {
+    let resolved = resolve_data_root(root)?;
+    Ok(match root {
+        Some(_) => resolved,
+        None => resolved.join("demo"),
+    })
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let data_root = resolve_data_root(cli.root.as_deref())
@@ -151,7 +167,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("{error}");
             std::process::exit(1);
         }
-        Commands::Demo { fast } => demo::run(fast, data_root)?,
+        Commands::Demo { fast } => {
+            let demo_root = resolve_demo_root(cli.root.as_deref())
+                .map_err(|message| -> Box<dyn std::error::Error> { message.into() })?;
+            demo::run(fast, demo_root)?
+        }
         Commands::SandboxCheck => cmd_sandbox_check()?,
         Commands::Status => cmd_status(&data_root)?,
         Commands::Ui {

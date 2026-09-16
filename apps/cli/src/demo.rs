@@ -105,6 +105,10 @@ impl Demo {
         validator: CapabilityValidatorV2<CapabilityClock>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         banner();
+        println!(
+            "  Isolated demo root (not the Workspace): {}",
+            self.root.display()
+        );
         self.pause();
 
         let (device, mut ledger) = self.act_1_trust_root()?;

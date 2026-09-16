@@ -1,4 +1,4 @@
-use super::{resolve_data_root, Cli, Commands};
+use super::{resolve_data_root, resolve_demo_root, Cli, Commands};
 use clap::{error::ErrorKind, CommandFactory, Parser};
 use std::fs;
 use std::path::Path;
@@ -145,4 +145,28 @@ fn resolve_data_root_accepts_missing_directory() {
     let nested = dir.path().join("fresh-root");
     assert!(!nested.exists());
     assert_eq!(resolve_data_root(Some(&nested)).unwrap(), nested);
+}
+
+#[test]
+fn resolve_demo_root_defaults_to_marked_subdirectory() {
+    let product = resolve_data_root(None).unwrap();
+    let demo = resolve_demo_root(None).unwrap();
+    assert_eq!(demo, product.join("demo"));
+    assert_ne!(demo, product);
+}
+
+#[test]
+fn resolve_demo_root_honors_explicit_root() {
+    let dir = tempfile::tempdir().unwrap();
+    let explicit = dir.path().join("throwaway");
+    assert_eq!(resolve_demo_root(Some(&explicit)).unwrap(), explicit);
+}
+
+#[test]
+fn resolve_demo_root_rejects_file_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("not-a-dir");
+    fs::write(&file, b"x").unwrap();
+    let err = resolve_demo_root(Some(&file)).unwrap_err();
+    assert!(err.contains("--root must be a directory"));
 }
