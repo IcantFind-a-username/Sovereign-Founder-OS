@@ -808,6 +808,7 @@ while the controller routes eligible design/review cards to the strong role.
   the typed error, and `cargo test -p sovereign-capability` passes.
 
 - [ ] **P3 | `crates/authority/`, `crates/capability/` | Give the no-approval path a two-part bundle.**
+  IN PROGRESS (2026-09-16).
   `authorize_and_consume_approved` with `approval_claim == None` still makes
   two sequential claims (token, then idempotency), because the authority
   store offers the bundle only for the three-part case. An idempotency failure
