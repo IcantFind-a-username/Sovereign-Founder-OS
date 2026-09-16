@@ -1529,6 +1529,9 @@ while the controller routes eligible design/review cards to the strong role.
   else to its `FFI_BOUNDARY_FILES` list, and add any new explicit Cargo target
   to its `ROOTS` in the same change (auto-discovery is off; the gate pins the
   closure).
+  Note (2026-09-16): Program 1B0 stays blocked on binding admission — evidence
+  `docs/handoff/reports/2026-09-16-vault-1b0-binding-admission-evidence.md`;
+  this 1A FFI item is not 1B0 and is not checked done by that survey.
 
 - [ ] **P2 | `crates/vault-v2-engine/` | Pin and verify the exact SQLCipher connection profile and resource limits.**
   Apply the fixed profile — compatibility 4, 4096-byte pages, AES-256-CBC,
@@ -1548,6 +1551,10 @@ while the controller routes eligible design/review cards to the strong role.
   stays green. Note (2026-08-26): any new test target (for example
   `tests/public.rs`) needs an explicit `[[test]]` entry in `Cargo.toml` AND a
   matching entry in `ROOTS` in `tests/ast_gate.rs`, in the same change.
+  Note (2026-09-16): the 4.14.0 profile pin remains Program 1A-only; no
+  released Rust binding admits SQLCipher exactly 4.17.0 — see
+  `docs/handoff/reports/2026-09-16-vault-1b0-binding-admission-evidence.md`.
+  This item stays open.
 
 - [x] **P2 | `crates/vault-v2-engine/` | Add the syn AST gate proving the FFI boundary is exact.**
   Landed 2026-08-26 as **gate v1** (`tests/gate.rs` machinery +
@@ -1975,6 +1982,10 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: Vault 1B0 binding-admission evidence (docs-only) —
+  `docs/handoff/reports/2026-09-16-vault-1b0-binding-admission-evidence.md`.
+  No released Rust binding bundles SQLCipher exactly 4.17.0; 1B0 stays
+  blocked. Did not implement 1B0, FFI, or a product pin.
 - 2026-09-16: P3 `test_changed.sh` `#[path]` includes — extracted path→package mapping into `scripts/lib/map_changed_paths.sh`; a changed include target now queues the includer's package (`sovereign-cli` for the three `apps/cli/tests/` → `consultant-playground` includes). Self-test pins the fixture, the real catalog/transport targets, and a mutation that drops the resolver (#165). Deliberate no-reverse-dep trade-off otherwise unchanged.
 - 2026-09-16: CI/docs hygiene — wired `./scripts/tests/gate_portability_test.sh` into the `test` job before the file-size step; closed the vault-v2 clean-runner build-gate item on `ubuntu-latest` evidence from CI jobs `vault-v2-qualification` (qualify wrapper) and `test` (`--workspace` compile) on PRs #160/#161. Left the Node-20 action-repin P3 alone (`actions/checkout` is already v7.0.1; gitleaks / dependency-review still need bumps).
 - 2026-09-16: owner-session trybuild remainder — stay-unregistered. After #157, no honest consumer compile-fail host (capability inverted; effects never a consumer; CLI has no payload/root re-export). `trybuild` 1.0.116 + rustc/Cargo 1.97 known-vacuous in-tree. Gate remains structural privacy + Task 7–8 source-shape TSV rows. Plan Tasks 7–8 / 11 remainder notes. No product Exact Effect.
