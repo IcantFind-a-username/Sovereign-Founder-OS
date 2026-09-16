@@ -121,7 +121,8 @@ repo audit; every entry below points at verified, real state of the code.
 <a id="v01-d01-capability-verify-consume"></a>
 
 - [ ] **P1 | `crates/capability/` (and capability tests only) | v01-D01 — Separate verification from consumption.**
-  Licensed 2026-09-16 by RFC 0002 Amendment 1 Written Acceptance
+  IN PROGRESS (2026-09-16). Licensed 2026-09-16 by RFC 0002 Amendment 1
+  Written Acceptance
   (`docs/handoff/reports/2026-09-16-rfc-0002-amendment-1-accepted.md`).
   Split `CapabilityValidatorV2` into a side-effect-free cryptographic /
   context verifier that returns opaque `VerifiedCapabilityV2` and, when
