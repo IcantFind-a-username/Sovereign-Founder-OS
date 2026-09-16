@@ -45,6 +45,24 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+<a id="rfc0004-legacy-amber-green-egress"></a>
+
+- [ ] **P1 | `crates/model/` | Close the RFC 0004 legacy Amber/Green public-egress bypass (v0.2 privacy slice 1).** IN PROGRESS (2026-09-16)
+  First actionable v0.2 privacy slice (RFC 0004 Current gap, first half of
+  rollout step 5; ROADMAP v0.2 exit #4). Fail-closed: caller-supplied
+  Amber/Green / `DataClass` MUST NOT authorize public/cloud egress; unknown
+  and legacy Amber/Green enter as Protected; `DataClass` MAY only narrow,
+  never grant. Hard-deny the gateway path that routes Amber→cloud-labelled
+  providers. Keep deterministic Local stand-ins for local-only / test paths
+  with honest labels (not “cloud-assisted”). Named regression tests:
+  mislabeled protected content cannot reach a public adapter; a provider
+  self-reported `local` flag alone cannot authorize raw Protected input;
+  a fully local workflow produces zero public adapter observations.
+  Honest bound: this is **not** full RFC 0004, **not** a real local-model
+  sandbox, **not** ActiveV2, **not** product Exact Effect / 1C0, and does
+  **not** claim v0.2 complete. Done when: `./scripts/test_changed.sh` is
+  ALL GREEN and the named tests pass.
+
 - [x] **P1 | `docs/security/`, `docs/INDEX.md`, `docs/backlog.md` | Add the Runtime Phase 1 development and acceptance guide.** Completed 2026-09-16.
   Owner-requested documentation integration: add the kernel review as a
   design source, write the Phase 1 scope, runtime contracts, dependencies and
