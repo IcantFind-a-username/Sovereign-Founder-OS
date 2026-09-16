@@ -796,8 +796,9 @@ while the controller routes eligible design/review cards to the strong role.
   `ApprovalAlreadyConsumed` so the bundle can say which part was held
   elsewhere (the public API's `ApprovalReused` promise depends on it). Three
   regression tests in `crates/capability/tests/approval_v2.rs`, each shown to
-  fail against the sequential shape. The no-approval path is not covered — see
-  the P3 entry below.
+  fail against the sequential shape. The no-approval path landed 2026-09-16
+  via #160 on `AuthorityStore::claim_verified` (two-part `consume_bundle`) —
+  see the P3 entry below.
   `authorize_and_consume_approved` (v2.rs:602) switches from three sequential
   claims to the bundle API; the in-memory mirrors (v2.rs:530-533) remain only
   as no-store-attached defense and say so; revocation maps to a new typed
@@ -808,13 +809,13 @@ while the controller routes eligible design/review cards to the strong role.
   the typed error, and `cargo test -p sovereign-capability` passes.
 
 - [x] **P3 | `crates/authority/`, `crates/capability/` | Give the no-approval path a two-part bundle.**
-  Closed 2026-09-16. After #157 the durable None arm lives on
-  `AuthorityStore::claim_verified`, not capability (Capability V2 is
-  process-local; no `capability → authority` edge). `consume_bundle` now
-  takes `Option<BundlePart>` for approval; the `(None, None)` arm uses the
-  two-part bundle instead of sequential `consume_token` + `bind_idempotency`.
-  Two-part bundle ids are domain-separated
-  (`sovereign:authority-bundle:v1:no-approval`). Regression:
+  Landed 2026-09-16 via #160 (`claim_verified` `(None,None)` two-part
+  `consume_bundle`, domain `sovereign:authority-bundle:v1:no-approval`).
+  After #157 the durable None arm lives on `AuthorityStore::claim_verified`,
+  not capability (Capability V2 is process-local; no `capability → authority`
+  edge). `consume_bundle` takes `Option<BundlePart>` for approval; the
+  `(None, None)` arm uses the two-part bundle instead of sequential
+  `consume_token` + `bind_idempotency`. Regression:
   `a_no_approval_bundle_interrupted_after_the_token_claim_resumes_on_retry`
   (mirrors `a_bundle_interrupted_after_the_token_claim_resumes_on_retry`)
   plus store-level
@@ -1614,7 +1615,16 @@ while the controller routes eligible design/review cards to the strong role.
   the workflow comment as already the latest available, and a fresh run shows
   no Node-version deprecation annotation under `gh run view <run-id>`.
 
-- [ ] **P3 | `crates/sandbox/` | Surface the swallowed quarantine-rename failure.**
+- [x] **P3 | `crates/sandbox/` | Surface the swallowed quarantine-rename failure.**
+  Landed 2026-09-16. `quarantine_entry` / `move_aside` return `Result`; a
+  rename failure is `CompiledCacheUnavailable`. `lookup` /
+  `lookup_component` propagate it (`Result<Option<_>>`) so a poisoned blob
+  is never served, and wasm execute fails closed instead of compiling over
+  live files that could not be moved aside. Both blob and COSE are attempted
+  even if the first rename fails; a leftover sibling is a miss (both files
+  required). Regression:
+  `an_unwritable_quarantine_dir_surfaces_the_rename_failure` occupies the
+  quarantine path with a regular file (chmod is a no-op under root).
   `compiled_cache.rs` (~219, ~266) discards quarantine rename errors with
   `let _ =` — a rejected cache blob can silently stay in the live cache dir.
   Done when: the quarantine helper returns `Result`, callers refuse to serve
