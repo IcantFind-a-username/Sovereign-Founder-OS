@@ -24,7 +24,8 @@ pub const COORDINATOR_REF: &str = "synthetic-owner-effect-v2";
 pub struct EffectIntentId(Uuid);
 
 impl EffectIntentId {
-    /// The only way to make one. Random, and unrelated to any payload.
+    /// Random, and unrelated to any payload. Rebuilds from a public id are
+    /// `from_uuid`; they cannot invent a reserved effect.
     pub fn allocate() -> Self {
         Self(Uuid::new_v4())
     }
@@ -33,7 +34,7 @@ impl EffectIntentId {
         self.0
     }
 
-    pub(crate) fn from_uuid(id: Uuid) -> Self {
+    pub fn from_uuid(id: Uuid) -> Self {
         Self(id)
     }
 

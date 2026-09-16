@@ -1,0 +1,37 @@
+[workspace]
+
+[package]
+name = "sovereign-synthetic-owner-effect-ui-harness"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Nested workspace so compile-fail bins are invisible to parent clippy
+# `--all-targets`. Cargo.lock versions must be a subset of the repo
+# workspace lock: CI fetches only that graph, and these checks run
+# `--offline --locked`.
+
+[dependencies.sovereign-synthetic-owner-effect]
+path = "../../.."
+default-features = false
+features = ["owner-effect-fixture"]
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
+[[bin]]
+name = "trybuild000"
+path = "../cannot_construct_authority_reserved.rs"
+
+[[bin]]
+name = "trybuild001"
+path = "../cannot_clone_debug_or_serialize_authority_reserved.rs"
+
+[[bin]]
+name = "trybuild002"
+path = "../cannot_destructure_authority_reserved.rs"
+
+[[bin]]
+name = "trybuild003"
+path = "../cannot_reconstruct_authority_reserved.rs"
