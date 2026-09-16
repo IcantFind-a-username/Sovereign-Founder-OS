@@ -807,18 +807,22 @@ while the controller routes eligible design/review cards to the strong role.
   token/approval is rejected through `authorize_and_consume_approved` with
   the typed error, and `cargo test -p sovereign-capability` passes.
 
-- [ ] **P3 | `crates/authority/`, `crates/capability/` | Give the no-approval path a two-part bundle.**
-  IN PROGRESS (2026-09-16).
-  `authorize_and_consume_approved` with `approval_claim == None` still makes
-  two sequential claims (token, then idempotency), because the authority
-  store offers the bundle only for the three-part case. An idempotency failure
-  after the token claim burns that token for good — the defect the bundle
-  removed from the approved path. Nothing a person authorised is at stake on
-  this path, which is why it is P3 and not P1. Done when: `consume_bundle`
-  (or a sibling) accepts an absent approval, the `None` arm in
-  `crates/capability/src/v2.rs` uses it, and a regression test mirrors
-  `a_bundle_interrupted_after_the_token_claim_resumes_on_retry` for a token
-  without an approval.
+- [x] **P3 | `crates/authority/`, `crates/capability/` | Give the no-approval path a two-part bundle.**
+  Closed 2026-09-16. After #157 the durable None arm lives on
+  `AuthorityStore::claim_verified`, not capability (Capability V2 is
+  process-local; no `capability → authority` edge). `consume_bundle` now
+  takes `Option<BundlePart>` for approval; the `(None, None)` arm uses the
+  two-part bundle instead of sequential `consume_token` + `bind_idempotency`.
+  Two-part bundle ids are domain-separated
+  (`sovereign:authority-bundle:v1:no-approval`). Regression:
+  `a_no_approval_bundle_interrupted_after_the_token_claim_resumes_on_retry`
+  (mirrors `a_bundle_interrupted_after_the_token_claim_resumes_on_retry`)
+  plus store-level
+  `a_two_part_bundle_interrupted_after_the_token_claim_resumes_on_retry`.
+  Capability still only does process-local inserts; a comment names the
+  inverted-plane `claim_verified` without mentioning the store type (the
+  authority-plane gate forbids that symbol under `crates/capability/`).
+  Does not reintroduce `capability → authority`.
 
 <a id="runtime-owner-design"></a>
 

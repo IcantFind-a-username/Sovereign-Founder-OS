@@ -559,3 +559,39 @@ fn a_bundle_interrupted_after_the_token_claim_resumes_on_retry() {
         Ok(())
     );
 }
+
+/// Mirror of [`a_bundle_interrupted_after_the_token_claim_resumes_on_retry`]
+/// for a token that carries no approval. After #157 the durable None arm is
+/// `AuthorityStore::claim_verified`, not capability — Capability V2 is
+/// process-local and must not depend on authority.
+#[test]
+fn a_no_approval_bundle_interrupted_after_the_token_claim_resumes_on_retry() {
+    let dir = tempfile::tempdir().unwrap();
+    let invocation = prepared("interrupted two-part bundle");
+    let idempotency = Uuid::from_u128(43);
+    let policy_decision = decision(&invocation, AutomationLevel::L1Draft, idempotency);
+    let token = issuer_at(NOW + 5)
+        .issue(request(&invocation, &policy_decision, idempotency))
+        .unwrap();
+
+    let store = AuthorityStore::open(dir.path()).unwrap();
+    let blocked = BlockedPath::block(dir.path().join("idempotency")).unwrap();
+    let first = authorize(NOW + 10, &token, &invocation, &policy_decision, None);
+    assert!(
+        matches!(
+            store.claim_verified(&first, None, NOW + 10),
+            Err(AuthorityError::Unavailable(_))
+        ),
+        "blocking idempotency after the token claim must fail closed, not burn silently"
+    );
+    drop(blocked);
+
+    let retry = authorize(NOW + 10, &token, &invocation, &policy_decision, None);
+    assert_eq!(
+        AuthorityStore::open(dir.path())
+            .unwrap()
+            .claim_verified(&retry, None, NOW + 10),
+        Ok(()),
+        "a same-input retry must resume the two-part bundle instead of dying on the token claim"
+    );
+}

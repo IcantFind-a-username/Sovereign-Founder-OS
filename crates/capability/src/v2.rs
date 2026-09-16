@@ -735,6 +735,10 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
             return Err(CapabilityV2Error::IdempotencyConflict);
         }
 
+        // Process-local only. Durable token / idempotency / optional
+        // approval claims live on the inverted authority plane
+        // (`claim_verified`; two-part when this arm is `None`). This crate
+        // must not depend on that plane.
         self.consumed_tokens.insert(claims.token_id);
         self.idempotency.insert(claims.idempotency_key, fingerprint);
         if let Some((approval_id, _)) = approval_claim {

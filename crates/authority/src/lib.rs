@@ -22,23 +22,26 @@
 //!
 //! ## Bundle transactions (RFC 0003 Amendment 1)
 //!
-//! `consume_bundle` claims a token, an approval, and an idempotency key as
-//! one recoverable transaction instead of three separate claims. The bundle
-//! id is deterministic — a SHA-256 of the three subject ids plus the
-//! invocation fingerprint — so a consumer that crashes mid-bundle and
-//! retries with the same inputs reconstructs and resumes its own bundle
-//! (every step is idempotent for the owning bundle) instead of burning its
-//! earlier claims or colliding with a stranger's. Only a durable
-//! `.committed` marker authorizes proceeding to the effect; recovery is
-//! roll-forward only, so nothing is ever deleted to recover. Consumption
-//! also fails closed on a durably revoked token or approval.
+//! `consume_bundle` claims a token, an optional approval, and an idempotency
+//! key as one recoverable transaction instead of sequential claims. The
+//! three-part id is the RFC 0003 Amendment 1 hash (token, approval,
+//! idempotency, fingerprint). A two-part (no-approval) bundle uses a
+//! distinct domain so it cannot collide with a three-part id. A consumer
+//! that crashes mid-bundle and retries with the same inputs reconstructs
+//! and resumes its own bundle (every step is idempotent for the owning
+//! bundle) instead of burning its earlier claims or colliding with a
+//! stranger's. Only a durable `.committed` marker authorizes proceeding
+//! to the effect; recovery is roll-forward only, so nothing is ever
+//! deleted to recover. Consumption also fails closed on a durably revoked
+//! token or approval.
 //!
 //! ## Durable revocation (RFC 0003 Amendment 1, part c)
 //!
 //! `revoke_token` and `revoke_approval` publish a durable record under
 //! `revoked-tokens/` or `revoked-approvals/` using the same exclusive
 //! publish-and-link primitive as every other claim. `consume_bundle` checks
-//! both directories before claiming (step 2) and again immediately before
+//! the token directory (and the approval directory when an approval is
+//! present) before claiming (step 2) and again immediately before
 //! committing (step 6); the legacy single-claim methods check before
 //! claiming too, as defense in depth. A revocation reports which of three
 //! durable outcomes occurred: `Revoked` (the subject was not yet authorized),
@@ -74,6 +77,7 @@ const REVOKED_TOKENS_DIR: &str = "revoked-tokens";
 const REVOKED_APPROVALS_DIR: &str = "revoked-approvals";
 const MAX_RECORD_BYTES: u64 = 4 * 1024;
 const BUNDLE_DOMAIN: &[u8] = b"sovereign:authority-bundle:v1";
+const TWO_PART_BUNDLE_DOMAIN: &[u8] = b"sovereign:authority-bundle:v1:no-approval";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AuthorityError {
@@ -125,7 +129,10 @@ pub struct BundlePart {
 struct BundleIntentRecord {
     kind: String,
     token_id: Uuid,
-    approval_id: Uuid,
+    /// Present on the three-part (approved) path; `None` on the two-part
+    /// (no-approval) path. Existing on-disk three-part records keep parsing
+    /// as `Some`.
+    approval_id: Option<Uuid>,
     idempotency_key: Uuid,
     invocation_fingerprint_hex: String,
     created_at_unix: i64,
@@ -136,7 +143,7 @@ struct BundleIntentRecord {
 struct BundleCommittedRecord {
     kind: String,
     token_id: Uuid,
-    approval_id: Uuid,
+    approval_id: Option<Uuid>,
     idempotency_key: Uuid,
     invocation_fingerprint_hex: String,
     created_at_unix: i64,
@@ -294,25 +301,30 @@ impl AuthorityStore {
         }
     }
 
-    /// Atomically consume a token, an approval, and an idempotency key as
-    /// one recoverable transaction (RFC 0003 Amendment 1, part a). `Ok(())`
-    /// means this call observed the one `Authorized` outcome for the
-    /// bundle — a durable `.committed` marker. Every other outcome,
-    /// including a retry of a bundle someone else already committed, is
-    /// `AlreadyConsumed` (the token, or the commit itself),
-    /// `ApprovalAlreadyConsumed`, `Revoked`, a replay/conflict error, or
-    /// `CorruptRecord`.
+    /// Atomically consume a token, an optional approval, and an idempotency
+    /// key as one recoverable transaction (RFC 0003 Amendment 1, part a,
+    /// plus the two-part no-approval sibling). `Ok(())` means this call
+    /// observed the one `Authorized` outcome for the bundle — a durable
+    /// `.committed` marker. Every other outcome, including a retry of a
+    /// bundle someone else already committed, is `AlreadyConsumed` (the
+    /// token, or the commit itself), `ApprovalAlreadyConsumed`, `Revoked`,
+    /// a replay/conflict error, or `CorruptRecord`.
+    ///
+    /// `approval == None` skips the approval claim and the approval
+    /// revocation checks. The two-part bundle id is domain-separated from
+    /// the three-part id, so an absent approval cannot collide with a
+    /// three-part bundle.
     pub fn consume_bundle(
         &self,
         token: BundlePart,
-        approval: BundlePart,
+        approval: Option<BundlePart>,
         idempotency: BundlePart,
         invocation_fingerprint: &[u8; 32],
         now_unix: i64,
     ) -> Result<(), AuthorityError> {
         let bundle_hex = compute_bundle_hex(
             token.id,
-            approval.id,
+            approval.map(|part| part.id),
             idempotency.id,
             invocation_fingerprint,
         );
@@ -324,14 +336,16 @@ impl AuthorityStore {
             invocation_fingerprint,
             now_unix,
         )?;
-        self.bundle_check_revocation(token.id, approval.id)?;
+        self.bundle_check_revocation(token.id, approval.map(|part| part.id))?;
         #[cfg(feature = "fault-injection")]
         fault_injection::reach(
             fault_injection::Barrier::AfterBundleRevocationPrecheckBeforeTokenClaim,
         );
         self.bundle_claim_token(&bundle_hex, token, now_unix)?;
         self.bundle_bind_idempotency(&bundle_hex, idempotency, invocation_fingerprint, now_unix)?;
-        self.bundle_claim_approval(&bundle_hex, approval, now_unix)?;
+        if let Some(approval) = approval {
+            self.bundle_claim_approval(&bundle_hex, approval, now_unix)?;
+        }
         #[cfg(feature = "fault-injection")]
         fault_injection::reach(
             fault_injection::Barrier::AfterBundleApprovalClaimBeforeCommitRecheck,
@@ -344,19 +358,22 @@ impl AuthorityStore {
         &self,
         bundle_hex: &str,
         token: BundlePart,
-        approval: BundlePart,
+        approval: Option<BundlePart>,
         idempotency: BundlePart,
         invocation_fingerprint: &[u8; 32],
         now_unix: i64,
     ) -> Result<BundleIntentRecord, AuthorityError> {
-        let expires_at_unix = token
-            .expires_at_unix
-            .max(approval.expires_at_unix)
-            .max(idempotency.expires_at_unix);
+        let expires_at_unix = match approval {
+            Some(approval) => token
+                .expires_at_unix
+                .max(approval.expires_at_unix)
+                .max(idempotency.expires_at_unix),
+            None => token.expires_at_unix.max(idempotency.expires_at_unix),
+        };
         let record = BundleIntentRecord {
             kind: "bundle-intent".into(),
             token_id: token.id,
-            approval_id: approval.id,
+            approval_id: approval.map(|part| part.id),
             idempotency_key: idempotency.id,
             invocation_fingerprint_hex: hex::encode(invocation_fingerprint),
             created_at_unix: now_unix,
@@ -381,16 +398,19 @@ impl AuthorityStore {
         }
     }
 
-    /// Steps 2 and 6: fail closed if either subject has a durable
-    /// revocation record, and fail closed (not open) if a revocation record
-    /// exists but does not parse.
+    /// Steps 2 and 6: fail closed if the token — or the approval, when
+    /// present — has a durable revocation record, and fail closed (not
+    /// open) if a revocation record exists but does not parse. A two-part
+    /// bundle does not consult `revoked-approvals/`.
     fn bundle_check_revocation(
         &self,
         token_id: Uuid,
-        approval_id: Uuid,
+        approval_id: Option<Uuid>,
     ) -> Result<(), AuthorityError> {
         check_not_revoked(&self.revoked_tokens, token_id)?;
-        check_not_revoked(&self.revoked_approvals, approval_id)?;
+        if let Some(approval_id) = approval_id {
+            check_not_revoked(&self.revoked_approvals, approval_id)?;
+        }
         Ok(())
     }
 
@@ -624,7 +644,10 @@ impl AuthorityStore {
     /// Durable half of what used to live on capability's
     /// `with_authority_store`: claim a purely verified Capability V2.
     /// Approval expiry is required when the authorized token carries
-    /// approval evidence, and forbidden when it does not.
+    /// approval evidence, and forbidden when it does not. Both arms go
+    /// through [`Self::consume_bundle`] — three-part when an approval is
+    /// present, two-part when it is absent — so an interruption after the
+    /// token claim resumes on retry instead of burning the token.
     pub fn claim_verified(
         &self,
         authorized: &sovereign_capability::v2::AuthorizedCapabilityV2,
@@ -642,10 +665,10 @@ impl AuthorityStore {
         match (authorized.approval_id(), approval_expires_at_unix) {
             (Some(approval_id), Some(approval_expires_at_unix)) => self.consume_bundle(
                 token,
-                BundlePart {
+                Some(BundlePart {
                     id: approval_id,
                     expires_at_unix: approval_expires_at_unix,
-                },
+                }),
                 BundlePart {
                     id: authorized.idempotency_key(),
                     expires_at_unix: authorized.expires_at_unix(),
@@ -653,15 +676,16 @@ impl AuthorityStore {
                 &fingerprint,
                 now_unix,
             ),
-            (None, None) => {
-                self.consume_token(token.id, now_unix, token.expires_at_unix)?;
-                self.bind_idempotency(
-                    authorized.idempotency_key(),
-                    &fingerprint,
-                    now_unix,
-                    token.expires_at_unix,
-                )
-            }
+            (None, None) => self.consume_bundle(
+                token,
+                None,
+                BundlePart {
+                    id: authorized.idempotency_key(),
+                    expires_at_unix: authorized.expires_at_unix(),
+                },
+                &fingerprint,
+                now_unix,
+            ),
             _ => Err(AuthorityError::CorruptRecord),
         }
     }
@@ -792,17 +816,27 @@ where
 
 fn compute_bundle_hex(
     token_id: Uuid,
-    approval_id: Uuid,
+    approval_id: Option<Uuid>,
     idempotency_key: Uuid,
     invocation_fingerprint: &[u8; 32],
 ) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
-    hasher.update(BUNDLE_DOMAIN);
-    hasher.update(token_id.as_bytes());
-    hasher.update(approval_id.as_bytes());
-    hasher.update(idempotency_key.as_bytes());
-    hasher.update(invocation_fingerprint);
+    match approval_id {
+        Some(approval_id) => {
+            hasher.update(BUNDLE_DOMAIN);
+            hasher.update(token_id.as_bytes());
+            hasher.update(approval_id.as_bytes());
+            hasher.update(idempotency_key.as_bytes());
+            hasher.update(invocation_fingerprint);
+        }
+        None => {
+            hasher.update(TWO_PART_BUNDLE_DOMAIN);
+            hasher.update(token_id.as_bytes());
+            hasher.update(idempotency_key.as_bytes());
+            hasher.update(invocation_fingerprint);
+        }
+    }
     hex::encode(hasher.finalize())
 }
 
