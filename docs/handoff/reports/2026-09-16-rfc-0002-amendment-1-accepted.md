@@ -45,11 +45,12 @@ product Exact Effect.
 
 ## Discussion-window waiver
 
-`CONTRIBUTING.md` requires a minimum 7-day discussion for substantial
-RFC changes unless a maintainer records why a shorter window is allowed.
-The remaining window is waived in writing:
+This is a sole-maintainer project; CONTRIBUTING.md’s 7-day community
+discussion is waived. No community discussion window is required.
 
-- sole maintainer;
+Supporting facts:
+
+- the repository owner is the sole developer;
 - proposal already on `main` (merged PR #146);
 - Amendment 1 acceptance checklist complete;
 - honest-close alignment (v0.1 = fixture + honest labels; product 1C0

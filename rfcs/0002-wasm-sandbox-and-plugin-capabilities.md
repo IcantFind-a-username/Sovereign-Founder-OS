@@ -705,12 +705,12 @@ G2.
 
 > **Written Acceptance — RFC 0002 Amendment 1 (2026-09-16)**
 >
-> As sole maintainer I accept RFC 0002 Amendment 1 (closed fixture
-> exact-effect profile: `low-risk-effectful` / `write_rfc5322`),
-> proposed via merged PR #146, as Target design for the synthetic
-> fixture only. RFC 0002 overall remains Draft. This is not a product
-> Current claim, not Phase D completion, and not RFC 0002 overall
-> `Accepted`.
+> As sole maintainer and sole developer of this repository I accept
+> RFC 0002 Amendment 1 (closed fixture exact-effect profile:
+> `low-risk-effectful` / `write_rfc5322`), proposed via merged PR #146,
+> as Target design for the synthetic fixture only. RFC 0002 overall
+> remains Draft. This is not a product Current claim, not Phase D
+> completion, and not RFC 0002 overall `Accepted`.
 >
 > **Rationale.** The proposal is already on `main` (PR #146). The
 > Amendment 1 acceptance checklist is complete: closed profile
@@ -722,12 +722,13 @@ G2.
 > alignment stands: v0.1 = fixture + honest labels; product 1C0
 > admission = v0.2. There are no co-authors.
 >
-> **Discussion-window waiver.** [CONTRIBUTING.md](../CONTRIBUTING.md)
-> requires a minimum 7-day discussion for substantial RFC changes
-> unless a maintainer records why a shorter window is allowed. I waive
-> the remaining window: I am the sole maintainer; the proposal is
-> already on `main`; the acceptance checklist is complete; honest-close
-> alignment is recorded; there are no co-authors awaiting discussion.
+> **Discussion-window waiver.** This is a sole-maintainer project
+> (the repository owner is the sole developer).
+> [CONTRIBUTING.md](../CONTRIBUTING.md)’s 7-day community discussion
+> is waived; no community discussion window is required. Supporting
+> facts: the proposal is already on `main` (PR #146); the acceptance
+> checklist is complete; honest-close alignment is recorded; there are
+> no co-authors.
 >
 > **What acceptance licenses.** Governance permission to treat
 > Amendment 1 as Accepted Target design for the closed fixture profile,
