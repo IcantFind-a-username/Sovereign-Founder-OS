@@ -1,12 +1,32 @@
 # RFC 0007: Audit-Ledger Freshness Anchor
 
 **Status:** Draft; approved implementation target for the v0.1 anchor slice;
-Amendment 1 proposed 2026-09-15 (latest-head / generation protection vs
-signing-key protection). **Amendment 1 is not accepted.** Status remains
-`Draft`; no RP1-06 product qualification is implied.
+Amendment 1 Accepted 2026-09-16 (latest-head / generation protection vs
+signing-key protection). RFC overall remains `Draft`; Amendment 1 is
+Accepted Target design. Design Accept ≠ product acceptance: no RP1-06
+product qualification, Runtime Phase 1 complete, whole-device rollback
+detection, Wave D, 1C0, ActiveV2, or 1B0 claim.
 **Stage:** v0.1 rollback-anchoring slice
 **Security impact:** High
 **Normative dependencies:** RFC 0003 (device/audit signing), THREAT_MODEL.md T6/T10
+
+## Amendment 1 acceptance record
+
+> **Written Acceptance — RFC 0007 Amendment 1 (2026-09-16)**  
+> As sole maintainer I accept RFC 0007 Amendment 1 (latest-head / `freshness_generation` vs signing-key protection), proposed via merged PR #150 / `14b490e7`, as Target design. RFC 0007 overall remains `Draft`; this is design acceptance of the amendment only.  
+>  
+> **Decision.** On 2026-09-16 I confirmed `accept-150-with-waiver` (Grok Bot).  
+>  
+> **Discussion waiver.** This repository currently has a sole developer. CONTRIBUTING.md's 7-day community discussion window does not apply as a blocking gate: there is no community whose discussion could change the record. This is stronger than shortening seven days; the discussion step is waived because a sole-maintainer project has no independent discussants.  
+>  
+> **What acceptance licenses.** Implementation of enrolled `freshness_generation`, paired-restore rejection when enrolled generation survives outside the restored tree, limited-recovery failure modes, and RFC 0003 authority coupling (generation invalidation of consumed / revoke / dispatch state). The backlog item **Implement RFC 0007 Amendment 1** may start.  
+>  
+> **What acceptance does not license.** (1) An RP1-06 product checkmark or Runtime Phase 1 completion — those still require evidence after implementation. (2) Whole-device rollback detection (Research; T10). (3) Treating a co-located enrolled file as independently protected until RFC 0005 / 1C1 custody. (4) Wave D, 1C0 admission, product ActiveV2, or Program 1B0. (5) Using audit-chain verify alone as fresh authority after restore.  
+>  
+> **Explicit separation:** Accepting Amendment 1 ≠ RP1-06 product pass.
+
+Recorded by the repository owner / sole maintainer (IcantFind-a-username /
+Yiqun Xu) on 2026-09-16. No co-signers.
 
 ## Summary
 
@@ -167,7 +187,7 @@ whole-device-rollback defense, is a security-critical amendment to this RFC.
 
 ## Amendments
 
-### Amendment 1 (proposed 2026-09-15): latest-head and generation protection vs signing-key protection
+### Amendment 1 (Accepted 2026-09-16): latest-head and generation protection vs signing-key protection
 
 **Scope and status.** This amendment is protocol and threat-model design for
 Runtime Phase 1 finding F09 and acceptance row RP1-06 (see
@@ -178,9 +198,11 @@ disk is strictly newer than the ledger**. It does **not** reject the paired
 restore of an **old** ledger **and** an **old** anchor that were captured
 together — both remain internally consistent and validly signed. Protecting
 the signing key from a ledger-only writer therefore does **not** by itself
-protect **latest** head or generation state. Nothing below is a claim that
-RP1-06 has passed; implementation backlog entries stay blocked until a
-maintainer accepts this amendment with rationale.
+protect **latest** head or generation state. Written Acceptance is recorded
+in [Amendment 1 acceptance record](#amendment-1-acceptance-record).
+Implementation of enrolled generation, paired-restore rejection, and
+authority coupling may start. Nothing below is a claim that RP1-06 has
+passed as a product checkmark.
 
 #### a. Two protection domains (normative separation)
 
@@ -299,7 +321,7 @@ itself alone.
 
 #### g. Conformance tests (implementation target; names illustrative)
 
-Blocked until Amendment 1 is accepted. Expected additions beyond §
+Accepted Target; implementation may start. Expected additions beyond §
 Conformance tests:
 
 - `paired_old_ledger_and_old_anchor_rejected_when_enrolled_generation_survives`
@@ -313,9 +335,12 @@ RP1-06 completion.
 
 #### h. What stays blocked
 
-- Flipping RFC 0007 or this amendment to **Accepted** on the implementation
-  branch.
+- Flipping RFC 0007 overall from `Draft` to `Accepted` on an implementation
+  branch (this record accepts **Amendment 1** only).
 - Claiming RP1-06 product qualification or Runtime Phase 1 completion.
 - Using audit freshness alone to authorize effects after restore.
 - Whole-device rollback detection without an external monotonic anchor
   (Research).
+- Treating a co-located enrolled file as independently protected until
+  RFC 0005 / 1C1 custody.
+- Wave D, 1C0 admission, product ActiveV2, or Program 1B0.
