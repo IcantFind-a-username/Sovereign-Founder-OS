@@ -1364,7 +1364,8 @@ while the controller routes eligible design/review cards to the strong role.
   unverified rather than hidden, and `cargo test -p sovereign-cli` covers both
   outcomes.
 
-- [ ] **P2 | `apps/cli/src/` | `demo` writes its events and admission records into the owner's real data root.** IN PROGRESS (2026-09-16)
+- [x] **P2 | `apps/cli/src/` | `demo` writes its events and admission records into the owner's real data root.**
+  Landed 2026-09-16 via #163: default `demo` writes under `<data-dir>/demo`; `demo_fast_leaves_seeded_product_root_byte_unchanged` pins the product ledger/vault/admissions byte-unchanged.
   `Commands::Demo` hands `data_dir()` straight to the demo (main.rs:88), so the
   story-driven run initializes and writes the same root the Workspace uses.
   Observed 2026-08-15 against a clean root: one `demo --fast` created
