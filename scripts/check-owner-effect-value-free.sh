@@ -27,7 +27,8 @@ if [ -z "${BASH_VERSINFO:-}" ] || [ "${BASH_VERSINFO[0]}" -lt 3 ] ||
 fi
 
 SCANNED="crates/authority/src/broker
-crates/owner/src"
+crates/owner/src
+crates/synthetic-owner-effect/src"
 
 # Field names that mean "this is secret". Deliberately short: a longer list
 # invites the belief that it is exhaustive.

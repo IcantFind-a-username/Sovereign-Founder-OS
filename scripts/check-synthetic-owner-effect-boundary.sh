@@ -123,6 +123,9 @@ if not normal_deps(fixture, "sovereign-capability"):
 if not normal_deps(fixture, "sovereign-authority"):
     sys.stderr.write("FAIL  fixture does not depend on sovereign-authority\n")
     sys.exit(1)
+if not normal_deps(fixture, "sovereign-owner"):
+    sys.stderr.write("FAIL  fixture does not depend on sovereign-owner\n")
+    sys.exit(1)
 if normal_deps("sovereign-capability", fixture):
     sys.stderr.write("FAIL  capability depends on the fixture crate\n")
     sys.exit(1)

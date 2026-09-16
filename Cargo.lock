@@ -2557,9 +2557,17 @@ dependencies = [
 name = "sovereign-synthetic-owner-effect"
 version = "0.1.0"
 dependencies = [
+ "hex",
+ "rand",
+ "redb",
+ "serde",
+ "serde_json",
  "sovereign-authority",
  "sovereign-capability",
+ "sovereign-identity",
+ "sovereign-owner",
  "tempfile",
+ "uuid",
 ]
 
 [[package]]
