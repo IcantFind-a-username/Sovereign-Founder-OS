@@ -958,13 +958,16 @@ while the controller routes eligible design/review cards to the strong role.
 
 <a id="runtime-owner-trybuild"></a>
 
-- [ ] **P3 | `crates/authority/` | Optional trybuild payload/root compile-fail goldens.**
-  IN PROGRESS (2026-09-16)
-  Privacy is currently structural (`pub(crate)` bytes + Debug redaction), not
-  a consumer compile-fail golden. Not product Exact Effect. See
-  [step-2 fixture evidence](handoff/reports/2026-09-16-runtime-phase1-step2-fixture-reservation-exact-effect-evidence.md).
-  Done when: optional trybuild goldens exist for payload/root compile-fail,
-  or the plan records they stay unregistered.
+- [x] **P3 | `crates/authority/` | Optional trybuild payload/root compile-fail goldens.**
+  Closed 2026-09-16 as stay-unregistered. After #157, capability is not an
+  authority consumer; effects never became one; CLI does not re-export
+  payload/root types (a consumer UI would be unresolved-import theater or
+  invented re-exports). `trybuild` 1.0.116 + Cargo 1.97 is known-vacuous
+  in-tree. Privacy stays structural (`pub(crate)` `sealed_bytes`, private
+  fields, Debug redaction) plus registered Task 7–8 source-shape tests.
+  Plan remainder notes: Tasks 7–8 / 11 in
+  [owner-session plan](superpowers/plans/2026-08-14-owner-session-exact-effect-v1-implementation.md).
+  Not product Exact Effect.
 
 <a id="runtime-owner-task12-heal"></a>
 
@@ -1914,6 +1917,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: owner-session trybuild remainder — stay-unregistered. After #157, no honest consumer compile-fail host (capability inverted; effects never a consumer; CLI has no payload/root re-export). `trybuild` 1.0.116 + rustc/Cargo 1.97 known-vacuous in-tree. Gate remains structural privacy + Task 7–8 source-shape TSV rows. Plan Tasks 7–8 / 11 remainder notes. No product Exact Effect.
 - 2026-09-16: owner-session Task 12 remainder — authority `effect_evidence` + 8 TSV rows (heal / crash-before-append). Projection tests stay in audit-ledger `effect_v1` (10). Stay-unregistered: signed event IDs, HTTP login reconcile, scanner extension. Not RP1-05. See plan Task 12 heal note.
 - 2026-09-15: owner-session Task 10 remainder — `scripts/check-owner-effect-authority-plane.sh` (fixture graph inverted: no `capability → authority`, `with_authority_store` removed, `authority → capability` + fixture feature forwarding). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate; Task 10 TSV still 7/7; Task 2 durable-approval rows moved to `sovereign-authority` / `approval_v2_integration`. No product Exact Effect / RP1-03 claim.
 - 2026-09-15: owner-session Task 4 remainder — `scripts/check-owner-effect-broker-build.sh` (same-`CARGO_TARGET_DIR` fixture image, no sibling broker artifact, `broker_bootstrap` 6 passed, default/release help+symbols lack hidden mode). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate. No product Exact Effect / RP1 claim.

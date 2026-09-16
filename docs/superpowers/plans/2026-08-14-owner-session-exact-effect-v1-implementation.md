@@ -508,6 +508,23 @@ For every task: register only the named tests and their exact package/target/fea
 
 **Produces:** A closed `SyntheticFixtureRootV1` lifecycle. No product root variant or raw node writer exists.
 
+**Trybuild remainder (2026-09-16, `runtime-owner-trybuild`):** Root
+privacy stays structural. `SyntheticFixtureRootV1` has private fields and
+value-free Debug; there is no `forest.rs`, no product-root variant, and no
+raw node-writer API to compile against. A `no_raw_node_writer` UI that
+named `RawNodeWriter` / `ProductRoot` would fail as an unresolved import,
+which this plan already rejects as an acceptable diagnostic. After #157,
+capability is not an authority consumer, and effects never gained that
+edge, so there is no extra consuming package that can name a table handle
+without inventing one. `trybuild` 1.0.116 + Cargo 1.97 is known-vacuous
+in-tree (`crates/vault-v2-engine/tests/ui.rs`: compile-fail cases false-
+succeed unless a custom `cargo check` harness replaces `TestCases`). Stay
+unregistered: authority `compile_fail` / `tests/ui/no_raw_node_writer`,
+the trybuild dev-dependency, and any TSV row for them. The gate remains
+private fields + Debug redaction + the registered Task 7 source-shape
+tests (`the_root_cannot_be_constructed_by_a_caller`,
+`no_product_root_type_or_conversion_exists`). Not product Exact Effect.
+
 - [ ] **RED:** Add exact tests `unauthorized_caller_cannot_create_root`, `product_root_type_and_command_do_not_exist`, `fixture_root_requires_fresh_fixture_uv_approval`, `root_is_fixture_suite_and_generation_bound`, `root_rights_are_fixed_and_cannot_widen`, `child_only_narrows_scope_lifetime_and_uses`, `ancestor_revocation_blocks_child`, `revocation_requires_fresh_fixture_uv_approval`, `reopen_revalidates_canonical_root`, `fixture_root_is_rejected_by_product_open`, and compile-fail `no_raw_node_writer`. Run:
 
   ```bash
@@ -570,6 +587,27 @@ For every task: register only the named tests and their exact package/target/fea
 - Modify: `scripts/owner-effect-tests.tsv`
 
 **Produces:** Opaque `EffectIntentId`, private `ProtectedFixturePayload`, exact deterministic RFC 5322 composition, `Prepared` state, and a high-level fixed synthetic preview projection.
+
+**Trybuild remainder (2026-09-16, `runtime-owner-trybuild`):** Payload
+privacy stays structural. `ProtectedFixturePayload` fields are private;
+`sealed_bytes()` is `pub(crate)`; Debug prints `"<protected>"`; the public
+projection is `FixturePreview` (`intent_id`, `header_count`,
+`is_synthetic`) — `SyntheticPreviewV1` was never named. Task 10 / #157
+removed the capability → authority edge, and this task already required
+deleting capability's consumer trybuild when that happened. Effects never
+became an authority consumer (no dep, no opaque façade), so an effects
+`protected_payload_boundary` would be unresolved-import theater. CLI
+depends on authority but does not re-export the payload/root types; a
+CLI UI crate that `use sovereign_authority::...` is not "through the
+consumer's public graph" without inventing re-exports (forbidden).
+`trybuild` 1.0.116 + Cargo 1.97 is known-vacuous in-tree (see Task 7
+note). Stay unregistered: authority `compile_fail` /
+`protected_payload_is_private`, capability/CLI/effects
+`protected_payload_boundary` targets, their trybuild dev-dependencies,
+and TSV rows for them. The gate remains `pub(crate)` bytes + Debug
+redaction + the registered Task 8 source-shape test
+(`the_payload_has_no_public_way_to_read_its_content`). Not product
+Exact Effect.
 
 - [ ] **RED:** With recording RNG/composer hooks, add `intent_id_is_allocated_before_any_synthetic_value_read`, `intent_id_is_random_not_value_derived`, `only_exact_fixture_recipient_and_corpus_are_accepted`, `same_id_and_fixture_inputs_produce_same_crlf_bytes`, `message_id_uses_random_intent`, `header_injection_is_impossible`, `fixture_policy_snapshot_expiry_and_epoch_are_immutable`, `sealed_recipient_bytes_policy_and_generation_are_immutable`, `changed_binding_requires_new_intent`, `payload_exists_only_in_named_private_table`, `expired_unreserved_payload_deletes_logical_row_but_makes_no_secure_erase_claim`, `reserved_payload_has_no_per_intent_delete_or_purge`, `preview_requires_live_fixture_session`, `preview_is_derived_inside_broker`, and compile-fail `protected_payload_is_private`. Run:
 
@@ -852,6 +890,15 @@ For every task: register only the named tests and their exact package/target/fea
 - Modify: `scripts/owner-effect-tests.tsv`
 
 **Produces:** Parameter-free sandbox fixture execution without a second capability claim, coordinator-private local publication, post-reservation expiry/revocation revalidation, state-aware canary allowlist, value-free façade/outcome, and exact `Indeterminate` semantics. Effects never sees recipient or bytes.
+
+**Trybuild remainder (2026-09-16, `runtime-owner-trybuild`):** Effects
+still has no `sovereign-authority` dependency and no fixture feature, so
+it is not "a real authority consumer here". The effects
+`protected_payload_boundary` target, trybuild dev-dependency, and TSV
+row stay unregistered for the same reason as Tasks 7–8 (unresolved-
+import theater; known-vacuous `trybuild` 1.0.116 + Cargo 1.97). Writer
+privacy is the crate-private `sealed_bytes()` call in
+`broker/dispatch.rs`. Not product Exact Effect.
 
 - [ ] Define `sovereign-sandbox/owner-effect-fixture` with `default = []`, and forward it only from `sovereign-authority/owner-effect-fixture`; define matching non-default effects feature. Add `trybuild` as an effects dev-dependency and register its `[[test]] name = "protected_payload_boundary"` with `required-features = ["owner-effect-fixture"]`, plus the matching TSV row with profile `owner-effect-fixture`. Register all other required-feature targets before RED, without adding the sandbox function or dispatch behavior. Deliberately omit the effects `.stderr` golden for the first boundary run.
 - [ ] **RED:** Add sandbox tests `synthetic_fixture_api_is_parameter_free`, `synthetic_fixture_owns_fixed_verified_artifact_and_input`, `synthetic_fixture_uses_verified_runtime_without_capability_consumption`, `synthetic_fixture_is_rerunnable_after_restart`, `synthetic_fixture_has_no_imports_or_host_input`, and `synthetic_fixture_returns_only_closed_pass`; authority/effects/CLI tests `fixed_verified_wasm_runs_after_reservation_before_dispatching`, `reserved_restart_reruns_pure_fixture_without_token_or_approval`, `sandbox_output_cannot_change_recipient_or_bytes`, `sandbox_import_or_failure_closes_failed_before_dispatch_without_io`, `prepared_expiry_after_reservation_closes_failed_before_dispatch_without_io`, `root_or_ancestor_expiry_after_reservation_closes_failed_before_dispatch_without_io`, `policy_expiry_or_epoch_change_after_reservation_closes_failed_before_dispatch_without_io`, `logout_generation_change_racing_dispatch_has_one_winner`, `final_revalidation_and_dispatching_commit_are_one_transaction`, `expiry_after_dispatching_never_cancels_retries_or_relabels`, `coordinator_commits_dispatching_before_filesystem_touch`, `only_authority_reserved_can_dispatch`, `revoked_ancestor_before_dispatch_closes_failed_before_dispatch_without_io`, `filename_is_random_intent_dot_eml`, `publication_temp_is_exact_same_directory_name_and_owner_only`, `published_file_equals_private_sealed_bytes`, `live_failure_before_any_payload_write_commits_failed_before_dispatch`, `crash_after_dispatching_before_failed_before_dispatch_commit_reopens_indeterminate`, `restart_dispatching_absent_is_indeterminate`, `restart_dispatching_identical_is_succeeded`, `different_unreadable_wrong_type_or_uncertain_sync_is_indeterminate`, `no_state_after_dispatching_retries_or_deletes`, `concurrent_dispatch_commands_have_one_winner`, `broker_death_never_auto_respawns_dispatch`, `dispatch_and_reconcile_routes_activate_only_with_exact_backend`, `canary_locations_match_state_allowlist`, and compile-fail `no_payload_or_raw_writer`. Run:
@@ -1303,7 +1350,7 @@ fixture signer, HTTP fixture-login reconcile, table/path scanner extension,
 - Confirm Task 11 uses sandbox's parameter-free fixed fixture over the existing crate-private verified primitive, never the public raw byte API or the capability-consuming executor, and sandbox has no authority dependency.
 - Confirm Task 9—not Task 14—is the first checkpoint with business modules/commands behind mutually exclusive legacy feature plus runtime opt-in, and every Task 9-16 GREEN runs clean default/fixture/legacy command+symbol builds.
 - Confirm Task 10 removes `with_authority_store`, `AuthorityStore::open`, and raw claim methods from default/fixture/public symbols; only the upper legacy module can compose pure validation with typed mutually exclusive legacy claims, and metadata/tree proves no `capability -> authority` edge.
-- Confirm Task 8's capability/CLI and Task 11's effects privacy cases live in those actual consumer crates with feature-gated targets/TSV rows and intended privacy diagnostics; capability's target is deleted when its authority dependency is removed.
+- Confirm Task 8's capability/CLI and Task 11's effects privacy cases stay unregistered after the #157 graph invert (see Tasks 7–8 / 11 trybuild remainder notes, `runtime-owner-trybuild`). Capability is not an authority consumer; effects never became one; CLI does not re-export payload/root types. Structural `pub(crate)` / private fields / Debug redaction plus the registered Task 7–8 source-shape tests remain the gate.
 - Confirm registration/login start/finish paths and bounded schemas are exhaustive, pre-session routes still require exact origin/fetch/JSON/generation, start issues no session, finish alone issues cookie/CSRF, and there is no API GET/alias/query-token path.
 - Confirm payload/composer/local-outbox are coordinator-private and no public closure/trait/callback can receive recipient/RFC bytes; synthetic preview is a fixed high-level projection, not an accessor.
 - Confirm no restart path maps missing file to `FailedBeforeDispatch`; only a live no-byte-written proof may commit it, and any uncommitted/crash ambiguity is `Indeterminate` with no retry.
