@@ -2554,6 +2554,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sovereign-synthetic-owner-effect"
+version = "0.1.0"
+dependencies = [
+ "sovereign-authority",
+ "sovereign-capability",
+ "tempfile",
+]
+
+[[package]]
 name = "sovereign-vault"
 version = "0.1.0"
 dependencies = [

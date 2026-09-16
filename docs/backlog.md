@@ -128,7 +128,20 @@ repo audit; every entry below points at verified, real state of the code.
   **Design Accept ≠ product Exact Effect.** No product Current, no 1C0, no
   `low_risk_effectful` admission, no RP1 / ActiveV2 / Wave D completion.
   Named tests and compile-fail fixtures are in `crates/capability/tests/`.
-  v01-D02…D07 stay unclaimed in
+  v01-D03…D07 stay unclaimed in
+  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+
+<a id="v01-d02-fixture-boundary"></a>
+
+- [x] **P1 | new `publish = false` fixture package + boundary script | v01-D02 — Release-excluded single-process fixture boundary.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D01 (`f04b4af`). Package `sovereign-synthetic-owner-effect` is
+  `publish = false`, not a `sovereign-cli` dependency. Adds the upper crate,
+  root classifier, retained OS lock, sole redb open, one listener module,
+  and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
+  effect behavior.** One public listener story at the compiled origin later.
+  **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
+  RP1. v01-D03…D07 stay unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="runtime-f03-exact-effect-product"></a>

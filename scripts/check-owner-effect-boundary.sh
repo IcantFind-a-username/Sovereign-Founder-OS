@@ -126,6 +126,7 @@ fi
 echo "== the fixture builds when requested"
 checked=$((checked + 1))
 if cargo build -p sovereign-owner -p sovereign-authority \
+  -p sovereign-synthetic-owner-effect \
   --no-default-features --features owner-effect-fixture --locked >/dev/null 2>&1; then
   echo "ok    the fixture builds under its own feature"
 else

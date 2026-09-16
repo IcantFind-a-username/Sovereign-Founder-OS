@@ -34,7 +34,9 @@ crates/owner/src
 crates/owner/tests
 apps/cli/tests
 crates/audit-ledger/src
-crates/audit-ledger/tests"
+crates/audit-ledger/tests
+crates/synthetic-owner-effect/src
+crates/synthetic-owner-effect/tests"
 
 completed=0
 on_exit() {
