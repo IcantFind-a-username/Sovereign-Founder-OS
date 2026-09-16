@@ -27,15 +27,24 @@ disagree. Current code remains the source of truth for protections that ship.
 
 ## Current gap
 
-The current model gateway accepts a public `ModelRequest` whose prompt,
-task, and `DataClass` are caller-controlled. A provider implementation also
-self-reports whether it is local or cloud. The gateway explicitly permits an
-Amber request to reach a cloud-labelled provider. These are useful Stage 2
-stand-ins but they do not satisfy this RFC: a buggy caller can place protected
-data in an Amber request and a provider can claim local trust.
+The supported model-gateway API previously let a caller-controlled
+`DataClass` (including Amber/Green) plus a provider's self-reported `local`
+or `cloud` label authorize a raw prompt onto a cloud-labelled adapter.
 
-Implementation MUST close that route before presets or UI claim this RFC's
-protection.
+That legacy Amber/Green public-egress route is now closed on the supported
+Rust API: unknown and legacy Amber/Green values enter as `Protected`;
+`DataClass` may only narrow a skip reason, never grant egress; a provider
+`trust()` flag cannot mint a `LocalVouch`; a cloud-labelled provider is
+refused even when this crate vouched the adapter as a local-enough stand-in.
+Deterministic Local providers remain the test/demo path and are labelled as
+on-device stand-ins, not “cloud-assisted” inference.
+
+This is **not** the rest of this RFC. Closing that one supported-API bypass
+does not ship the privacy compiler as the only public door, a real
+local-model sandbox, ActiveV2, product Exact Effect, or 1C0. A vouched
+local process can still read whatever a caller put in the prompt — locality
+is not the full boundary. Presets or UI MUST NOT claim this RFC's
+protection until those later slices land.
 
 The current Vault is also a cryptographic serialization prototype rather than
 a production at-rest boundary: each entry uses AES-256-GCM, but the Base64 raw

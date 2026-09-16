@@ -102,9 +102,8 @@ impl Store {
     /// Providers come from the device's `model.json` (an Experimental Ollama
     /// adapter over loopback) with deterministic stand-ins as fallback. The
     /// gateway gives them health-aware failover and a data-disclosure record.
-    /// Only Red is skipped for non-local providers; Amber may reach cloud.
-    /// `data_class` is caller-declared and provider locality is self-reported
-    /// — labels are not verified.
+    /// Raw requests are local-only: Amber/Green/`DataClass` cannot grant
+    /// cloud egress. `data_class` is a compatibility/display label.
     pub fn draft_assistant(
         &self,
         customer_id: Uuid,
@@ -126,9 +125,8 @@ impl Store {
             .complete(&ModelRequest {
                 task: "draft_outreach".into(),
                 prompt: note,
-                // Caller labels this Amber (named-customer business data). The
-                // gateway may route to any healthy provider; disclosure records
-                // provider self-reported trust — labels are not verified.
+                // Caller labels this Amber (named-customer business data).
+                // The label is display/compat only: it cannot grant egress.
                 data_class: DataClass::Amber,
                 max_output_chars: 8192,
             })

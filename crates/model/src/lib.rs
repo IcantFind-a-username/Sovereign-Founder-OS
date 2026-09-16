@@ -11,24 +11,27 @@
 //!   carries no authority, holds no keys, and callers must never write it into
 //!   authoritative state without independent review. Nothing here touches the
 //!   vault, policy, or capability layers.
-//! - **Confidentiality routing is label-driven and partially self-reported.**
-//!   [`ModelRequest::data_class`] is whatever the caller declares; this crate
-//!   does not inspect prompt contents to verify it. [`ModelProvider::trust`]
-//!   is each provider's own word. The gateway applies deterministic skips
-//!   (including Red-labeled requests to non-[`ProviderTrust::Local`] providers
-//!   that carry a [`LocalVouch`], and raw requests only to vouched locals) and
-//!   records what was disclosed to whom — but it does not cryptographically
-//!   prove class or locality. Closing that gap is RFC 0004 / v0.2 work.
+//! - **Raw requests are local-only.** A prompt reaches only a provider this
+//!   crate vouches for ([`LocalVouch`]) that also reports
+//!   [`ProviderTrust::Local`]. Caller-supplied Amber/Green/`DataClass` MUST
+//!   NOT authorize public or cloud-labelled egress: unknown and legacy Amber
+//!   and Green values enter as Protected, and `DataClass` may only narrow a
+//!   skip reason. A provider's self-reported `local` flag cannot mint a
+//!   vouch. This closes RFC 0004's legacy Amber/Green public-egress bypass
+//!   on the supported Rust API. It is **not** the rest of RFC 0004: there is
+//!   no compiler-owned public projection dispatch here, no real local-model
+//!   sandbox, no ActiveV2, and no product Exact Effect / 1C0.
 //!
 //! ## Honest limits
 //!
 //! The providers in this crate are **deterministic local stand-ins, not
-//! LLMs.** They exist to prove the routing, health, failover, and disclosure
-//! contract without adding a network dependency or a real model. A real
-//! cloud provider would implement the same [`ModelProvider`] trait behind an
-//! egress broker (which does not exist yet); until it does, only local
-//! providers can be marked healthy for Red data. "Cost" and "latency" fields
-//! are placeholders a real provider would populate.
+//! LLMs** and not “cloud-assisted” inference. They exist to prove the
+//! routing, health, failover, and disclosure contract without adding a
+//! network dependency or a real model. A real public provider would
+//! implement the same [`ModelProvider`] trait behind an egress broker that
+//! does not exist yet; until it does, a cloud-labelled adapter is skipped
+//! before it can observe a raw prompt. "Cost" and "latency" fields are
+//! placeholders a real provider would populate.
 
 use std::fmt;
 
@@ -58,8 +61,11 @@ pub enum Health {
     Down,
 }
 
-/// One request for model assistance. `data_class` drives confidentiality
-/// routing; it is the caller's classification of the prompt contents.
+/// One request for model assistance. `data_class` is a compatibility/display
+/// field: the caller classifies the prompt, but the label MUST NOT grant
+/// public or cloud-labelled egress. The gateway treats unknown and legacy
+/// Amber/Green values as Protected and may only use `DataClass` to narrow a
+/// skip reason.
 #[derive(Debug, Clone)]
 pub struct ModelRequest {
     pub task: String,
@@ -99,7 +105,8 @@ pub struct SkipReason {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SkipCause {
-    /// Red data may not be disclosed to a non-local provider.
+    /// Red data may not be disclosed to a non-local provider. `DataClass` may
+    /// only narrow a skip reason this way; it never grants egress.
     RedDataConfidentiality,
     /// The provider reported itself down.
     Unhealthy,
@@ -109,6 +116,9 @@ pub enum SkipCause {
     /// running on this device. Reaching anything else requires a compiled
     /// projection (RFC 0004).
     RawRequestIsLocalOnly,
+    /// A cloud-labelled provider never receives a raw request. Caller Amber
+    /// or Green cannot grant that egress (RFC 0004 Current gap).
+    CloudLabelledDenied,
 }
 
 /// Proof that a provider is one this crate itself vouches for as local.
@@ -259,18 +269,20 @@ impl ModelGateway {
         allow_degraded: bool,
     ) -> Eligibility {
         // A raw request carries whatever the caller put in it, so it may only
-        // reach a provider this crate vouches for. This is the route RFC 0004
-        // requires closing: previously a caller could label protected data
-        // Amber and an adapter could claim local trust, and between them they
-        // reached the cloud. Confidentiality is decided here, before health,
-        // and never by the provider's own word.
+        // reach a provider this crate vouches for. A trait method or a caller
+        // string MUST NOT establish that trust (RFC 0004).
         if provider.local_vouch().is_none() {
             return Eligibility::Skip(SkipCause::RawRequestIsLocalOnly);
         }
-        // Kept as defence in depth: a vouched provider that nonetheless
-        // reports non-local trust never sees Red data.
-        if request.data_class == DataClass::Red && provider.trust() != ProviderTrust::Local {
-            return Eligibility::Skip(SkipCause::RedDataConfidentiality);
+        // Caller DataClass never grants egress. Unknown and legacy Amber/Green
+        // enter this boundary as Protected. A cloud-labelled provider — even
+        // one this crate vouched as a local-enough stand-in — does not receive
+        // a raw request. DataClass may only narrow the recorded skip reason.
+        if provider.trust() != ProviderTrust::Local {
+            return Eligibility::Skip(match request.data_class {
+                DataClass::Red => SkipCause::RedDataConfidentiality,
+                DataClass::Amber | DataClass::Green => SkipCause::CloudLabelledDenied,
+            });
         }
         match provider.health() {
             Health::Healthy => Eligibility::Try,
@@ -627,16 +639,16 @@ mod tests {
         );
     }
 
-    /// A vouched stand-in that nonetheless self-reports cloud trust — models the
-    /// case where this crate accepted a provider as local enough to serve raw
-    /// prompts while the provider still labels itself [`ProviderTrust::Cloud`].
+    /// A vouched stand-in that nonetheless self-reports cloud trust — models
+    /// the case where this crate accepted a provider as local enough to exist
+    /// while the provider still labels itself [`ProviderTrust::Cloud`].
     struct VouchedCloudTrustStandIn {
-        id: String,
+        hits: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl ModelProvider for VouchedCloudTrustStandIn {
         fn id(&self) -> &str {
-            &self.id
+            "vouched-cloud"
         }
 
         fn trust(&self) -> ProviderTrust {
@@ -648,6 +660,7 @@ mod tests {
         }
 
         fn complete(&self, request: &ModelRequest) -> Result<String, ProviderError> {
+            self.hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(request.prompt.clone())
         }
 
@@ -658,24 +671,41 @@ mod tests {
 
     #[test]
     fn the_gateway_trusts_caller_labels_a_mislabeled_prompt_routes_to_cloud() {
-        // The gateway does not read prompt bodies to infer data class. A caller
-        // can label obviously sensitive content Green and, as long as a vouched
-        // provider is eligible, routing follows the label — here onto a provider
-        // that self-reports Cloud trust. If RFC 0004 later verifies class or
-        // blocks this path, this test will fail: invert the assertions then,
-        // do not delete the test.
-        let gateway = ModelGateway::new(vec![Box::new(VouchedCloudTrustStandIn {
-            id: "vouched-cloud".into(),
+        // Inverted from the v01-01 honesty pin (RFC 0004 Current gap): a
+        // caller can still mislabel protected content Green or Amber, but
+        // that label MUST NOT authorize a cloud-labelled provider — even one
+        // this crate vouched as a local-enough stand-in. DataClass may only
+        // narrow the skip reason; it never grants egress. Do not delete this
+        // test.
+        let hits = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let cloud_only = ModelGateway::new(vec![Box::new(VouchedCloudTrustStandIn {
+            hits: hits.clone(),
         })]);
-        let request = ModelRequest {
-            task: "draft_outreach".into(),
-            prompt: "SSN 123-45-6789 and full patient record for Dr. Tan".into(),
-            data_class: DataClass::Green,
-            max_output_chars: 4096,
-        };
-        let (response, disclosure) = gateway.complete(&request).unwrap();
-        assert_eq!(response.provider_id, "vouched-cloud");
-        assert_eq!(response.provider_trust, ProviderTrust::Cloud);
-        assert_eq!(disclosure.data_class, DataClass::Green);
+        for class in [DataClass::Green, DataClass::Amber, DataClass::Red] {
+            assert_eq!(
+                cloud_only.complete(&request(class)),
+                Err(ModelError::AllProvidersFailed),
+                "{class:?} must not grant egress to a cloud-labelled provider"
+            );
+        }
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+        let with_local = ModelGateway::new(vec![
+            Box::new(VouchedCloudTrustStandIn { hits: hits.clone() }),
+            Box::new(DeterministicProvider::local(
+                "local-drafter",
+                Health::Healthy,
+            )),
+        ]);
+        let (response, disclosure) = with_local.complete(&request(DataClass::Green)).unwrap();
+        assert_eq!(response.provider_id, "local-drafter");
+        assert_eq!(disclosure.skipped[0].provider_id, "vouched-cloud");
+        assert_eq!(disclosure.skipped[0].reason, SkipCause::CloudLabelledDenied);
+        let (_, amber) = with_local.complete(&request(DataClass::Amber)).unwrap();
+        assert_eq!(amber.skipped[0].reason, SkipCause::CloudLabelledDenied);
+        let (_, red) = with_local.complete(&request(DataClass::Red)).unwrap();
+        // DataClass may only narrow: Red records the more specific deny.
+        assert_eq!(red.skipped[0].reason, SkipCause::RedDataConfidentiality);
+        assert_eq!(hits.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 }
