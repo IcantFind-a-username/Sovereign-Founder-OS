@@ -1610,7 +1610,7 @@ while the controller routes eligible design/review cards to the strong role.
   run shows it green.
 
 - [x] **P3 | `.github/workflows/` | Repin the four actions still targeting the Node 20 runtime.**
-  Landed 2026-09-16. Checkout was already Node 24 everywhere
+  Landed 2026-09-16 (#164). Checkout was already Node 24 everywhere
   (`actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` # v7.0.1).
   Bumped `actions/dependency-review-action` v4 → v5.0.0
   (`a1d282b36b6f3519aa1f3fc636f609c47dddb294`, `using: node24`; `allow-ghsas`
