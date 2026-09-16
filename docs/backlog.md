@@ -1680,7 +1680,7 @@ while the controller routes eligible design/review cards to the strong role.
   verbatim, confirm the test count is unchanged, and for anything that runs
   (a route, a gauntlet) exercise it live rather than trusting the build. Done
   when every file is under 1000 lines, so the next change has room.
-- [ ] **P3 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.**
+- [ ] **P3 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.** IN PROGRESS (2026-09-16)
   Re-scoped from P2 on 2026-09-11, the same day it was filed: the first
   version missed that the gap is a **documented, deliberate** trade-off. The
   script's own header says scoped runs do not rebuild reverse dependencies
