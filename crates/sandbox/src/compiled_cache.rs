@@ -13,9 +13,12 @@
 //! `compiled-cache` role binding the engine identity, the source component
 //! digest, and the compiled-blob digest. On lookup the record is verified
 //! against the owner's cache trust store, every field is checked, and the
-//! blob is rehashed — only then is it deserialized. Any failure quarantines
-//! the entry and reports a miss, so the caller recompiles from source. This
-//! never trusts a file merely because it sits under a digest-shaped name.
+//! blob is rehashed — only then is it deserialized. Any verification failure
+//! quarantines the entry and reports a miss, so the caller recompiles from
+//! source. If the quarantine move itself fails, lookup returns
+//! [`SandboxError::CompiledCacheUnavailable`] rather than a hit — the poisoned
+//! blob is never served. This never trusts a file merely because it sits
+//! under a digest-shaped name.
 
 use std::path::{Path, PathBuf};
 
@@ -94,18 +97,28 @@ impl CompiledCache {
     }
 
     /// Return a verified compiled module for `component_digest`, or `None` on a
-    /// miss or any integrity failure. A failing entry is quarantined so the
-    /// caller recompiles and never sees it again.
-    pub(crate) fn lookup(&self, engine: &Engine, component_digest: Digest) -> Option<Module> {
-        let blob = self.lookup_verified_blob(COMPILED_CACHE_ENGINE_IDENTITY, component_digest)?;
+    /// miss or a quarantined integrity failure. A failing entry is moved aside
+    /// so the caller recompiles and never sees it again. If that move fails,
+    /// this is [`SandboxError::CompiledCacheUnavailable`]: the blob is still
+    /// refused, and the live files are not treated as a hit.
+    pub(crate) fn lookup(
+        &self,
+        engine: &Engine,
+        component_digest: Digest,
+    ) -> Result<Option<Module>, SandboxError> {
+        let Some(blob) =
+            self.lookup_verified_blob(COMPILED_CACHE_ENGINE_IDENTITY, component_digest)?
+        else {
+            return Ok(None);
+        };
         // SAFETY: the blob's digest was just re-verified against a record
         // signed under the trusted compiled-cache role for the core-module
         // identity; wasmtime's own compatibility check is the final gate.
         match unsafe { Module::deserialize(engine, &blob) } {
-            Ok(module) => Some(module),
+            Ok(module) => Ok(Some(module)),
             Err(_) => {
-                self.quarantine_by_key(COMPILED_CACHE_ENGINE_IDENTITY, component_digest);
-                None
+                self.quarantine_by_key(COMPILED_CACHE_ENGINE_IDENTITY, component_digest)?;
+                Ok(None)
             }
         }
     }
@@ -117,16 +130,19 @@ impl CompiledCache {
         &self,
         engine: &Engine,
         component_digest: Digest,
-    ) -> Option<Component> {
-        let blob =
-            self.lookup_verified_blob(COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, component_digest)?;
+    ) -> Result<Option<Component>, SandboxError> {
+        let Some(blob) =
+            self.lookup_verified_blob(COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, component_digest)?
+        else {
+            return Ok(None);
+        };
         // SAFETY: as in `lookup`, the blob was re-verified against a signed
         // record bound to the component identity before deserialization.
         match unsafe { Component::deserialize(engine, &blob) } {
-            Ok(component) => Some(component),
+            Ok(component) => Ok(Some(component)),
             Err(_) => {
-                self.quarantine_by_key(COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, component_digest);
-                None
+                self.quarantine_by_key(COMPILED_CACHE_COMPONENT_ENGINE_IDENTITY, component_digest)?;
+                Ok(None)
             }
         }
     }
@@ -135,7 +151,7 @@ impl CompiledCache {
         &self,
         engine_identity: &str,
         component_digest: Digest,
-    ) -> Option<Vec<u8>> {
+    ) -> Result<Option<Vec<u8>>, SandboxError> {
         let key = self.entry_key(engine_identity, component_digest);
         let blob_path = self.dir.join(format!("{key}.blob"));
         let record_path = self.dir.join(format!("{key}.cose"));
@@ -143,15 +159,17 @@ impl CompiledCache {
         // A plain miss (either file absent) is not a failure and is not
         // quarantined.
         if !is_present(&blob_path) || !is_present(&record_path) {
-            return None;
+            return Ok(None);
         }
 
         match self.verify_entry(engine_identity, component_digest, &blob_path, &record_path) {
-            Ok(blob) => Some(blob),
+            Ok(blob) => Ok(Some(blob)),
             Err(_) => {
-                // Poisoned/mismatched/mutable entry: move it aside and miss.
-                self.quarantine_entry(&key, &blob_path, &record_path);
-                None
+                // Poisoned/mismatched/mutable entry: never deserialize.
+                // Quarantine is defense in depth so it cannot be reused; a
+                // move failure still refuses the blob.
+                self.quarantine_entry(&key, &blob_path, &record_path)?;
+                Ok(None)
             }
         }
     }
@@ -277,20 +295,49 @@ impl CompiledCache {
         Digest::of_bytes(&keyed).as_hex()
     }
 
-    fn quarantine_by_key(&self, engine_identity: &str, component_digest: Digest) {
+    fn quarantine_by_key(
+        &self,
+        engine_identity: &str,
+        component_digest: Digest,
+    ) -> Result<(), SandboxError> {
         let key = self.entry_key(engine_identity, component_digest);
         self.quarantine_entry(
             &key,
             &self.dir.join(format!("{key}.blob")),
             &self.dir.join(format!("{key}.cose")),
-        );
+        )
     }
 
-    fn quarantine_entry(&self, key: &str, blob_path: &Path, record_path: &Path) {
-        // Best-effort: move both files aside so the poisoned entry cannot be
-        // reused, and a lookup after this simply recompiles.
-        let _ = std::fs::rename(blob_path, self.quarantine.join(format!("{key}.blob")));
-        let _ = std::fs::rename(record_path, self.quarantine.join(format!("{key}.cose")));
+    fn quarantine_entry(
+        &self,
+        key: &str,
+        blob_path: &Path,
+        record_path: &Path,
+    ) -> Result<(), SandboxError> {
+        // Attempt both moves even if the first fails: a leftover sibling in
+        // the live dir is treated as a miss on the next lookup (both files
+        // are required), but we still surface the failure.
+        let blob = move_aside(blob_path, self.quarantine.join(format!("{key}.blob")));
+        let record = move_aside(record_path, self.quarantine.join(format!("{key}.cose")));
+        match (blob, record) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(error), _) | (_, Err(error)) => Err(error),
+        }
+    }
+}
+
+/// Rename `src` into `dest`. A missing source is already gone from the live
+/// dir (success). Any other I/O error — including a missing or unwritable
+/// destination parent — is [`SandboxError::CompiledCacheUnavailable`].
+fn move_aside(src: &Path, dest: PathBuf) -> Result<(), SandboxError> {
+    match std::fs::rename(src, &dest) {
+        Ok(()) => Ok(()),
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound && src.symlink_metadata().is_err() =>
+        {
+            Ok(())
+        }
+        Err(error) => Err(SandboxError::CompiledCacheUnavailable(error.to_string())),
     }
 }
 
@@ -407,7 +454,7 @@ mod tests {
         let cache = cache(dir.path(), "cache.local", 0x55, 0x55);
         let digest = Digest::of_bytes(b"component-A");
         cache.store(digest, &serialized_module(&engine, 7)).unwrap();
-        assert!(cache.lookup(&engine, digest).is_some());
+        assert!(cache.lookup(&engine, digest).unwrap().is_some());
         assert_eq!(quarantined_count(dir.path()), 0);
     }
 
@@ -426,7 +473,7 @@ mod tests {
         bytes[mid] ^= 0xff;
         std::fs::write(&blob, &bytes).unwrap();
 
-        assert!(cache.lookup(&engine, digest).is_none());
+        assert!(cache.lookup(&engine, digest).unwrap().is_none());
         assert!(
             find(dir.path(), "blob").is_none(),
             "poisoned entry left in place"
@@ -450,7 +497,7 @@ mod tests {
             .unwrap();
 
         let reader = cache(dir.path(), "cache.local", 0xBB, 0xBB);
-        assert!(reader.lookup(&engine, digest).is_none());
+        assert!(reader.lookup(&engine, digest).unwrap().is_none());
         assert_eq!(quarantined_count(dir.path()), 2);
     }
 
@@ -477,7 +524,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(cache.lookup(&engine, other).is_none());
+        assert!(cache.lookup(&engine, other).unwrap().is_none());
         assert_eq!(quarantined_count(dir.path()), 2);
     }
 
@@ -495,6 +542,48 @@ mod tests {
         std::fs::rename(&blob, &elsewhere).unwrap();
         std::os::unix::fs::symlink(&elsewhere, &blob).unwrap();
 
-        assert!(cache.lookup(&engine, digest).is_none());
+        assert!(cache.lookup(&engine, digest).unwrap().is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unwritable_quarantine_dir_surfaces_the_rename_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = engine();
+        let cache = cache(dir.path(), "cache.local", 0x55, 0x55);
+        let digest = Digest::of_bytes(b"component-A");
+        cache.store(digest, &serialized_module(&engine, 7)).unwrap();
+
+        // Flip the compiled bytes: the record's blob digest no longer matches.
+        let blob = find(dir.path(), "blob").unwrap();
+        let mut bytes = std::fs::read(&blob).unwrap();
+        let mid = bytes.len() / 2;
+        bytes[mid] ^= 0xff;
+        std::fs::write(&blob, &bytes).unwrap();
+
+        // chmod-based "unwritable" is a silent no-op under root (CI). Occupy
+        // the quarantine path with a regular file so rename-into-quarantine
+        // fails for every uid.
+        let quarantine = dir.path().join("quarantine");
+        std::fs::remove_dir_all(&quarantine).unwrap();
+        std::fs::write(&quarantine, b"occupied").unwrap();
+
+        let key = cache.entry_key(COMPILED_CACHE_ENGINE_IDENTITY, digest);
+        let blob_path = dir.path().join(format!("{key}.blob"));
+        let record_path = dir.path().join(format!("{key}.cose"));
+
+        // Lookup must refuse the poisoned blob and surface the move failure
+        // rather than treating it as a quiet miss.
+        let error = cache
+            .lookup(&engine, digest)
+            .expect_err("unwritable quarantine must surface");
+        assert!(
+            matches!(error, SandboxError::CompiledCacheUnavailable(_)),
+            "got {error:?}"
+        );
+        assert!(
+            blob_path.is_file() && record_path.is_file(),
+            "poisoned entry remained in the live cache dir"
+        );
     }
 }

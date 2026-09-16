@@ -350,12 +350,14 @@ impl WasmSandbox {
 
         // A verified cache hit skips compilation entirely; a miss compiles
         // (out-of-process when a worker is attached, otherwise in-process) and
-        // stores the result under a freshly signed record for next time.
+        // stores the result under a freshly signed record for next time. A
+        // poisoned entry that cannot be quarantined fails closed here rather
+        // than compiling over files still sitting in the live cache dir.
         let component_digest = Digest::of_bytes(module_bytes);
-        let cached = self
-            .compiled_cache
-            .as_ref()
-            .and_then(|cache| cache.lookup(&self.engine, component_digest));
+        let cached = match &self.compiled_cache {
+            Some(cache) => cache.lookup(&self.engine, component_digest)?,
+            None => None,
+        };
         let module = match cached {
             Some(module) => module,
             None => {
@@ -489,10 +491,10 @@ impl WasmSandbox {
         }
 
         let component_digest = Digest::of_bytes(component_bytes);
-        let cached = self
-            .compiled_cache
-            .as_ref()
-            .and_then(|cache| cache.lookup_component(&self.component_engine, component_digest));
+        let cached = match &self.compiled_cache {
+            Some(cache) => cache.lookup_component(&self.component_engine, component_digest)?,
+            None => None,
+        };
         let component = match cached {
             Some(component) => component,
             None => {
