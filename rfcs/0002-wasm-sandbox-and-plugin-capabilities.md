@@ -1,9 +1,8 @@
 # RFC 0002: WASM Sandbox and Plugin Capabilities
 
-**Status:** Draft; Amendment 1 proposed 2026-09-13 (closed fixture
-exact-effect profile). **Not accepted.** An implementation PR must not
-mark this RFC Accepted, start Wave D code, or treat discussion as
-consent.
+**Status:** Draft; Amendment 1 accepted 2026-09-16 (closed fixture
+exact-effect profile). RFC overall remains Draft. Design Accept ≠
+product Current. See Amendment 1 Acceptance record.
 **Stage:** 1
 **Security impact:** Critical
 
@@ -59,7 +58,7 @@ Sandbox escape vulnerabilities in the chosen engine remain possible. Process iso
 | --- | --- | --- |
 | Pure local computation | Publisher-verified and locally admitted import-free Core Wasm; exact V2 binding; authenticated input through `sovereign_core_wasm_v2`; Experimental: one zero-import component world (`sovereign:tool/pure-tool@0.1.0`); no guest host effects | Wasmtime Component with reviewed WIT world |
 | Low-risk constrained plugin | Denied | Wasmtime Component plus explicit capability host interfaces |
-| Fixture exact local-outbox (`low-risk-effectful` / `write_rfc5322`) | Denied on every product and default-release path. The existing `RiskClass::LowRiskEffectful` serde token (`low_risk_effectful`) is already rejected at admission (`UnsupportedRiskClass`). | Target after Amendment 1 acceptance only: synthetic fixture; import-free Core Wasm v2 guest; trusted coordinator publishes one exact `.eml`. Not a product plugin class and not Phase D completion. |
+| Fixture exact local-outbox (`low-risk-effectful` / `write_rfc5322`) | Denied on every product and default-release path. The existing `RiskClass::LowRiskEffectful` serde token (`low_risk_effectful`) is already rejected at admission (`UnsupportedRiskClass`). | Target after Amendment 1 (accepted 2026-09-16): synthetic fixture; import-free Core Wasm v2 guest; trusted coordinator publishes one exact `.eml`. Not a product plugin class and not Phase D completion. |
 | High-risk/native tool | Denied | Ephemeral container or micro-VM |
 | Unknown or undeclared | Denied | None |
 
@@ -372,8 +371,8 @@ tokens stay restricted to pure computation until transactional reservation,
 revocation, crash-safe effect ordering, owner authority, and reviewed host
 interfaces are complete.
 
-Amendment 1 (proposed 2026-09-13, **not accepted**) is that exact-effect
-profile amendment. It starts from this Current approval-retention fact and
+Amendment 1 (accepted 2026-09-16) is that exact-effect profile
+amendment. It starts from this Current approval-retention fact and
 must not re-plan retention. RFC 0003 Amendment 1 (2026-08-26) still pins
 the one-transaction reservation and revocation protocol for the current
 filesystem store. Amendment 1 additionally pins the *fixture* reservation
@@ -529,22 +528,23 @@ This design requires no external API, account, wallet, or blockchain. Future pub
 
 ## Amendments
 
-### Amendment 1 (proposed 2026-09-13): closed fixture exact-effect profile
+### Amendment 1 (accepted 2026-09-16): closed fixture exact-effect profile
 
-**Status.** Proposed. This RFC stays Draft. [CONTRIBUTING.md](../CONTRIBUTING.md)
-requires a minimum **seven-day** discussion for substantial changes and
-explicit maintainer acceptance or rejection with rationale. Opening or
-merging this text is not acceptance. An implementation PR cannot accept
-its own RFC. Wave D fixture code must not start until a maintainer
-records acceptance with rationale.
+**Status.** **Accepted** (2026-09-16) as Target design for the closed
+fixture exact-effect profile. This RFC stays **Draft**. Design Accept ≠
+product Current, ≠ Phase D completion, ≠ RFC 0002 overall `Accepted`.
+Wave D fixture code is now licensed only as release-excluded Target work
+after this record; it must not touch product paths. See
+[Acceptance record](#acceptance-record).
 
 **Why.** RFC 0002 already anticipated an exact-effect profile amendment
 and forbade re-planning the Current approval-retention fix. The v2
 synthetic-owner / exact local-outbox plan
 (`docs/superpowers/plans/2026-08-14-synthetic-owner-exact-local-outbox-v2-implementation.md`,
-Task 0) cannot start until this closed profile exists here. Honest-close
+Task 0) required this closed profile here before Wave D. Honest-close
 places product 1C0 admission in v0.2; v0.1 is fixture evidence plus
-honest labels. This amendment unblocks that fixture discussion only.
+honest labels. Written Acceptance licenses that fixture Target only;
+it does not admit a product path.
 
 **What this is not.** It is not product 1C0 admission, Program 2
 completion, product authority, product-safe persistence, E2EE, an email
@@ -691,8 +691,8 @@ id, path, byte count, time, account, reason, or policy value.
 #### Architecture non-claims for implementers
 
 The v2 plan — not the obsolete v1 plan — is the implementation target
-after acceptance: one release-excluded fixture process, one public
-listener at the compiled origin, typed in-process calls, no HMAC
+now that Amendment 1 is accepted: one release-excluded fixture process,
+one public listener at the compiled origin, typed in-process calls, no HMAC
 transport, no hidden child broker, no second/ephemeral listen port, and
 no `sovereign-cli` default/release dependency. RFC 0006 G2 is untouched.
 RFC 0006 G13–G15 still describe the superseded v1 broker/IPC; continuing
@@ -701,10 +701,52 @@ that residue is forbidden. Retiring those transport clauses is a
 match the v2 plan. That amendment is not this change and must not touch
 G2.
 
-#### Acceptance
+#### Acceptance record
 
-“Accepted” means a maintainer records explicit acceptance with rationale
-after the seven-day substantial-change discussion, without weakening G2
-or promoting this profile to a product path. Until then this text is a
-discussion draft. Rejection with rationale also closes Wave D until a
-revised proposal is accepted.
+> **Written Acceptance — RFC 0002 Amendment 1 (2026-09-16)**
+>
+> As sole maintainer I accept RFC 0002 Amendment 1 (closed fixture
+> exact-effect profile: `low-risk-effectful` / `write_rfc5322`),
+> proposed via merged PR #146, as Target design for the synthetic
+> fixture only. RFC 0002 overall remains Draft. This is not a product
+> Current claim, not Phase D completion, and not RFC 0002 overall
+> `Accepted`.
+>
+> **Rationale.** The proposal is already on `main` (PR #146). The
+> Amendment 1 acceptance checklist is complete: closed profile
+> identities and the hyphenated-name → existing snake_case wire map are
+> unchanged; product admission of `low_risk_effectful` stays denied;
+> RFC 0006 G2 is untouched; no product 1C0, app-signer removal, Vault
+> `ActiveV2`, or Phase D “now Current” language is introduced; v1
+> broker revival remains residue, not the Wave D target. Honest-close
+> alignment stands: v0.1 = fixture + honest labels; product 1C0
+> admission = v0.2. There are no co-authors.
+>
+> **Discussion-window waiver.** [CONTRIBUTING.md](../CONTRIBUTING.md)
+> requires a minimum 7-day discussion for substantial RFC changes
+> unless a maintainer records why a shorter window is allowed. I waive
+> the remaining window: I am the sole maintainer; the proposal is
+> already on `main`; the acceptance checklist is complete; honest-close
+> alignment is recorded; there are no co-authors awaiting discussion.
+>
+> **What acceptance licenses.** Governance permission to treat
+> Amendment 1 as Accepted Target design for the closed fixture profile,
+> and to start Wave D / v01-D01 after this acceptance as
+> release-excluded fixture work. Frozen tickets v01-D02…v01-D07 remain
+> in `docs/handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md`
+> until claimed.
+>
+> **What acceptance does not license.** Product 1C0; product
+> `low_risk_effectful` admission; product Exact Effect; RP1 product
+> pass; Vault `ActiveV2` / product enrollment; Phase D completion; RFC
+> 0002 overall `Accepted`; finishing the v1 HMAC hidden broker.
+>
+> **Residual risks.** RFC 0006 G13–G15 still describe the superseded
+> v1 broker/IPC; they remain stale transport text and are not retired
+> by this acceptance. Wave D must not touch product paths.
+>
+> **Explicit separation:** Accepting Amendment 1 ≠ implementing Wave D
+> ≠ product Exact Effect.
+
+Recorded by the repository owner / sole maintainer (IcantFind-a-username /
+Yiqun Xu) on 2026-09-16. No co-signers.
