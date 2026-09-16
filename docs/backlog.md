@@ -1609,7 +1609,7 @@ while the controller routes eligible design/review cards to the strong role.
   `./scripts/tests/gate_portability_test.sh` before the file-size step, and a
   run shows it green.
 
-- [ ] **P3 | `.github/workflows/` | Repin the four actions still targeting the Node 20 runtime.**
+- [ ] **P3 | `.github/workflows/` | Repin the four actions still targeting the Node 20 runtime.** IN PROGRESS (2026-09-16)
   Every CI job carries a deprecation annotation. Run 31886107586 (green, commit
   9277f27 on `feature/auto-iterate`) reports "Node.js 20 is deprecated … being
   forced to run on Node.js 24" against `actions/checkout@34e1148` (all four
