@@ -351,7 +351,8 @@ fn cmd_model_check(data_root: &std::path::Path) {
     println!("(the built-in providers are deterministic stand-ins, not LLMs)\n");
 
     // The primary is down and a cloud stand-in sits between two local ones.
-    // Amber may reach the cloud provider; Red skips it and fails over locally.
+    // Raw requests skip the cloud-labelled provider for every DataClass;
+    // work continues on the vouched local fallback.
     let gateway = ModelGateway::new(vec![
         Box::new(DeterministicProvider::local("local-primary", Health::Down)),
         Box::new(DeterministicProvider::cloud(

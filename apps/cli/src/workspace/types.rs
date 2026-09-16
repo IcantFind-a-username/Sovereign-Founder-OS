@@ -272,6 +272,7 @@ impl From<&sovereign_model::SkipReason> for SkippedProvider {
             sovereign_model::SkipCause::Unhealthy => "unhealthy",
             sovereign_model::SkipCause::Failed => "failed",
             sovereign_model::SkipCause::RawRequestIsLocalOnly => "raw_request_is_local_only",
+            sovereign_model::SkipCause::CloudLabelledDenied => "cloud_labelled_denied",
         };
         Self {
             provider_id: skip.provider_id.clone(),

@@ -45,6 +45,24 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+<a id="rfc0004-legacy-amber-green-egress"></a>
+
+- [x] **P1 | `crates/model/` | Close the RFC 0004 legacy Amber/Green public-egress bypass (v0.2 privacy slice 1).** Completed 2026-09-16.
+  First actionable v0.2 privacy slice (RFC 0004 Current gap, first half of
+  rollout step 5; ROADMAP v0.2 exit #4). Fail-closed: caller-supplied
+  Amber/Green / `DataClass` MUST NOT authorize public/cloud egress; unknown
+  and legacy Amber/Green enter as Protected; `DataClass` MAY only narrow,
+  never grant. Hard-deny the gateway path that routes Amber→cloud-labelled
+  providers. Keep deterministic Local stand-ins for local-only / test paths
+  with honest labels (not “cloud-assisted”). Named regression tests:
+  `mislabeled_protected_content_cannot_reach_a_public_adapter`,
+  `self_reported_local_flag_alone_cannot_authorize_raw_protected_input`,
+  `local_only_workflow_produces_zero_public_adapter_observations`; the v01-01
+  honesty pin is inverted, not deleted. Honest bound: this is **not** full
+  RFC 0004, **not** a real local-model sandbox, **not** ActiveV2, **not**
+  product Exact Effect / 1C0, and does **not** claim v0.2 complete. Done when:
+  `./scripts/test_changed.sh` is ALL GREEN and the named tests pass.
+
 - [x] **P1 | `docs/security/`, `docs/INDEX.md`, `docs/backlog.md` | Add the Runtime Phase 1 development and acceptance guide.** Completed 2026-09-16.
   Owner-requested documentation integration: add the kernel review as a
   design source, write the Phase 1 scope, runtime contracts, dependencies and
@@ -1999,7 +2017,12 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 ## Run log
 
 - 2026-09-16: v01-D03 unqualified owner UV sessions — fixture package reuses `crates/owner` registry/session; closed v2 auth routes; memory sessions/CSRF; lock→`TypedSigner<ApprovalRole>`→redb public trust only; historical keys verify-only. Named tests in `unqualified_uv_sessions` / `signer_epoch` / `cross_port_residuals`. **Design Accept ≠ product Current.** No 1C0 / Exact Effect / RFC 0003 `approve_invocation` (D04).
-
+- 2026-09-16: RFC 0004 legacy Amber/Green public-egress bypass closed on the
+  supported model-gateway API (v0.2 privacy slice 1). Caller `DataClass`
+  cannot grant cloud egress; unvouched `local` self-report cannot authorize
+  raw Protected input; named integration tests pin zero public-adapter
+  observations. **Not** full RFC 0004, local-model sandbox, ActiveV2, Exact
+  Effect, 1C0, or v0.2 complete.
 - 2026-09-16: Vault 1B0 binding-admission evidence (docs-only) —
   `docs/handoff/reports/2026-09-16-vault-1b0-binding-admission-evidence.md`.
   No released Rust binding bundles SQLCipher exactly 4.17.0; 1B0 stays
