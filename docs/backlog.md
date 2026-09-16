@@ -968,6 +968,7 @@ while the controller routes eligible design/review cards to the strong role.
 <a id="runtime-owner-task12-heal"></a>
 
 - [ ] **P3 | `crates/audit-ledger/`, `crates/authority/` | Owner-session Task 12 remainder: terminal-before-append heal + authority `effect_evidence`.**
+  IN PROGRESS (2026-09-16)
   TSV Task 12 is 10 `sovereign-audit-ledger` `effect_v1` rows (value-free
   projection, chain, conflict, indeterminate never relabelled). Plan extras
   `crash_after_terminal_before_append_heals_evidence_only` and
