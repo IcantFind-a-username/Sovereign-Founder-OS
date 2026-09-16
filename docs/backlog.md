@@ -47,7 +47,7 @@ repo audit; every entry below points at verified, real state of the code.
 
 <a id="rfc0004-privacy-slice-2-local-only"></a>
 
-- [ ] **P1 | `crates/privacy/`, `crates/model/` | RFC 0004 privacy foundation + `LocalOnly` zero-public-observation path (v0.2 privacy slice 2).** IN PROGRESS (2026-09-16)
+- [x] **P1 | `crates/privacy/`, `crates/model/` | RFC 0004 privacy foundation + `LocalOnly` zero-public-observation path (v0.2 privacy slice 2).** Completed 2026-09-16.
   Remainder of RFC 0004 rollout step 5 (pure privacy compiler, one fixed
   no-network projection, strict validation, value-free evidence) and the
   start of step 7 (`AutoProtect`/`LocalOnly`, Owned Mesh stays
@@ -2098,6 +2098,15 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: RFC 0004 v0.2 privacy slice 2 — `sovereign-privacy` closed
+  `PrivacyGateway` + process-local no-network stand-in; selectable
+  `LocalOnly`/`AutoProtect` snapshots; zero public/owned-node broker
+  observations on a fully local workflow; local compute failure cannot
+  create a public job; OwnedMesh activation rejected; compile-fail for
+  borrowing `PublicJob` bytes / forging `RouteEvidence`; canary on
+  Debug/Display/serialization. `sovereign-model` re-exports only the
+  closed gateway. **Not** full RFC 0004, local-model sandbox, ActiveV2,
+  Exact Effect, 1C0, Secure Mesh, or v0.2 complete.
 - 2026-09-16: v01-D07 qualify synthetic exact-effect evidence — soak 25
   real process-kill/reopen iterations on five crash boundaries and 100
   same-process reservation/logout/dispatch races; linux Chrome/148 virtual

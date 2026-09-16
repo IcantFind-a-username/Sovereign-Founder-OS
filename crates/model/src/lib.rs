@@ -18,9 +18,11 @@
 //!   and Green values enter as Protected, and `DataClass` may only narrow a
 //!   skip reason. A provider's self-reported `local` flag cannot mint a
 //!   vouch. This closes RFC 0004's legacy Amber/Green public-egress bypass
-//!   on the supported Rust API. It is **not** the rest of RFC 0004: there is
-//!   no compiler-owned public projection dispatch here, no real local-model
-//!   sandbox, no ActiveV2, and no product Exact Effect / 1C0.
+//!   on the supported Rust API. v0.2 privacy slice 2 re-exports the closed
+//!   [`PrivacyGateway`] from `sovereign-privacy`; attempt/adapter internals
+//!   stay there. It is **not** the rest of RFC 0004: there is no real
+//!   local-model sandbox, no ActiveV2, no product Exact Effect / 1C0, and
+//!   no Secure Mesh / OwnedMesh executable.
 //!
 //! ## Honest limits
 //!
@@ -41,6 +43,14 @@ use sovereign_contracts::DataClass;
 mod ollama;
 
 pub use ollama::{OllamaConfigError, OllamaProvider};
+
+/// Closed RFC 0004 privacy workflow. Re-exported so this crate is a single
+/// high-level door; broker, attempt, and adapter internals stay inside
+/// `sovereign-privacy`. There is no public cross-crate manual attempt API.
+pub use sovereign_privacy::{
+    activate_owned_mesh, ActivationError, GatewayError, LocalCapability, PrivacyGateway,
+    WorkflowOutcome,
+};
 
 /// Where a provider runs, for confidentiality routing. Local providers run on
 /// the founder's device; cloud providers are untrusted for confidentiality.

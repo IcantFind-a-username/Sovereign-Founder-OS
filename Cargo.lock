@@ -2494,6 +2494,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sovereign-contracts",
+ "sovereign-privacy",
  "thiserror 2.0.18",
 ]
 
@@ -2529,6 +2530,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.18",
+ "trybuild",
  "uuid",
 ]
 

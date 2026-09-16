@@ -18,30 +18,44 @@
 //! - a **preview** shows a person the exact outbound bytes first, and a
 //!   pseudonymised field renders as a fixed label, so two records differing
 //!   only in protected values compile to identical payloads;
-//! - the **response** comes back untrusted and can widen nothing.
+//! - the **response** comes back untrusted and can widen nothing;
+//! - [`PrivacyGateway`] is the closed high-level door: a `LocalOnly`
+//!   workflow never constructs a public job and never observes a public or
+//!   owned-node adapter.
 //!
 //! What this crate does not do, on purpose: it opens no socket, holds no
 //! secret, persists nothing, and depends on neither the model gateway nor the
 //! policy engine. Dispatching a compiled job is an external effect and is
-//! authorized above this crate.
+//! authorized above this crate. The first projection consumer is a
+//! process-local deterministic stand-in, labelled as on-device demonstration,
+//! not “cloud-assisted” inference or real AI.
 //!
-//! Honest limit: pseudonymisation and previews reduce what leaves; they do
-//! not make a public provider confidential. A task that genuinely requires a
-//! model to read raw customer text belongs on a local model or nowhere.
+//! Honest limit: this slice is **not** full RFC 0004, **not** a sandboxed
+//! local model, **not** ActiveV2, **not** product Exact Effect / 1C0, and
+//! **not** Secure Mesh / OwnedMesh executable. Pseudonymisation and previews
+//! reduce what leaves; they do not make a public provider confidential.
 
+mod broker;
 mod compile;
+mod gateway;
+mod local;
 mod response;
 mod transform;
 mod types;
 mod value;
 
+pub use broker::{Attempt, AttemptOutcome, ClosedProviderId, RouteEvidence};
 pub use compile::{
     compile, require, CompileError, ExposureManifest, ExposurePreview, PreviewRow, PublicJob,
     JOB_TTL_SECONDS,
 };
+pub use gateway::{GatewayError, PrivacyGateway, WorkflowOutcome};
+pub use local::{LocalError, LocalResult, STAND_IN_EXPLANATION, STAND_IN_KIND, STAND_IN_LABEL};
 pub use response::{accept, RehydratedResponse, ResponseError, MAX_RESPONSE_CHARS};
 pub use transform::{by_id, for_purpose, Disposition, FieldRule, Transform, REGISTRY};
 pub use types::{
-    Grant, Placement, PlacementDecision, PolicySnapshot, Preset, Purpose, Recipient, Sensitivity,
+    activate_owned_mesh, ActivationError, ComputeUnavailable, Grant, LocalCapability, Placement,
+    PlacementDecision, PolicySnapshot, Preset, Purpose, Recipient, Sensitivity,
+    POLICY_SCHEMA_VERSION,
 };
 pub use value::{Provenance, SourceRecord, TrustedValue};

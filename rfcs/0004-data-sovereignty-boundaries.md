@@ -39,12 +39,20 @@ refused even when this crate vouched the adapter as a local-enough stand-in.
 Deterministic Local providers remain the test/demo path and are labelled as
 on-device stand-ins, not “cloud-assisted” inference.
 
-This is **not** the rest of this RFC. Closing that one supported-API bypass
-does not ship the privacy compiler as the only public door, a real
-local-model sandbox, ActiveV2, product Exact Effect, or 1C0. A vouched
-local process can still read whatever a caller put in the prompt — locality
-is not the full boundary. Presets or UI MUST NOT claim this RFC's
-protection until those later slices land.
+`sovereign-privacy` now owns the compiler, one process-local no-network
+projection stand-in, strict response validation, value-free evidence, and a
+closed `PrivacyGateway`. Selectable `LocalOnly` (default remains
+`AutoProtect`) compiles to an immutable policy snapshot: a fully local
+workflow produces zero public or owned-node broker observations, and local
+compute failure cannot create or reach a public request. Owned Mesh
+activation is rejected in this version. `sovereign-model` re-exports only
+that closed gateway.
+
+This is **not** the rest of this RFC. These slices do not ship a real
+local-model sandbox, ActiveV2, product Exact Effect, 1C0, Secure Mesh, or
+ROADMAP v0.2 exit. A vouched local process can still read whatever a caller
+put in the prompt — locality is not the full boundary. Presets or UI MUST
+NOT claim this RFC's protection until those later slices land.
 
 The current Vault is also a cryptographic serialization prototype rather than
 a production at-rest boundary: each entry uses AES-256-GCM, but the Base64 raw

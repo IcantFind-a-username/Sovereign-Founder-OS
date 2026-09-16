@@ -17,3 +17,9 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+# Pin matches crates/capability. trybuild 1.0.116 + Cargo 1.97 treats
+# compile-fail cases as success, so tests/ui.rs drives cargo check itself;
+# the crate is listed to keep the reviewed pin in this package graph.
+trybuild = "=1.0.116"
