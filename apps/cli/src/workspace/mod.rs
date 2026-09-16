@@ -35,6 +35,7 @@ mod crew_template;
 mod crew_types;
 mod erp_ops;
 mod erp_types;
+mod freshness;
 mod kernel_exec;
 mod model_config;
 mod ops;
@@ -65,6 +66,8 @@ mod f03_rp1_02_exact_effect_honesty_pin_tests;
 mod kernel_exec_tests;
 #[cfg(test)]
 mod privacy_tests;
+#[cfg(test)]
+mod rfc0007_amendment1_tests;
 #[cfg(test)]
 mod rfc0007_open_tests;
 #[cfg(test)]
@@ -136,4 +139,7 @@ pub struct Store {
     policy: PolicyEngine,
     /// Snapshot from [`ExecutionJournal::recover`] at open; never triggers replay.
     execution_recovery: Vec<RecoveredExecution>,
+    /// Separate enrolled-generation store. `None` keeps the v0.1 open path
+    /// (no latest-head claim). Must not be implied by `ledger.json` / `ledger.head`.
+    enrollment_dir: Option<PathBuf>,
 }

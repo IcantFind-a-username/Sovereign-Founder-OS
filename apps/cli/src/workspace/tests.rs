@@ -604,18 +604,23 @@ fn double_decision_and_unknown_ids_fail_closed() {
     let approval_id = workspace.approvals[0].id;
 
     store.decide(approval_id, false).unwrap();
-    assert!(matches!(
-        store.decide(approval_id, true),
-        Err(WorkspaceError::Invalid(_))
-    ));
-    assert!(matches!(
-        store.decide(Uuid::new_v4(), true),
-        Err(WorkspaceError::NotFound(_))
-    ));
-    assert!(matches!(
-        store.request_send(Uuid::new_v4()),
-        Err(WorkspaceError::NotFound(_))
-    ));
+    match store.decide(approval_id, true) {
+        Err(WorkspaceError::Invalid(_)) => {}
+        other => panic!("replay must fail closed as Invalid, got {other:?}"),
+    }
+    let unknown = Uuid::nil();
+    match store.decide(unknown, false) {
+        Err(WorkspaceError::NotFound(_)) => {}
+        other => panic!("unknown approval id must be NotFound, got {other:?}"),
+    }
+    match store.decide(unknown, true) {
+        Err(WorkspaceError::NotFound(_)) => {}
+        other => panic!("unknown approval id must be NotFound, got {other:?}"),
+    }
+    match store.request_send(Uuid::nil()) {
+        Err(WorkspaceError::NotFound(_)) => {}
+        other => panic!("unknown document id must be NotFound, got {other:?}"),
+    }
     // A non-draft document cannot be resubmitted.
     assert!(matches!(
         store.request_send(document_id),

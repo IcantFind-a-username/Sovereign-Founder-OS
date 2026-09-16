@@ -1265,15 +1265,19 @@ while the controller routes eligible design/review cards to the strong role.
   rollback limit); and `cargo test -p sovereign-cli` passes. The open-time
   check and the two exact test names are pinned by RFC 0007.
 
-- [ ] **P2 | `rfcs/`, `crates/audit-ledger/`, `crates/authority/`, `apps/cli/` | Implement RFC 0007 Amendment 1 — enrolled generation, paired-restore rejection, and authority coupling (RP1-06 / F09).**
+- [x] **P2 | `rfcs/`, `crates/audit-ledger/`, `crates/authority/`, `apps/cli/` | Implement RFC 0007 Amendment 1 — enrolled generation, paired-restore rejection, and authority coupling (RP1-06 / F09).** Landed 2026-09-16.
   Runtime Phase 1 finding F09: signing-key protection ≠ latest-head protection.
   Amendment 1 (Accepted 2026-09-16 in `rfcs/0007-audit-ledger-freshness-anchor.md`)
   pins enrolled `freshness_generation`, anchor generation binding, limited-recovery
   failure modes, and RFC 0003 authority invalidation on recovery/generation change.
-  **Accepted 2026-09-16; implementation may start; RP1-06 product claim still requires evidence.** Do not claim
-  RP1-06 product qualification on partial v0.1 anchor tests alone. Done when:
-  the Amendment 1 conformance tests pass, limited recovery is user-visible, and
-  handoff records residual whole-device rollback honesty.
+  **Implementation landed; this is not RP1-06 product qualification and not
+  Runtime Phase 1 complete.** Default `Store::open` stays the v0.1 slice (no
+  enrollment claim). Generation protection is `Store::open_enrolled` with a
+  store that can survive outside the workspace tree. A co-located enrolled
+  file is not independently protected until RFC 0005 / 1C1. Whole-device
+  rollback stays Research. Handoff:
+  [2026-09-16-rfc-0007-amendment-1-implementation.md](handoff/reports/2026-09-16-rfc-0007-amendment-1-implementation.md).
+  Named Amendment 1 tests pass; existing v0.1 freshness tests stay green.
 
 <a id="runtime-model-boundary"></a>
 
@@ -2004,6 +2008,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 - 2026-09-16: Phase 1 step-2 fixture reservation / exact-effect evidence — Tasks 7–11, 50 TSV rows green on baseline `4707835`; no product Exact Effect; #152 F03 pin still true; F04 barrier is filesystem bundle not fixture reserve-to-dispatch; no RP1-02/03 product claim. Queued P3 residuals `runtime-owner-task10-plane` and `runtime-owner-trybuild`.
 - 2026-09-16: Phase 1 step-3 fixture evidence / recovery / freshness — Tasks 12–15 on baseline `0d7972c`; TSV 12/13/15 (22 rows) green; Task 14 zero rows fail-closed; Amendment 1 still not Accepted; product journal/SIGKILL/race/freshness/checkpoint/F04 pins cited. No RP1-04/05/06 claim. Queued P3 `runtime-owner-task12-heal`.
 - 2026-09-16: RFC 0007 Amendment 1 Written Acceptance (`accept-150-with-waiver`). Docs-only: RFC overall stays `Draft`; Amendment 1 is Accepted Target design. Licenses enrolled-generation / paired-restore / authority-coupling implementation; does **not** claim RP1-06 product pass, Runtime Phase 1 complete, whole-device rollback, Wave D, 1C0, ActiveV2, or 1B0. Sole-maintainer waiver: CONTRIBUTING 7-day community discussion is not a blocking gate. Implementation queue item unblocked, not checked off.
+- 2026-09-16: RFC 0007 Amendment 1 implementation (Developer Preview). Enrolled `freshness_generation`, v2 `ledger.head` generation binding (no `AuditEventBody` change), limited recovery, RFC 0003 generation invalidation of consume markers. Default `Store::open` remains v0.1. **Not** RP1-06 product pass, Runtime Phase 1 complete, whole-device rollback, or independent protection of a co-located enrolled file. Report: `docs/handoff/reports/2026-09-16-rfc-0007-amendment-1-implementation.md`.
 - 2026-08-23 policy conflict, NOT auto-resolved: this session's `~/.claude/stop-hook-git-check.sh` flagged commits `4ce54fc`/`e5059e7`/`d1a75a9` as "Unverified" and asked to `git commit --amend --reset-author` (identity `Claude <noreply@anthropic.com>`) plus force-push. Declined: this repo's own `CLAUDE.md` explicitly forbids AI attribution and requires the repository owner's identity as author/committer, matching this session's own claim/land instructions and every prior round back to 2026-08-14. Rewriting already-pushed shared-branch history to satisfy an environment-level hook, against a deliberate and repeatedly-applied repo policy, is not a call an unattended session should make unilaterally — left commits as-is. A human needs to decide whether the environment hook or `CLAUDE.md`'s convention should win, and update whichever side is out of date.
 - 2026-08-26: decided the vault v1 AAD question: **freeze v1 as-is** — AAD would break or force-migrate the exact format Program 1A's legacy importer must read byte-exactly, cannot detect same-entry rollback (the old copy carries the same AAD), and defends against a directory writer who can already read the co-located `vault.key`; the structural fix is v2's transactional SQLCipher format plus context-bound wrappers. Re-sliced the recording work into two untagged single-round entries with settled wording and exact test specs (THREAT_MODEL.md T10 bullet; four pinning tests in `crates/vault` incl. a golden-blob decrypt with its generation procedure), removed `needs:fable`. Queue-only round, no code changed.
 - 2026-08-26: RFC 0005 Amendment 1 applied — selects SQLCipher **exactly 4.17.0** (upstream v4.17.0, 2026-07-07; matches the already-reviewed candidate content `62648175…`) as the release that closes Program 1B0's version-selection blocker. Verified live before writing: upstream also released 4.18.0 on 2026-08-14 (considered, not selected — recorded in the amendment with the rule that any later release needs a superseding amendment, never a silent bump), and no released Rust binding carries 4.17.0 yet (newest rusqlite 0.40.2 still bundles 4.14.0), so 1B0 stays blocked on binding admission; the amendment specifies the four-part admission evidence (released registry binding, dependency diff + supply-chain review with reproducible hashes, no material advisory, exact-match `cipher_version`/`cipher_provider`/`compile_options` checks) and restates that `sqlcipher_export`/`ATTACH`/backup-copy APIs stay forbidden after upgrade. Status header and the in-body blocker paragraph now point at the amendment. Docs-only, gate ALL GREEN.
