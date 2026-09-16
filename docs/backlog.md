@@ -141,8 +141,21 @@ repo audit; every entry below points at verified, real state of the code.
   and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
   effect behavior.** One public listener story at the compiled origin later.
   **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
-  RP1. v01-D03…D07 stay unclaimed in
+  RP1. v01-D03 is claimed below; v01-D04…D07 stay unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
+
+<a id="v01-d03-unqualified-uv-sessions"></a>
+
+- [ ] **P1 | fixture package `sovereign-synthetic-owner-effect` + reuse `crates/owner` | v01-D03 — Unqualified WebAuthn UV, session, CSRF, signer epoch.** IN PROGRESS (2026-09-16)
+  Licensed by RFC 0002 Amendment 1. Depends on v01-D02 (`0f576bd`). Closed
+  register/login routes, one-credential registry, mechanism matrix row
+  (empty real matrix allowed), memory sessions, middleware, logout. After
+  lock and before redb: ephemeral `TypedSigner<ApprovalRole>`, random
+  signer epoch, closed `ApprovalBridge`. Persist only the labelled public
+  trust record. Reuse `crates/owner` session/registry as a library; keep
+  empty default / fail-closed product admission. **Design Accept ≠ product
+  Current.** Not 1C0, Exact Effect, ActiveV2, RP1, or RFC 0003 approval
+  emission (that is D04).
 
 <a id="runtime-f03-exact-effect-product"></a>
 
