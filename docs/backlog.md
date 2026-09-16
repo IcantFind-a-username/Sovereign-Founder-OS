@@ -1680,7 +1680,12 @@ while the controller routes eligible design/review cards to the strong role.
   verbatim, confirm the test count is unchanged, and for anything that runs
   (a route, a gauntlet) exercise it live rather than trusting the build. Done
   when every file is under 1000 lines, so the next change has room.
-- [ ] **P3 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.** IN PROGRESS (2026-09-16)
+- [x] **P3 | `scripts/test_changed.sh` | The scoped gate cannot see a file included by `#[path]` from another crate.** Completed 2026-09-16.
+  Mapping lives in `scripts/lib/map_changed_paths.sh` (sourced by the gate and
+  `gate_portability_test.sh`); `#[path = "…"]` targets are resolved with
+  `cd "$(dirname …)" && pwd -P` and queue the includer's package. Self-test:
+  `path-include-target-queues-includer`, `path-include-mapping-has-teeth`,
+  `path-include-real-catalog-queues-cli`, `path-include-real-transport-queues-cli`.
   Re-scoped from P2 on 2026-09-11, the same day it was filed: the first
   version missed that the gap is a **documented, deliberate** trade-off. The
   script's own header says scoped runs do not rebuild reverse dependencies
@@ -1941,6 +1946,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: P3 `test_changed.sh` `#[path]` includes — extracted path→package mapping into `scripts/lib/map_changed_paths.sh`; a changed include target now queues the includer's package (`sovereign-cli` for the three `apps/cli/tests/` → `consultant-playground` includes). Gate self-test pins the fixture, the real catalog/transport targets, and a mutation that drops the resolver. Deliberate no-reverse-dep trade-off otherwise unchanged.
 - 2026-09-16: CI/docs hygiene — wired `./scripts/tests/gate_portability_test.sh` into the `test` job before the file-size step; closed the vault-v2 clean-runner build-gate item on `ubuntu-latest` evidence from CI jobs `vault-v2-qualification` (qualify wrapper) and `test` (`--workspace` compile) on PRs #160/#161. Left the Node-20 action-repin P3 alone (`actions/checkout` is already v7.0.1; gitleaks / dependency-review still need bumps).
 - 2026-09-16: owner-session trybuild remainder — stay-unregistered. After #157, no honest consumer compile-fail host (capability inverted; effects never a consumer; CLI has no payload/root re-export). `trybuild` 1.0.116 + rustc/Cargo 1.97 known-vacuous in-tree. Gate remains structural privacy + Task 7–8 source-shape TSV rows. Plan Tasks 7–8 / 11 remainder notes. No product Exact Effect.
 - 2026-09-16: owner-session Task 12 remainder — authority `effect_evidence` + 8 TSV rows (heal / crash-before-append). Projection tests stay in audit-ledger `effect_v1` (10). Stay-unregistered: signed event IDs, HTTP login reconcile, scanner extension. Not RP1-05. See plan Task 12 heal note.
