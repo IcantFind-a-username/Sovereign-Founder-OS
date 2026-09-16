@@ -1552,7 +1552,16 @@ while the controller routes eligible design/review cards to the strong role.
   `cargo test -p sovereign-vault-v2-engine` and the gate fails if a raw-handle
   accessor is added anywhere in the closure.
 
-- [ ] **P2 | `.github/workflows/`, `scripts/`, `crates/vault-v2-engine/` | Confirm the vault-v2 build gate does not trip on a clean CI runner.**
+- [x] **P2 | `.github/workflows/`, `scripts/`, `crates/vault-v2-engine/` | Confirm the vault-v2 build gate does not trip on a clean CI runner.**
+  Closed 2026-09-16. Confirmed on `ubuntu-latest` by the existing CI workflow
+  rather than a one-off `feature/auto-iterate` SHA: job `vault-v2-qualification`
+  in `.github/workflows/ci.yml` runs `./scripts/qualify-vault-v2.sh full` and
+  completed green on recent main PRs #160 and #161. The sibling `test` job on
+  the same runner class also compiled `sovereign-vault-v2-engine` via
+  `cargo clippy --workspace` / `cargo test --workspace` without `build.rs`
+  panicking, so ambient GitHub-runner env did not fail the workspace path.
+  Wrapper output remains the qualification evidence; a green workspace compile
+  is not Program 1A qualification.
   `crates/vault-v2-engine/build.rs` (added 2026-08-15) panics when any of 23
   dependency-shaping variables or the `PKG_CONFIG_*` family is set to a
   non-empty value. Because the crate is a workspace member, a runner that
@@ -1581,7 +1590,12 @@ while the controller routes eligible design/review cards to the strong role.
   contains no "encrypted at rest", "E2EE", "recovery-complete", or
   "production-ready" claim.
 
-- [ ] **P2 | `.github/workflows/` | Run the gate self-test in CI.**
+- [x] **P2 | `.github/workflows/` | Run the gate self-test in CI.**
+  Closed 2026-09-16. The `test` job in `.github/workflows/ci.yml` now runs
+  `./scripts/tests/gate_portability_test.sh` immediately before the file-size
+  step. The self-test now `mkdir -p`s gitignored `.harness/` before writing
+  its control file, so a clean CI runner does not fail the construct scan.
+  Local self-test exit 0; this PR's CI `test` job is the green-run evidence.
   `scripts/tests/gate_portability_test.sh` (added 2026-08-15) proves the gate
   scripts run on bash 3.2 and can never exit 0 without checking anything, but
   nothing in CI invokes it: `ci.yml` calls `check-file-size.sh` directly and
@@ -1932,6 +1946,7 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: CI/docs hygiene — wired `./scripts/tests/gate_portability_test.sh` into the `test` job before the file-size step; closed the vault-v2 clean-runner build-gate item on `ubuntu-latest` evidence from CI jobs `vault-v2-qualification` (qualify wrapper) and `test` (`--workspace` compile) on PRs #160/#161. Left the Node-20 action-repin P3 alone (`actions/checkout` is already v7.0.1; gitleaks / dependency-review still need bumps).
 - 2026-09-16: owner-session trybuild remainder — stay-unregistered. After #157, no honest consumer compile-fail host (capability inverted; effects never a consumer; CLI has no payload/root re-export). `trybuild` 1.0.116 + rustc/Cargo 1.97 known-vacuous in-tree. Gate remains structural privacy + Task 7–8 source-shape TSV rows. Plan Tasks 7–8 / 11 remainder notes. No product Exact Effect.
 - 2026-09-16: owner-session Task 12 remainder — authority `effect_evidence` + 8 TSV rows (heal / crash-before-append). Projection tests stay in audit-ledger `effect_v1` (10). Stay-unregistered: signed event IDs, HTTP login reconcile, scanner extension. Not RP1-05. See plan Task 12 heal note.
 - 2026-09-15: owner-session Task 10 remainder — `scripts/check-owner-effect-authority-plane.sh` (fixture graph inverted: no `capability → authority`, `with_authority_store` removed, `authority → capability` + fixture feature forwarding). Self-test 20 checks; `test_changed.sh` ALL GREEN including the real gate; Task 10 TSV still 7/7; Task 2 durable-approval rows moved to `sovereign-authority` / `approval_v2_integration`. No product Exact Effect / RP1-03 claim.

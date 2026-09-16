@@ -74,6 +74,7 @@ scan_for() { # <grep-flag> <pattern> <human name>
   fi
 }
 
+mkdir -p "$ROOT/.harness" || exit 1
 CONTROL="$ROOT/.harness/gate-self-test-control.$$"
 {
   echo 'declare -A assoc=()'
