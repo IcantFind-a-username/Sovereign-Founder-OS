@@ -18,7 +18,9 @@ Developer Preview maturity.
   (gateway), `privacy` (RFC 0004 data-sovereignty boundary — the only way to
   build a public-compute job), `effects`, `execution`, `artifact`, `workflow`,
   `consultant-playground`, `vault-v2-engine` (RFC 0005 Program 1A engine,
-  `publish = false`, no product path yet).
+  `publish = false`, no product path yet), `synthetic-owner-effect` (RFC 0002
+  Amendment 1 Wave D upper fixture, `publish = false`, not a `sovereign-cli`
+  dependency).
 - `apps/desktop` — Tauri desktop shell, **its own workspace on purpose** so
   the webview stack never enters the audited core lock file or CI's
   `--workspace` runs. Build with `./apps/desktop/build-bundle.sh`.

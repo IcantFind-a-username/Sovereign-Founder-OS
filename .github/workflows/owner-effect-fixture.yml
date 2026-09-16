@@ -35,6 +35,7 @@ jobs:
       - name: Fixture tests
         run: |
           cargo test -p sovereign-authority -p sovereign-owner -p sovereign-cli \
+            -p sovereign-synthetic-owner-effect \
             --no-default-features --features owner-effect-fixture --locked
 
       # The barriers live behind a second feature, so the kill matrix needs
@@ -74,6 +75,7 @@ jobs:
       - name: Boundary and corpus gates
         run: |
           ./scripts/check-owner-effect-boundary.sh
+          SKIP_RELEASE_BUILD=1 ./scripts/check-synthetic-owner-effect-boundary.sh
           ./scripts/check-owner-effect-canaries.sh
           ./scripts/check-owner-effect-value-free.sh
           ./scripts/check-owner-effect-crypto-profile.sh

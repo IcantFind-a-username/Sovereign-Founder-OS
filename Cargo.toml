@@ -19,6 +19,7 @@ members = [
     "crates/vault-v2-engine",
     "crates/workflow",
     "crates/sandbox",
+    "crates/synthetic-owner-effect",
     "apps/cli",
     "tests/adversarial",
 ]
@@ -47,6 +48,7 @@ sovereign-vault = { path = "crates/vault" }
 sovereign-vault-v2-engine = { path = "crates/vault-v2-engine" }
 sovereign-workflow = { path = "crates/workflow" }
 sovereign-sandbox = { path = "crates/sandbox" }
+sovereign-synthetic-owner-effect = { path = "crates/synthetic-owner-effect" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

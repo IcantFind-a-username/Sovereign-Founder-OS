@@ -133,24 +133,16 @@ repo audit; every entry below points at verified, real state of the code.
 
 <a id="v01-d02-fixture-boundary"></a>
 
-- [ ] **P1 | new `publish = false` fixture package + boundary script | v01-D02 — Release-excluded single-process fixture boundary.**
-  IN PROGRESS (2026-09-16). Licensed by RFC 0002 Amendment 1. Depends on
-  v01-D01 (`f04b4af`). Package name follows the v2 plan's upper fixture
-  (`sovereign-synthetic-owner-effect`). Adds the package, root classifier,
-  retained OS lock, sole redb open, and release-graph exclusion only.
-  **No owner or effect behavior.** One public listener story at the compiled
-  origin later. **Design Accept ≠ product Current.**
-  **Done when:** product `cargo tree -p sovereign-cli --locked` and release
-  symbols contain no fixture/redb/WebAuthn from this package; a second real
-  fixture process fails on the OS lock before redb open; lock precedes the
-  only production redb open; product/unmarked/symlink roots fail before
-  listener or database state; source inventory has one listener and no
-  internal transport module; `./scripts/test_changed.sh` is ALL GREEN.
-  **Out of scope:** HMAC, hidden child, second port, `apps/cli/**` product UI,
-  finishing `run_owner_effect_fixture_broker`, WebAuthn, owner sessions,
-  effect publication, product Exact Effect / 1C0 / ActiveV2 / RP1,
-  product issuance of `low_risk_effectful`.
-  Suggested commit: `test(fixture): establish single-process owner boundary`.
+- [x] **P1 | new `publish = false` fixture package + boundary script | v01-D02 — Release-excluded single-process fixture boundary.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D01 (`f04b4af`). Package `sovereign-synthetic-owner-effect` is
+  `publish = false`, not a `sovereign-cli` dependency. Adds the upper crate,
+  root classifier, retained OS lock, sole redb open, one listener module,
+  and `scripts/check-synthetic-owner-effect-boundary.sh`. **No owner or
+  effect behavior.** One public listener story at the compiled origin later.
+  **Design Accept ≠ product Current.** Not 1C0, Exact Effect, ActiveV2, or
+  RP1. v01-D03…D07 stay unclaimed in
+  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="runtime-f03-exact-effect-product"></a>
 

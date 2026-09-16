@@ -188,7 +188,8 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # the whole broker and the whole owner crate — would otherwise never be
   # linted at all. Lint them under their own feature.
   run_step "clippy(owner-effect-fixture)" cargo clippy \
-    -p sovereign-authority -p sovereign-owner -p sovereign-cli --all-targets \
+    -p sovereign-authority -p sovereign-owner -p sovereign-cli \
+    -p sovereign-synthetic-owner-effect --all-targets \
     --features owner-effect-fixture --locked -- -D warnings
   run_step "owner-effect-profile-builds" ./scripts/check-owner-effect-profile-builds.sh
   # A real address reaching the fixture would put it in an unencrypted redb
@@ -204,6 +205,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # all of it in the release binary, and nothing about a normal day would show
   # it. This checks the artefact.
   run_step "owner-effect-boundary" ./scripts/check-owner-effect-boundary.sh
+  # v2 upper crate: not a sovereign-cli dependency, lock-before-redb, one
+  # listener. Distinct from the v1 feature-exclusion gate above.
+  run_step "synthetic-owner-effect-boundary" env SKIP_RELEASE_BUILD=1 \
+    ./scripts/check-synthetic-owner-effect-boundary.sh
   # Code gates catch code. This catches the other way the boundary erodes:
   # a sentence that is nearly right gets quoted, and later a decision rests
   # on it.

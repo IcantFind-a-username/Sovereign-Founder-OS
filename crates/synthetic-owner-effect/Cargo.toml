@@ -1,0 +1,44 @@
+[package]
+name = "sovereign-synthetic-owner-effect"
+description = "Release-excluded single-process synthetic owner-effect fixture (Wave D). Not a product path."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Never published. This is the v2 upper fixture process, not product packaging.
+publish = false
+# Explicit targets only: a file dropped into src/bin must not become a second
+# listener or a hidden child by auto-discovery.
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[features]
+# Empty default so a workspace build cannot unify owner-effect-fixture into
+# sovereign-cli. The crate *is* the fixture; the feature exists so Cargo's
+# additive unification cannot smuggle it into a product graph.
+default = []
+owner-effect-fixture = ["sovereign-authority/owner-effect-fixture"]
+
+[lib]
+name = "sovereign_synthetic_owner_effect"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sovereign-synthetic-owner-effect"
+path = "src/main.rs"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "single_process_boundary"
+path = "tests/single_process_boundary.rs"
+required-features = ["owner-effect-fixture"]
+
+[dependencies]
+sovereign-authority = { workspace = true }
+sovereign-capability = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
