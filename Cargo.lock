@@ -2378,7 +2378,9 @@ dependencies = [
  "sovereign-contracts",
  "sovereign-identity",
  "sovereign-policy",
+ "static_assertions",
  "thiserror 2.0.18",
+ "trybuild",
  "uuid",
 ]
 

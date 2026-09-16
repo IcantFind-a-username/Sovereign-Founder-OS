@@ -25,3 +25,10 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
 serde_json_canonicalizer = { workspace = true }
+
+[dev-dependencies]
+# Pin matches crates/vault-v2-engine. trybuild 1.0.116 + Cargo 1.97 treats
+# compile-fail cases as success, so tests/ui.rs drives cargo check itself;
+# the crate is listed to keep the reviewed pin in this package graph.
+trybuild = "=1.0.116"
+static_assertions = "=1.1.0"
