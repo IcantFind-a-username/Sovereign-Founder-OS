@@ -1,7 +1,7 @@
 # v01-D03 — Unqualified WebAuthn UV, session, CSRF, signer epoch
 
 - **Outcome:** landed
-- **Branch:** `cursor/unqualified-owner-uv-sessions-b302` · **Base:** `0f576bd` · **Head:** (this commit)
+- **Branch:** `cursor/unqualified-owner-uv-sessions-b302` · **Base:** `0f576bd` (#171) · **PR:** #172
 - **Backlog entry:** v01-D03 — Unqualified WebAuthn UV, session, CSRF, signer epoch — checked off: yes
 
 ## What changed
@@ -30,7 +30,7 @@ Plus lock/signer/redb order, epoch rotation, zeroize graph, closed bridge, allow
 
 ## Gate
 
-`./scripts/test_changed.sh` — run after this report lands. Fixture tests: 23 passed under `--features owner-effect-fixture`. **Design Accept ≠ product Current.**
+`./scripts/test_changed.sh` ALL GREEN — workspace + frontend tsc + vault-v2 qualification. Fixture tests: 23 named D03 cases plus D02 boundary, under `--features owner-effect-fixture`. **Design Accept ≠ product Current.**
 
 ## Out of scope (untouched)
 
