@@ -45,6 +45,27 @@ repo audit; every entry below points at verified, real state of the code.
 
 ## Queue
 
+<a id="rfc0004-privacy-slice-2-local-only"></a>
+
+- [ ] **P1 | `crates/privacy/`, `crates/model/` | RFC 0004 privacy foundation + `LocalOnly` zero-public-observation path (v0.2 privacy slice 2).** IN PROGRESS (2026-09-16)
+  Remainder of RFC 0004 rollout step 5 (pure privacy compiler, one fixed
+  no-network projection, strict validation, value-free evidence) and the
+  start of step 7 (`AutoProtect`/`LocalOnly`, Owned Mesh stays
+  non-executable Research). Foundational `sovereign-privacy` owns opaque
+  trusted values / provenance / policy snapshots / placement; MUST NOT
+  depend on model, policy, workflow, UI, or provider networking, and MUST
+  NOT own `NonDisclosableSecret`. Selectable `LocalOnly` compiles to an
+  immutable snapshot such that a fully local workflow produces zero public
+  / owned-node broker observations. One process-local deterministic
+  stand-in, labelled as on-device demonstration (not cloud-assisted or
+  real AI). Closed broker: request bytes reach an adapter only inside
+  dispatch; no public cross-crate manual attempt API. Reject OwnedMesh
+  activation / fake configuration CTA. Honest bound: **not** full RFC 0004,
+  **not** a real local-model sandbox, **not** ActiveV2, **not** product
+  Exact Effect / 1C0, **not** Secure Mesh / OwnedMesh executable, and does
+  **not** claim ROADMAP v0.2 exit complete. Done when:
+  `./scripts/test_changed.sh` is ALL GREEN and the named tests pass.
+
 <a id="rfc0004-legacy-amber-green-egress"></a>
 
 - [x] **P1 | `crates/model/` | Close the RFC 0004 legacy Amber/Green public-egress bypass (v0.2 privacy slice 1).** Completed 2026-09-16.
