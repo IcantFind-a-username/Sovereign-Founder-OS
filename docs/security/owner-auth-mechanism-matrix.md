@@ -57,6 +57,7 @@ owner authentication works on real hardware.
 | qualification | os / arch | browser | authenticator | observed | date |
 | --- | --- | --- | --- | --- | --- |
 | `protocol_fixture_only` | darwin 25.5.0 / arm64 | Chrome/152.0.7977.83 | virtual, ctap2, internal, resident, UV | cookie returned to its origin: **yes**; another port set the same `__Host-` cookie: **yes**; the legitimate value survived: **no**; hostile-origin assertion obtained: **yes** (user-verified); accepted at the legitimate origin: **no**; same-user-handle creation from the other origin: **succeeded**, leaving **1** credential on the authenticator | 2026-09-10 |
+| `protocol_fixture_only` | linux 6.12.94+ / x86_64 | Chrome/148.0.7778.96 | virtual, ctap2, internal, resident, UV | cookie returned to its origin: **yes**; another port set the same `__Host-` cookie: **yes**; the legitimate value survived: **no**; hostile-origin assertion obtained: **yes** (user-verified); accepted at the legitimate origin: **no**; same-user-handle creation from the other origin: **succeeded**, leaving **1** credential on the authenticator | 2026-09-16 |
 
 ## Real matrix (`mechanism_qualified_only`)
 
