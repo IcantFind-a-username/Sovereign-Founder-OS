@@ -98,6 +98,11 @@ the focused `cargo` passthrough commands named in the Program 1A plan).
 5. Platform evidence: set `SFO_VAULT_PLATFORM_NAMESPACE=sfo-ci:<run>:<attempt>`
    and run `./scripts/run-vault-platform-qualifier.sh <host-triple>` on a native
    runner matching that triple.
+6. On `ubuntu-latest`, CI job `vault-v2-qualification` in
+   `.github/workflows/ci.yml` runs `./scripts/qualify-vault-v2.sh full` (green
+   on recent main PRs including #160/#161); the sibling `test` job also compiles
+   this crate via `--workspace` without `build.rs` tripping, which confirms
+   ambient runner env rather than substituting for wrapper qualification.
 
 ## Merge / stack notes (v01-22)
 
