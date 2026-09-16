@@ -222,3 +222,67 @@ fn reopen_sees_either_all_or_none_of_the_reservation() {
     let view = inspect_reservation(&store, ids.0, ids.1, ids.2, ids.3, generation).unwrap();
     assert!(proofs::all_of_the_reservation(&view, ids.0, ids.4));
 }
+
+#[test]
+fn failpoint_injection_does_not_leak_to_another_thread() {
+    use std::thread;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut harness = proofs::Harness::boot(&root::marked_root(dir.path()));
+    let armed = harness.issue_for_new_intent();
+    let sibling = harness.issue_for_new_intent();
+    let store = harness.owner.open_store().unwrap();
+    let (armed_capability, armed_approval) = harness.verify(
+        &armed.token,
+        &armed.signed_approval,
+        armed.intent_id,
+        armed.context.now_unix,
+    );
+    let (sibling_capability, sibling_approval) = harness.verify(
+        &sibling.token,
+        &sibling.signed_approval,
+        sibling.intent_id,
+        sibling.context.now_unix,
+    );
+    thread::scope(|scope| {
+        scope.spawn(|| {
+            let error = proofs::refuse(
+                with_failpoint(ReservationFailpoint::AfterApprovalClaim, || {
+                    thread::sleep(std::time::Duration::from_millis(50));
+                    reserve_exact_authority(
+                        &store,
+                        &armed.context,
+                        armed_capability,
+                        armed_approval,
+                    )
+                }),
+                "the armed thread must hit its own failpoint",
+            );
+            assert_eq!(
+                error,
+                ReserveError::Failpoint(ReservationFailpoint::AfterApprovalClaim)
+            );
+        });
+        reserve_exact_authority(
+            &store,
+            &sibling.context,
+            sibling_capability,
+            sibling_approval,
+        )
+        .expect("a sibling thread must not observe another thread's failpoint");
+    });
+    let view = inspect_reservation(
+        &store,
+        sibling.intent_id,
+        sibling.approval_id,
+        sibling.token_id,
+        sibling.idempotency_key,
+        sibling.context.fixture_generation,
+    )
+    .unwrap();
+    assert!(proofs::all_of_the_reservation(
+        &view,
+        sibling.intent_id,
+        sibling.approval_expires_at_unix
+    ));
+}

@@ -237,6 +237,7 @@ task	package	target	profile	test_name
 19	sovereign-synthetic-owner-effect	reserve_atomicity	owner-effect-fixture	same_key_idempotent_replay_is_refused
 19	sovereign-synthetic-owner-effect	reserve_atomicity	owner-effect-fixture	different_intent_conflicts_on_the_same_idempotency_key
 19	sovereign-synthetic-owner-effect	reserve_atomicity	owner-effect-fixture	reopen_sees_either_all_or_none_of_the_reservation
+19	sovereign-synthetic-owner-effect	reserve_atomicity	owner-effect-fixture	failpoint_injection_does_not_leak_to_another_thread
 19	sovereign-synthetic-owner-effect	reserve_races	owner-effect-fixture	same_process_concurrent_http_or_thread_reservation_has_one_winner
 19	sovereign-synthetic-owner-effect	reserve_races	owner-effect-fixture	expiry_race_refuses_and_commits_nothing
 19	sovereign-synthetic-owner-effect	reserve_races	owner-effect-fixture	logout_race_refuses_and_commits_nothing

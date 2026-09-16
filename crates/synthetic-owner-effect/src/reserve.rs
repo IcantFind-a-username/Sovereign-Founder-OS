@@ -16,9 +16,8 @@
 //! **Maturity:** Developer Preview fixture. Design Accept ≠ product Current.
 //! Not 1C0, Exact Effect, ActiveV2, or RP1.
 
+use std::cell::Cell;
 use std::io::Write;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Mutex;
 use std::time::Duration;
 
 use redb::{ReadableTable, TableDefinition};
@@ -58,8 +57,12 @@ pub const KILL_REACHED_PREFIX: &str = "fixture-reserve-barrier-reached: ";
 pub const BARRIER_BEFORE_COMMIT: &str = "BeforeCommit";
 pub const BARRIER_AFTER_COMMIT: &str = "AfterCommit";
 
-static INJECT: AtomicU8 = AtomicU8::new(0);
-static INJECT_LOCK: Mutex<()> = Mutex::new(());
+thread_local! {
+    // Per-thread so a failpoint test cannot abort a parallel reservation
+    // on another thread. Process-wide injection is what CI's default
+    // `--test-threads` caught as `Failpoint(AfterApprovalClaim)` on reopen.
+    static INJECT: Cell<u8> = const { Cell::new(0) };
+}
 
 /// In-process failpoint between logical mutations. Returning `Err` aborts
 /// the write transaction, so nothing partial is visible.
@@ -83,17 +86,16 @@ impl ReservationFailpoint {
     ];
 }
 
-/// Run `body` with one in-process failpoint armed. The injection is cleared
-/// even if `body` panics. Concurrent failpoint tests serialize on this lock.
+/// Run `body` with one in-process failpoint armed on **this thread**.
+/// The injection is cleared even if `body` panics. Other threads are
+/// unaffected, so parallel cargo tests and same-process reservation races
+/// cannot observe a sibling failpoint.
 pub fn with_failpoint<R>(stage: ReservationFailpoint, body: impl FnOnce() -> R) -> R {
-    let _guard = INJECT_LOCK
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
-    INJECT.store(stage as u8, Ordering::SeqCst);
+    INJECT.with(|cell| cell.set(stage as u8));
     struct Reset;
     impl Drop for Reset {
         fn drop(&mut self) {
-            INJECT.store(0, Ordering::SeqCst);
+            INJECT.with(|cell| cell.set(0));
         }
     }
     let _reset = Reset;
@@ -101,7 +103,7 @@ pub fn with_failpoint<R>(stage: ReservationFailpoint, body: impl FnOnce() -> R) 
 }
 
 fn hit(stage: ReservationFailpoint) -> Result<(), ReserveError> {
-    if INJECT.load(Ordering::SeqCst) == stage as u8 {
+    if INJECT.with(Cell::get) == stage as u8 {
         return Err(ReserveError::Failpoint(stage));
     }
     Ok(())
