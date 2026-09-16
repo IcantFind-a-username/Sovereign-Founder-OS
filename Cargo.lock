@@ -2346,13 +2346,20 @@ dependencies = [
 name = "sovereign-authority"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "hex",
  "hmac 0.12.1",
  "redb",
  "serde",
  "serde_json",
+ "serde_json_canonicalizer",
  "sha2 0.10.9",
+ "sovereign-artifact",
+ "sovereign-capability",
+ "sovereign-contracts",
  "sovereign-fault-testing",
+ "sovereign-identity",
+ "sovereign-policy",
  "tempfile",
  "thiserror 2.0.18",
  "uuid",
@@ -2367,12 +2374,9 @@ dependencies = [
  "serde_json",
  "serde_json_canonicalizer",
  "sovereign-artifact",
- "sovereign-authority",
  "sovereign-contracts",
- "sovereign-fault-testing",
  "sovereign-identity",
  "sovereign-policy",
- "tempfile",
  "thiserror 2.0.18",
  "uuid",
 ]

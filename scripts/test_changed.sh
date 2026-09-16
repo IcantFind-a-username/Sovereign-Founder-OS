@@ -154,6 +154,26 @@ done <<EOF
 $CHANGED
 EOF
 
+# Authority-plane graph gate: cargo metadata + tree is not cheap enough
+# for every session. Run it when the capability/authority manifests, the
+# plane script, or the capability verifier sources move.
+NEED_AUTHORITY_PLANE=0
+while IFS= read -r f; do
+  case "$f" in
+  scripts/check-owner-effect-authority-plane.sh | scripts/tests/check-owner-effect-authority-plane.sh)
+    NEED_AUTHORITY_PLANE=1
+    ;;
+  crates/capability/Cargo.toml | crates/authority/Cargo.toml | Cargo.toml | Cargo.lock)
+    NEED_AUTHORITY_PLANE=1
+    ;;
+  crates/capability/src/* | crates/authority/src/lib.rs)
+    NEED_AUTHORITY_PLANE=1
+    ;;
+  esac
+done <<EOF
+$CHANGED
+EOF
+
 # any runtime-crate change also runs the cross-crate security invariants
 if [ -n "$PKGS" ]; then
   add_pkg "sovereign-adversarial-tests"
@@ -178,6 +198,10 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # nobody runs. The real build is queued below when fixture sources move.
   run_step "owner-effect-broker-build-selftest" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/check-owner-effect-broker-build.sh
+  # Same shape as the broker-build self-test: stub cargo, no rustc. The
+  # real metadata/tree walk is queued below when plane sources move.
+  run_step "owner-effect-authority-plane-selftest" env GATE_SELFTEST_RUNNING=1 \
+    ./scripts/tests/check-owner-effect-authority-plane.sh
   # The supervisor MAC is what separates the fixture broker's parent from any
   # other local process. A silent dependency bump changes that code path
   # without changing a line here, so the reviewed graph is checked every run.
@@ -218,6 +242,9 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
 fi
 if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ] && [ "$NEED_BROKER_BUILD" -eq 1 ]; then
   run_step "owner-effect-broker-build" ./scripts/check-owner-effect-broker-build.sh
+fi
+if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ] && [ "$NEED_AUTHORITY_PLANE" -eq 1 ]; then
+  run_step "owner-effect-authority-plane" ./scripts/check-owner-effect-authority-plane.sh
 fi
 run_step "file-size" ./scripts/check-file-size.sh
 run_step "fmt" cargo fmt --all --check

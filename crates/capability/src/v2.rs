@@ -3,10 +3,11 @@
 //! This module does not upgrade or accept a V1 token. It accepts only the
 //! artifact layer's opaque [`PreparedInvocation`], which prevents callers from
 //! inventing digest views that were never prepared by the artifact boundary.
-//! Replay and idempotency defense is process-local by default; attaching a
-//! durable [`AuthorityStore`] makes consumption survive restarts and
-//! concurrent processes. Effectful execution additionally requires crash-safe
-//! audit ordering and reviewed host interfaces, which do not exist yet.
+//! Replay and idempotency defense is process-local. Durable one-use
+//! consumption lives on the authority store after a token has been purely
+//! verified here — capability does not own or open a store. Effectful
+//! execution additionally requires crash-safe audit ordering and reviewed
+//! host interfaces, which do not exist yet.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -18,8 +19,6 @@ use sovereign_artifact::{
 };
 use sovereign_identity::{ApprovalRole, AuthorityRole, IdentityError, RoleTrustStore, TypedSigner};
 use sovereign_policy::PolicyAuthorizationV2;
-
-use sovereign_authority::{AuthorityError, AuthorityStore, BundlePart};
 
 use crate::approval::SignedApprovalV1;
 use thiserror::Error;
@@ -278,12 +277,6 @@ pub enum CapabilityV2Error {
     ApprovalFromFuture,
     #[error("approval was already consumed in this process")]
     ApprovalReused,
-    /// The token or the approval carries a durable revocation record. Distinct
-    /// from `Replay`: a replay is something spent by a legitimate earlier use,
-    /// a revocation is something the owner withdrew — and a caller that cannot
-    /// tell them apart cannot tell "try a fresh token" from "stop".
-    #[error("the token or its approval has been revoked")]
-    Revoked,
     #[error("approval evidence in the token does not match the presented approval")]
     ApprovalEvidenceMismatch,
     #[error("approval signing key is not trusted")]
@@ -302,8 +295,6 @@ pub enum CapabilityV2Error {
     InvalidApprovalEnvelope,
     #[error("approval verification failed")]
     ApprovalVerificationFailed,
-    #[error("durable authority store unavailable or corrupt; execution denied")]
-    AuthorityStoreUnavailable,
 }
 
 #[derive(Debug, Clone)]
@@ -533,15 +524,12 @@ pub struct CapabilityValidatorV2<C: TrustedClock> {
     expected_issuer: String,
     expected_audience: String,
     clock: C,
-    // The process-local mirrors below are not the durable record and do not
-    // pretend to be. With a store attached, the bundle transaction is what
-    // decides; these remain as the only defence when no store is attached at
-    // all, and as a cheap early refusal before a store round-trip.
+    // Process-local mirrors only. Durable one-use consumption is the
+    // authority crate's job after this verifier returns.
     consumed_tokens: HashSet<Uuid>,
     idempotency: HashMap<Uuid, Digest>,
     approvals: Option<ApprovalTrust>,
     consumed_approvals: HashSet<Uuid>,
-    authority_store: Option<AuthorityStore>,
 }
 
 impl<C: TrustedClock> CapabilityValidatorV2<C> {
@@ -564,7 +552,6 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
             idempotency: HashMap::new(),
             approvals: None,
             consumed_approvals: HashSet::new(),
-            authority_store: None,
         })
     }
 
@@ -582,15 +569,6 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
             expected_issuer,
         });
         Ok(self)
-    }
-
-    /// Attach a durable Authority Store. Consumption of tokens, approvals,
-    /// and idempotency keys then survives restarts and concurrent processes;
-    /// a store failure denies execution (fail closed). Without a store,
-    /// replay defense remains process-local, as documented.
-    pub fn with_authority_store(mut self, store: AuthorityStore) -> Self {
-        self.authority_store = Some(store);
-        self
     }
 
     /// Verify every binding and consume the one-use token before guest startup.
@@ -757,67 +735,6 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
             return Err(CapabilityV2Error::IdempotencyConflict);
         }
 
-        // Durable claims come after every validation and before the
-        // process-local bookkeeping.
-        //
-        // With an approval present, all three claims — token, idempotency,
-        // approval — go through one bundle transaction (RFC 0003 Amendment 1).
-        // The claims are made under one durable intent, so a bundle that
-        // stops part-way — a crash, a store that went away — is retried as
-        // the same bundle and resumes where it stopped, rather than finding
-        // its own token already spent. The previous shape made the three
-        // claims in sequence with no intent record, so a failure on the third
-        // burned the first two for good on a request that was then denied.
-        // Both shapes fail closed; only the old one was also lossy.
-        //
-        // Revocation is checked inside the bundle, before any claim, and
-        // surfaces as its own error rather than as a replay.
-        if let Some(store) = &self.authority_store {
-            match approval_claim {
-                Some((approval_id, approval_expires_at_unix)) => {
-                    store
-                        .consume_bundle(
-                            BundlePart {
-                                id: claims.token_id,
-                                expires_at_unix: claims.expires_at_unix,
-                            },
-                            BundlePart {
-                                id: approval_id,
-                                expires_at_unix: approval_expires_at_unix,
-                            },
-                            BundlePart {
-                                id: claims.idempotency_key,
-                                expires_at_unix: claims.expires_at_unix,
-                            },
-                            fingerprint.as_bytes(),
-                            now_unix,
-                        )
-                        .map_err(map_authority_error_bundle)?;
-                }
-                None => {
-                    // No approval, so no bundle: the authority store offers
-                    // the transaction only for the three-part case. This
-                    // path keeps two sequential claims, and keeps the old
-                    // defect with them — an idempotency failure after the
-                    // token was consumed burns that token. It is the
-                    // no-approval path, so nothing a person authorised is
-                    // lost, but it is a gap and is named as one rather than
-                    // hidden behind the bundle above.
-                    store
-                        .consume_token(claims.token_id, now_unix, claims.expires_at_unix)
-                        .map_err(map_authority_error_token)?;
-                    store
-                        .bind_idempotency(
-                            claims.idempotency_key,
-                            fingerprint.as_bytes(),
-                            now_unix,
-                            claims.expires_at_unix,
-                        )
-                        .map_err(map_authority_error_idempotency)?;
-                }
-            }
-        }
-
         self.consumed_tokens.insert(claims.token_id);
         self.idempotency.insert(claims.idempotency_key, fingerprint);
         if let Some((approval_id, _)) = approval_claim {
@@ -845,6 +762,23 @@ impl AuthorizedCapabilityV2 {
 
     pub fn idempotency_key(&self) -> Uuid {
         self.claims.idempotency_key
+    }
+
+    pub fn expires_at_unix(&self) -> i64 {
+        self.claims.expires_at_unix
+    }
+
+    pub fn approval_id(&self) -> Option<Uuid> {
+        self.claims
+            .approval_evidence
+            .as_ref()
+            .map(|evidence| evidence.approval_id)
+    }
+
+    /// Invocation fingerprint the durable store binds an idempotency key to.
+    /// Recomputed from already-canonical claims; fails only if JCS does.
+    pub fn invocation_fingerprint(&self) -> Result<Digest, CapabilityV2Error> {
+        invocation_fingerprint(&self.claims)
     }
 }
 
@@ -1120,36 +1054,6 @@ fn compare_invocation_claims(
         return Err(CapabilityV2Error::InvocationMismatch("backend"));
     }
     Ok(())
-}
-
-/// The bundle reports one outcome for the whole transaction. `AlreadyConsumed`
-/// is the bundle's word for "another caller committed this bundle first",
-/// which from this side is a replay; `Revoked` is its own thing and stays so.
-fn map_authority_error_bundle(error: AuthorityError) -> CapabilityV2Error {
-    match error {
-        AuthorityError::Revoked => CapabilityV2Error::Revoked,
-        AuthorityError::AlreadyConsumed => CapabilityV2Error::Replay,
-        AuthorityError::ApprovalAlreadyConsumed => CapabilityV2Error::ApprovalReused,
-        AuthorityError::IdempotencyReplay => CapabilityV2Error::IdempotencyReplay,
-        AuthorityError::IdempotencyConflict => CapabilityV2Error::IdempotencyConflict,
-        _ => CapabilityV2Error::AuthorityStoreUnavailable,
-    }
-}
-
-fn map_authority_error_token(error: AuthorityError) -> CapabilityV2Error {
-    match error {
-        AuthorityError::AlreadyConsumed => CapabilityV2Error::Replay,
-        AuthorityError::Revoked => CapabilityV2Error::Revoked,
-        _ => CapabilityV2Error::AuthorityStoreUnavailable,
-    }
-}
-
-fn map_authority_error_idempotency(error: AuthorityError) -> CapabilityV2Error {
-    match error {
-        AuthorityError::IdempotencyReplay => CapabilityV2Error::IdempotencyReplay,
-        AuthorityError::IdempotencyConflict => CapabilityV2Error::IdempotencyConflict,
-        _ => CapabilityV2Error::AuthorityStoreUnavailable,
-    }
 }
 
 fn map_identity_error(error: IdentityError) -> CapabilityV2Error {

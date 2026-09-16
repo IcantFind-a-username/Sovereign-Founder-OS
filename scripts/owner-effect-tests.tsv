@@ -17,8 +17,8 @@
 # Rows are added by the task that makes them pass, never in advance: a row for
 # a test that does not exist yet fails the runner, which is the point.
 task	package	target	profile	test_name
-2	sovereign-capability	approval_v2	no-default-features	durable_approval_survives_token_expiry_purge_until_approval_expiry
-2	sovereign-capability	approval_v2	no-default-features	expired_approval_purges_at_approval_expiry
+2	sovereign-authority	approval_v2_integration	no-default-features	durable_approval_survives_token_expiry_purge_until_approval_expiry
+2	sovereign-authority	approval_v2_integration	no-default-features	expired_approval_purges_at_approval_expiry
 3	sovereign-authority	subprocess_claims	fault-injection	real_subprocess_token_claim_has_one_winner
 3	sovereign-authority	subprocess_claims	fault-injection	real_subprocess_approval_survives_restart
 3	sovereign-authority	subprocess_claims	fault-injection	real_subprocess_idempotency_distinguishes_replay_and_conflict
