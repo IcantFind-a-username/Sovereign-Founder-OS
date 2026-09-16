@@ -60,3 +60,13 @@ All existing v0.1 freshness tests remain required and green.
   after restore — the new gate exists so that mistake fails closed.
 
 **Explicit separation:** landing Amendment 1 code ≠ RP1-06 product pass.
+
+## CI note (2026-09-16, after #168)
+
+Updating onto `main` at `2dc2659` was docs-only (`docs/backlog.md` + the 1B0
+evidence report). Amendment 1 named tests stayed green. The `test` job
+failed on existing `workspace::tests::double_decision_and_unknown_ids_fail_closed`:
+`decide` of an unknown id could surface `Invalid("another workspace writer
+is already active")` instead of `NotFound` when the writer lock was taken
+for a fail-closed lookup. Fail-closed reads now run before the lock; this
+is not RP1-06.
