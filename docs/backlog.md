@@ -1615,6 +1615,7 @@ while the controller routes eligible design/review cards to the strong role.
   no Node-version deprecation annotation under `gh run view <run-id>`.
 
 - [ ] **P3 | `crates/sandbox/` | Surface the swallowed quarantine-rename failure.**
+  IN PROGRESS (2026-09-16)
   `compiled_cache.rs` (~219, ~266) discards quarantine rename errors with
   `let _ =` — a rejected cache blob can silently stay in the live cache dir.
   Done when: the quarantine helper returns `Result`, callers refuse to serve
