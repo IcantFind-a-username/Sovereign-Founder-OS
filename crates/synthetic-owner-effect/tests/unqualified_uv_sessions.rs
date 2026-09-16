@@ -372,7 +372,7 @@ fn v2_auth_routes_are_closed() {
     );
     for target in [
         "/fixture/register/start",
-        "/api/fixture/effect/prepare",
+        "/api/fixture/effect/dispatch",
         "/api/workspace/decide",
         "/api/fixture/auth/register/start/",
     ] {

@@ -189,6 +189,7 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # linted at all. Lint them under their own feature.
   run_step "clippy(owner-effect-fixture)" cargo clippy \
     -p sovereign-authority -p sovereign-owner -p sovereign-cli \
+    -p sovereign-artifact -p sovereign-capability \
     -p sovereign-synthetic-owner-effect --all-targets \
     --features owner-effect-fixture --locked -- -D warnings
   run_step "owner-effect-profile-builds" ./scripts/check-owner-effect-profile-builds.sh

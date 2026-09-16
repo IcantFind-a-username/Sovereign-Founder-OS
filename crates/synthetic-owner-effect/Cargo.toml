@@ -44,16 +44,26 @@ name = "cross_port_residuals"
 path = "tests/cross_port_residuals.rs"
 required-features = ["owner-effect-fixture"]
 
+[[test]]
+name = "exact_uv_approval"
+path = "tests/exact_uv_approval.rs"
+required-features = ["owner-effect-fixture"]
+
 [dependencies]
 sovereign-authority = { workspace = true }
 sovereign-capability = { workspace = true }
 sovereign-identity = { workspace = true, optional = true }
 sovereign-owner = { workspace = true, optional = true }
+sovereign-artifact = { workspace = true, optional = true }
+sovereign-policy = { workspace = true, optional = true }
+sovereign-contracts = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
 redb = { version = "=4.1.0", optional = true }
 uuid = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+serde_json_canonicalizer = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -61,8 +71,12 @@ tempfile = "3"
 uuid = { workspace = true }
 serde_json = { workspace = true }
 hex = { workspace = true }
+static_assertions = "=1.1.0"
 sovereign-identity = { workspace = true }
 sovereign-authority = { workspace = true }
+sovereign-capability = { workspace = true }
+sovereign-artifact = { workspace = true }
+sovereign-policy = { workspace = true }
 
 [features]
 # Empty default so a workspace build cannot unify owner-effect-fixture into
@@ -72,12 +86,18 @@ default = []
 owner-effect-fixture = [
     "sovereign-authority/owner-effect-fixture",
     "sovereign-owner/owner-effect-fixture",
+    "sovereign-capability/owner-effect-fixture",
     "dep:sovereign-identity",
     "dep:sovereign-owner",
+    "dep:sovereign-artifact",
+    "dep:sovereign-policy",
+    "dep:sovereign-contracts",
+    "dep:chrono",
     "dep:redb",
     "dep:uuid",
     "dep:hex",
     "dep:serde",
     "dep:serde_json",
+    "dep:serde_json_canonicalizer",
     "dep:rand",
 ]

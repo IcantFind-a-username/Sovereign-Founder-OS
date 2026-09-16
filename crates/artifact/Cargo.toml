@@ -7,6 +7,12 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+# Fixture-only closed RFC 0002 Amendment 1 profile. Product `verify()` stays
+# PureCompute-only even when this feature is unified into a workspace test.
+owner-effect-fixture = []
+
 [dependencies]
 hex = { workspace = true }
 serde = { workspace = true }

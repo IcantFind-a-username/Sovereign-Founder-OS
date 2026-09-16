@@ -23,6 +23,16 @@ pub const HARD_MAX_MANIFEST_PAYLOAD_BYTES: usize = 192 * 1024;
 pub const HARD_MAX_COMPONENT_BYTES: usize = 2 * 1024 * 1024;
 pub(crate) const MANIFEST_DIGEST_DOMAIN: &[u8] = b"sovereign.plugin-manifest.jcs.v1";
 
+/// Closed RFC 0002 Amendment 1 profile identities. Product `verify()` never
+/// admits this row; only [`ArtifactVerifier::verify_closed_fixture_profile`]
+/// does, and only under `owner-effect-fixture`.
+#[cfg(feature = "owner-effect-fixture")]
+pub const CLOSED_FIXTURE_TOOL_ID: &str = "local_outbox";
+#[cfg(feature = "owner-effect-fixture")]
+pub const CLOSED_FIXTURE_TOOL_VERSION: &str = "1.0.0";
+#[cfg(feature = "owner-effect-fixture")]
+pub const CLOSED_FIXTURE_OPERATION_ID: &str = "write_rfc5322";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactBackend {
@@ -213,6 +223,26 @@ impl PluginManifest {
         &self.operations
     }
 
+    /// Exact closed fixture profile. Product admission still fails closed
+    /// through [`Self::validate_structural`]; this is an identity check, not
+    /// an admission grant.
+    #[cfg(feature = "owner-effect-fixture")]
+    pub fn is_closed_fixture_profile(&self) -> bool {
+        self.risk_class == RiskClass::LowRiskEffectful
+            && self.backend == ArtifactBackend::CoreWasm
+            && self.abi == ArtifactAbi::SovereignCoreWasmV2
+            && self.entrypoint == CORE_WASM_ENTRYPOINT
+            && self.wit_world.is_none()
+            && self.requested_host_capabilities.is_empty()
+            && self.operations.len() == 1
+            && {
+                let selector = self.operations[0].selector();
+                selector.tool_id() == CLOSED_FIXTURE_TOOL_ID
+                    && selector.tool_version() == CLOSED_FIXTURE_TOOL_VERSION
+                    && selector.operation_id() == CLOSED_FIXTURE_OPERATION_ID
+            }
+    }
+
     pub(crate) fn operation(&self, selector: &OperationSelector) -> Option<&OperationDefinition> {
         self.operations
             .iter()
@@ -231,6 +261,36 @@ impl PluginManifest {
             return Err(ArtifactError::PublisherKeyIdMismatch);
         }
         self.validate_structural()
+    }
+
+    #[cfg(feature = "owner-effect-fixture")]
+    fn validate_closed_fixture(
+        &self,
+        expected_issuer: &str,
+        verified_key_id: &[u8; 32],
+    ) -> Result<(), ArtifactError> {
+        if self.publisher_issuer != expected_issuer {
+            return Err(ArtifactError::PublisherIssuerMismatch);
+        }
+        if self.publisher_key_id.as_bytes() != verified_key_id {
+            return Err(ArtifactError::PublisherKeyIdMismatch);
+        }
+        if self.protocol_version != MANIFEST_PROTOCOL_VERSION {
+            return Err(ArtifactError::UnsupportedProtocolVersion(
+                self.protocol_version,
+            ));
+        }
+        if !self.is_closed_fixture_profile() {
+            return Err(ArtifactError::UnsupportedRiskClass);
+        }
+        let mut selectors = BTreeSet::new();
+        for operation in &self.operations {
+            operation.validate()?;
+            if !selectors.insert(operation.selector.clone()) {
+                return Err(ArtifactError::DuplicateOperation);
+            }
+        }
+        Ok(())
     }
 
     /// Manifest invariants that do not depend on publisher trust resolution.
@@ -494,6 +554,12 @@ pub struct ArtifactVerifier<'a, C = SystemClock> {
     clock: C,
 }
 
+enum StructuralGate {
+    Product,
+    #[cfg(feature = "owner-effect-fixture")]
+    ClosedFixture,
+}
+
 impl<'a> ArtifactVerifier<'a, SystemClock> {
     pub fn new(publishers: &'a RoleTrustStore<PublisherRole>) -> Self {
         Self {
@@ -533,6 +599,38 @@ impl<'a, C: TrustedClock> ArtifactVerifier<'a, C> {
         intent: &ArtifactVerificationIntent,
         signed_manifest_cose: &[u8],
         component_bytes: &[u8],
+    ) -> Result<VerifiedArtifact, ArtifactError> {
+        self.verify_with(
+            intent,
+            signed_manifest_cose,
+            component_bytes,
+            StructuralGate::Product,
+        )
+    }
+
+    /// Admit the one closed RFC 0002 Amendment 1 profile. Product
+    /// [`Self::verify`] remains PureCompute-only.
+    #[cfg(feature = "owner-effect-fixture")]
+    pub fn verify_closed_fixture_profile(
+        &self,
+        intent: &ArtifactVerificationIntent,
+        signed_manifest_cose: &[u8],
+        component_bytes: &[u8],
+    ) -> Result<VerifiedArtifact, ArtifactError> {
+        self.verify_with(
+            intent,
+            signed_manifest_cose,
+            component_bytes,
+            StructuralGate::ClosedFixture,
+        )
+    }
+
+    fn verify_with(
+        &self,
+        intent: &ArtifactVerificationIntent,
+        signed_manifest_cose: &[u8],
+        component_bytes: &[u8],
+        gate: StructuralGate,
     ) -> Result<VerifiedArtifact, ArtifactError> {
         if signed_manifest_cose.len() > self.limits.max_signed_manifest_bytes {
             return Err(ArtifactError::ManifestTooLarge);
@@ -586,7 +684,18 @@ impl<'a, C: TrustedClock> ArtifactVerifier<'a, C> {
         }
         let manifest: PluginManifest = serde_json::from_value(value)
             .map_err(|error| ArtifactError::InvalidManifest(error.to_string()))?;
-        manifest.validate(intent.expected_publisher_issuer(), verified.key_id())?;
+        match gate {
+            StructuralGate::Product => {
+                manifest.validate(intent.expected_publisher_issuer(), verified.key_id())?;
+            }
+            #[cfg(feature = "owner-effect-fixture")]
+            StructuralGate::ClosedFixture => {
+                manifest.validate_closed_fixture(
+                    intent.expected_publisher_issuer(),
+                    verified.key_id(),
+                )?;
+            }
+        }
 
         if component_digest != manifest.component_digest {
             return Err(ArtifactError::ComponentDigestMismatch {

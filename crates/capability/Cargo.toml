@@ -9,10 +9,15 @@ repository.workspace = true
 
 [features]
 default = []
-# Empty forwarding hook so authority's `owner-effect-fixture` can name this
-# crate's same feature after the Task 10 graph inversion. No code is gated
-# here yet; the feature exists so Cargo can forward it without a cycle.
-owner-effect-fixture = []
+# Fixture-only closed RFC 0002 Amendment 1 profile issuance. Product
+# Capability V2 issuance stays `pure_compute`; this feature never enters
+# sovereign-cli's default/release graph.
+owner-effect-fixture = ["sovereign-artifact/owner-effect-fixture"]
+
+[[test]]
+name = "closed_profile_issuance"
+path = "tests/closed_profile_issuance.rs"
+required-features = ["owner-effect-fixture"]
 
 [dependencies]
 sovereign-contracts = { workspace = true }

@@ -3,8 +3,8 @@
 //! After the OS lock and before redb opens, the process generates a
 //! `TypedSigner<ApprovalRole>` and a random signer epoch. This bridge owns
 //! that signer privately: there is no getter, secret export, generic public
-//! signing method, or serialization path. RFC 0003 `approve_invocation` is
-//! D04 and is not present here.
+//! signing method, or serialization path. RFC 0003 evidence is emitted only
+//! by [`ApprovalBridge::approve_invocation`].
 //!
 //! **Maturity:** Developer Preview fixture. Design Accept ≠ product Current.
 //! The label is `unqualified_fixture`; this is not owner admission.
@@ -14,9 +14,15 @@ use std::fmt;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sovereign_artifact::PreparedInvocation;
 use sovereign_authority::broker::store::OwnedStore;
+use sovereign_capability::approval::{approve_invocation, ApprovalGrantRequest, SignedApprovalV1};
 use sovereign_identity::{ApprovalRole, TypedSigner};
+use sovereign_policy::PolicyAuthorizationV2;
 
+use crate::effect::{SessionBinding, UnixClock, FIXTURE_AUDIENCE, FIXTURE_VENTURE};
+use crate::grant::FreshUvGrant;
+use crate::owner_surface::OwnerError;
 use crate::trust_persist::{self, TrustError};
 use crate::BoundaryError;
 
@@ -166,5 +172,64 @@ impl ApprovalBridge {
             .map_err(|_| TrustError::Unavailable)?;
         trust_persist::persist_public_trust(store, &record, &attestation)?;
         Ok(record)
+    }
+
+    /// The only signing entry point. Consumes a one-use [`FreshUvGrant`] and
+    /// emits RFC 0003 COSE/Ed25519 approval evidence over the existing
+    /// canonical claim. There is no generic public `sign` method.
+    pub fn approve_invocation(
+        &self,
+        grant: FreshUvGrant,
+        session: &SessionBinding,
+        prepared: &PreparedInvocation,
+        policy: &PolicyAuthorizationV2,
+        now: std::time::Instant,
+        now_unix: i64,
+    ) -> Result<SignedApprovalV1, OwnerError> {
+        if now >= grant.expires_at() {
+            return Err(OwnerError::CeremonyExpired);
+        }
+        if grant.signer_epoch() != self.epoch {
+            return Err(OwnerError::EpochMismatch);
+        }
+        if grant.logout_epoch() != session.logout_epoch {
+            return Err(OwnerError::EpochMismatch);
+        }
+        if grant.session_id() != session.session_id {
+            return Err(OwnerError::SessionUnknown);
+        }
+        if grant.credential_id() != session.credential_id.as_slice() {
+            return Err(OwnerError::CredentialMismatch);
+        }
+        if grant.policy_decision_id() != policy.decision_id() {
+            return Err(OwnerError::IntentMismatch);
+        }
+        if grant.fixture_generation() != session.fixture_generation {
+            return Err(OwnerError::EpochMismatch);
+        }
+        let primary = prepared
+            .primary_resource()
+            .ok_or(OwnerError::UnknownIntent)?;
+        if primary != grant.effect_intent_id().file_stem() {
+            return Err(OwnerError::IntentMismatch);
+        }
+        if grant.challenge_id().is_nil() {
+            return Err(OwnerError::UnknownCeremony);
+        }
+        approve_invocation(
+            &self.signer,
+            &UnixClock(now_unix),
+            ApprovalGrantRequest {
+                approver_subject_id: &session.subject.to_string(),
+                audience: FIXTURE_AUDIENCE,
+                venture_id: FIXTURE_VENTURE,
+                subject_id: &session.subject.to_string(),
+                session_id: session.session_id,
+                policy_decision: policy,
+                prepared_invocation: prepared,
+                ttl_seconds: 300,
+            },
+        )
+        .map_err(|_| OwnerError::CoordinatorUnavailable)
     }
 }

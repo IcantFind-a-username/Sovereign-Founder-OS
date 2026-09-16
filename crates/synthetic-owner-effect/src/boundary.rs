@@ -60,6 +60,7 @@ impl std::fmt::Display for BoundaryError {
 pub struct ProcessBoundary {
     root: PathBuf,
     lock: HeldLock,
+    generation: u64,
 }
 
 impl std::fmt::Debug for ProcessBoundary {
@@ -76,6 +77,7 @@ impl ProcessBoundary {
     /// not bind the public listener.
     pub fn acquire(candidate: &Path) -> Result<Self, BoundaryError> {
         let classified = classify(candidate).map_err(|_| BoundaryError::RootRejected)?;
+        let generation = read_generation(classified.path())?;
         let lock = process_lock::acquire(classified.path()).map_err(|error| match error {
             LockError::BrokerAlreadyRunning => BoundaryError::AlreadyRunning,
             LockError::Unavailable => BoundaryError::LockUnavailable,
@@ -83,11 +85,16 @@ impl ProcessBoundary {
         Ok(Self {
             root: classified.path().to_path_buf(),
             lock,
+            generation,
         })
     }
 
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 
     /// The only production redb open. The `&HeldLock` constructor is what
@@ -115,4 +122,16 @@ impl ProcessBoundary {
     pub fn with_signer(self) -> Result<crate::LockedSigner, BoundaryError> {
         crate::LockedSigner::from_boundary(self)
     }
+}
+
+fn read_generation(root: &Path) -> Result<u64, BoundaryError> {
+    let text =
+        std::fs::read_to_string(root.join(sovereign_authority::broker::bootstrap::FIXTURE_MARKER))
+            .map_err(|_| BoundaryError::RootRejected)?;
+    for line in text.lines() {
+        if let Some(value) = line.strip_prefix("generation=") {
+            return value.parse().map_err(|_| BoundaryError::RootRejected);
+        }
+    }
+    Err(BoundaryError::RootRejected)
 }

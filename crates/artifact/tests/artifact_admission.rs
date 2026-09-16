@@ -559,3 +559,79 @@ fn debug_output_redacts_artifact_input_and_resource_secrets() {
     assert!(!invocation_debug.contains("customer:debug-primary-secret"));
     assert!(!invocation_debug.contains(&raw_canonical_input_debug));
 }
+
+fn closed_fixture_manifest(component: &[u8], signer: &TypedSigner<PublisherRole>) -> Value {
+    json!({
+        "protocol_version": 1,
+        "publisher_issuer": signer.issuer(),
+        "publisher_key_id": hex::encode(signer.key_id()),
+        "component_digest": Digest::of_bytes(component).as_hex(),
+        "backend": "core_wasm",
+        "risk_class": "low_risk_effectful",
+        "abi": "sovereign_core_wasm_v2",
+        "entrypoint": "sovereign_run",
+        "requested_host_capabilities": [],
+        "operations": [{
+            "selector": {
+                "tool_id": "local_outbox",
+                "tool_version": "1.0.0",
+                "operation_id": "write_rfc5322"
+            },
+            "input_limits": {
+                "max_bytes": 4096,
+                "max_depth": 8
+            },
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "effect_intent_id": { "type": "string", "max_utf8_bytes": 64 },
+                    "fixture_generation": { "type": "string", "max_utf8_bytes": 32 },
+                    "operation": { "type": "string", "max_utf8_bytes": 64 },
+                    "coordinator": { "type": "string", "max_utf8_bytes": 128 }
+                },
+                "required": ["effect_intent_id", "fixture_generation", "operation", "coordinator"],
+                "max_properties": 4
+            },
+            "resource_bindings": [{
+                "binding_id": "intent",
+                "json_pointer": "/effect_intent_id",
+                "normalization": "exact_utf8_v1",
+                "primary": true
+            }]
+        }]
+    })
+}
+
+#[test]
+fn product_verify_still_denies_the_closed_fixture_profile() {
+    let (signer, trust) = publisher();
+    let component = component_a();
+    let signed = sign_value(&closed_fixture_manifest(&component, &signer), &signer);
+    assert_eq!(
+        verify_artifact(&trust, &signed, &component).unwrap_err(),
+        ArtifactError::UnsupportedRiskClass
+    );
+}
+
+#[cfg(feature = "owner-effect-fixture")]
+#[test]
+fn closed_fixture_profile_is_admitted_only_via_the_fixture_verifier() {
+    let (signer, trust) = publisher();
+    let component = component_a();
+    let signed = sign_value(&closed_fixture_manifest(&component, &signer), &signer);
+    let intent = intent(&signed, &component);
+    let verifier =
+        ArtifactVerifier::with_clock(&trust, AdmissionLimits::default(), FixedClock(NOW));
+    assert_eq!(
+        verifier.verify(&intent, &signed, &component).unwrap_err(),
+        ArtifactError::UnsupportedRiskClass
+    );
+    let artifact = verifier
+        .verify_closed_fixture_profile(&intent, &signed, &component)
+        .expect("the fixture verifier must admit the closed profile");
+    assert!(artifact.manifest().is_closed_fixture_profile());
+    assert_eq!(
+        artifact.manifest().risk_class(),
+        sovereign_artifact::RiskClass::LowRiskEffectful
+    );
+}

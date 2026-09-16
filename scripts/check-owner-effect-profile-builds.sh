@@ -39,7 +39,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-PACKAGES="-p sovereign-authority -p sovereign-owner -p sovereign-cli -p sovereign-synthetic-owner-effect"
+PACKAGES="-p sovereign-authority -p sovereign-owner -p sovereign-cli -p sovereign-artifact -p sovereign-capability -p sovereign-synthetic-owner-effect"
 
 # The profiles the manifest's `profile` column may name, plus the default
 # build and the two-feature combination nothing else exercises.

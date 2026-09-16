@@ -1,6 +1,6 @@
-//! Closed v2 auth routes and request middleware.
+//! Closed v2 auth and effect-prepare/preview/approve routes.
 //!
-//! Effect publication is D04 and is not on this surface. Unknown paths are
+//! Dispatch and reconcile are D05/D06 and remain unknown. Unknown paths are
 //! refused before headers are trusted.
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -40,6 +40,26 @@ const ROUTES: &[(FixtureRoute, &str, Method)] = &[
     (
         FixtureRoute::Logout,
         "/api/fixture/auth/logout",
+        Method::Post,
+    ),
+    (
+        FixtureRoute::Prepare,
+        "/api/fixture/effect/prepare",
+        Method::Post,
+    ),
+    (
+        FixtureRoute::Preview,
+        "/api/fixture/effect/preview",
+        Method::Post,
+    ),
+    (
+        FixtureRoute::ApproveStart,
+        "/api/fixture/effect/approve/start",
+        Method::Post,
+    ),
+    (
+        FixtureRoute::ApproveFinish,
+        "/api/fixture/effect/approve/finish",
         Method::Post,
     ),
 ];

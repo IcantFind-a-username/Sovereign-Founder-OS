@@ -93,7 +93,7 @@ fn a_request_from_another_port_cannot_use_the_shared_rp() {
 fn probing_for_effect_and_product_routes_finds_nothing() {
     let server = http::Guarded::start(Arc::new(Mutex::new(OwnerSurface::new())));
     for target in [
-        "/api/fixture/effect/prepare",
+        "/api/fixture/effect/dispatch",
         "/api/workspace/decide",
         "/fixture/logout",
         "/api/fixture/auth/logout/",

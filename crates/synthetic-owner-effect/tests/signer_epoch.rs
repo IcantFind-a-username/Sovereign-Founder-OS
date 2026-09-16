@@ -93,7 +93,6 @@ fn historical_keys_are_verify_only() {
         "pub fn signer(",
         "pub fn secret",
         "pub fn sign(",
-        "pub fn approve_invocation",
         "pub fn from_secret",
         "impl Clone for ApprovalBridge",
         "activate_epoch",
@@ -194,5 +193,9 @@ fn approval_bridge_is_closed() {
     assert!(
         !source.contains("impl Serialize for ApprovalBridge"),
         "ApprovalBridge must not be serializable"
+    );
+    assert!(
+        source.contains("pub fn approve_invocation"),
+        "RFC 0003 evidence must come from ApprovalBridge::approve_invocation"
     );
 }

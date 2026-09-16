@@ -295,6 +295,22 @@ fn issues_and_consumes_one_exact_verified_pure_compute_invocation() {
 }
 
 #[test]
+fn product_issuance_stays_pure_compute_on_the_wire() {
+    let (issuer, validator) = authority(NOW);
+    let prepared = prepared("first input");
+    let decision = decision(&prepared);
+    let session_id = Uuid::new_v4();
+    let token = issue(&issuer, &prepared, &decision, session_id, Uuid::new_v4());
+    let verified = validator
+        .verify(&token, context(&prepared, &decision, session_id))
+        .unwrap();
+    let json = serde_json::to_value(verified.claims()).unwrap();
+    assert_eq!(json["risk_class"], "pure_compute");
+    assert_eq!(json["backend"], "core_wasm");
+    assert_ne!(json["tool"]["operation"], "write_rfc5322");
+}
+
+#[test]
 fn rejects_cose_signature_tampering() {
     let (issuer, mut validator) = authority(NOW);
     let prepared = prepared("first input");

@@ -190,14 +190,26 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
         if claims.max_uses != 1 {
             return Err(CapabilityV2Error::InvalidUseLimit);
         }
-        if claims.risk_class != RiskClass::PureCompute {
-            return Err(CapabilityV2Error::UnsupportedRiskClass);
-        }
-        if !matches!(
-            claims.backend,
-            ArtifactBackend::CoreWasm | ArtifactBackend::ComponentWasm
-        ) {
-            return Err(CapabilityV2Error::BackendDowngradeDenied);
+        #[cfg(feature = "owner-effect-fixture")]
+        let closed_fixture = context
+            .prepared_invocation
+            .artifact()
+            .manifest()
+            .is_closed_fixture_profile()
+            && claims.risk_class == RiskClass::LowRiskEffectful
+            && claims.backend == ArtifactBackend::CoreWasm;
+        #[cfg(not(feature = "owner-effect-fixture"))]
+        let closed_fixture = false;
+        if !closed_fixture {
+            if claims.risk_class != RiskClass::PureCompute {
+                return Err(CapabilityV2Error::UnsupportedRiskClass);
+            }
+            if !matches!(
+                claims.backend,
+                ArtifactBackend::CoreWasm | ArtifactBackend::ComponentWasm
+            ) {
+                return Err(CapabilityV2Error::BackendDowngradeDenied);
+            }
         }
         if claims.venture_id != context.venture_id {
             return Err(CapabilityV2Error::VentureMismatch);

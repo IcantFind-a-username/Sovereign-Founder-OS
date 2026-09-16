@@ -2557,15 +2557,21 @@ dependencies = [
 name = "sovereign-synthetic-owner-effect"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "hex",
  "rand",
  "redb",
  "serde",
  "serde_json",
+ "serde_json_canonicalizer",
+ "sovereign-artifact",
  "sovereign-authority",
  "sovereign-capability",
+ "sovereign-contracts",
  "sovereign-identity",
  "sovereign-owner",
+ "sovereign-policy",
+ "static_assertions",
  "tempfile",
  "uuid",
 ]
