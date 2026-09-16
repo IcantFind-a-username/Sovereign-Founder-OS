@@ -1264,7 +1264,7 @@ while the controller routes eligible design/review cards to the strong role.
   rollback limit); and `cargo test -p sovereign-cli` passes. The open-time
   check and the two exact test names are pinned by RFC 0007.
 
-- [ ] **P2 | `rfcs/`, `crates/audit-ledger/`, `crates/authority/`, `apps/cli/` | Implement RFC 0007 Amendment 1 — enrolled generation, paired-restore rejection, and authority coupling (RP1-06 / F09).**
+- [ ] **P2 | `rfcs/`, `crates/audit-ledger/`, `crates/authority/`, `apps/cli/` | Implement RFC 0007 Amendment 1 — enrolled generation, paired-restore rejection, and authority coupling (RP1-06 / F09).** IN PROGRESS (2026-09-16)
   Runtime Phase 1 finding F09: signing-key protection ≠ latest-head protection.
   Amendment 1 (Accepted 2026-09-16 in `rfcs/0007-audit-ledger-freshness-anchor.md`)
   pins enrolled `freshness_generation`, anchor generation binding, limited-recovery
