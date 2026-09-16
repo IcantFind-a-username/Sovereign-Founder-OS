@@ -3,5 +3,6 @@
 use sovereign_capability::v2::VerifiedCapabilityV2;
 
 fn main() {
-    let _proof = VerifiedCapabilityV2 { claims: loop {} };
+    let claims: sovereign_capability::v2::CapabilityClaimsV2 = unreachable!();
+    let _proof = VerifiedCapabilityV2 { claims };
 }

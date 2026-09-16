@@ -51,6 +51,7 @@ fn cargo_check(bin: &str) -> Output {
             "--bin",
             bin,
             "--offline",
+            "--locked",
             "--color=never",
             "--config=build.rustflags=[\"--cfg\",\"trybuild\",\"--verbose\",\"-A\",\"dead_code\"]",
         ])
@@ -70,8 +71,10 @@ fn proof_types_reject_forging_cloning_debug_and_serialize() {
             "fixture {fixture} was expected not to compile; stdout:\n{stdout}\nstderr:\n{stderr}"
         );
         assert!(
-            !stderr.contains("unresolved import"),
-            "fixture {fixture} failed by unresolved import rather than a privacy/trait bound; stderr:\n{stderr}"
+            !stderr.contains("failed to select a version")
+                && !stderr.contains("failed to download")
+                && !stderr.contains("unresolved import"),
+            "fixture {fixture} failed before reaching a privacy/trait-bound diagnostic; stderr:\n{stderr}"
         );
         for needle in *needles {
             assert!(
