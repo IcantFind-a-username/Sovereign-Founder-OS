@@ -2,7 +2,8 @@
 //! loopback HTTP. It is deliberately narrow:
 //!
 //! - loopback only — `ProviderTrust::Local` is only honest when the daemon
-//!   is on this machine, and the gateway's Red-data guard relies on it;
+//!   is on this machine, and the gateway's raw-request local-only guard
+//!   relies on the crate-constructed vouch plus that label;
 //! - raw HTTP/1.1 over `std::net::TcpStream` with read/write timeouts, so a
 //!   hung daemon cannot hang the product and no HTTP client crate is added;
 //! - non-streaming `POST /api/generate`; the gateway still enforces the

@@ -18,8 +18,8 @@ Throughout this document, **Current** means merged code with passing repository 
 
 | Area | Repository today | Required by this design |
 | --- | --- | --- |
-| Raw model route | A caller supplies `prompt`, `task`, and `DataClass`; Amber/Green can reach a provider that self-reports Cloud/Local trust. | Raw request accepted only by a closed local boundary; caller labels never grant egress. |
-| Public compute | Deterministic cloud-labelled stand-ins accept the same raw request type. | Only a compiler-owned, purpose-bound projection reaches a closed public broker. |
+| Raw model route | **Current (supported API slice):** raw `ModelRequest` reaches only a crate-vouched provider that also reports Local. Caller Amber/Green/`DataClass` cannot grant public/cloud egress; a self-reported `local` flag cannot mint that vouch. Remaining: this is still the legacy request type, not compiler-only public dispatch, and Ollama is loopback-routed rather than sandboxed. | Raw request accepted only by a closed local boundary; caller labels never grant egress. |
+| Public compute | Cloud-labelled stand-ins exist only as skip-path test doubles; they do not receive a raw `ModelRequest`. No compiler-owned public projection is dispatched through this crate. | Only a compiler-owned, purpose-bound projection reaches a closed public broker. |
 | Disclosure record | Public fields, caller/provider strings, unsigned and forgeable; useful demo telemetry only. | Private broker-derived evidence, value-free, then signed through the audit ledger. |
 | Presets/visibility | Target UX documentation only. | Deterministic immutable snapshot, simple/pro views, widening approval and revocation. |
 | Owned-node E2EE | Not implemented. | Research concept and non-executable reserved type until measured need and a reviewed Secure Mesh protocol; no configuration CTA. |
@@ -28,7 +28,12 @@ Throughout this document, **Current** means merged code with passing repository 
 | Recovery/export | The JSON export is useful for inspection but is not a clean-machine backup or trust-continuity package. | **Target:** separately handled encrypted business backup and public trust-continuity material, followed by a verified restore ceremony and new device identity. |
 | Local model isolation | Deterministic stand-ins exercise routing; they are not real AI or a sandboxed local model. | **Target:** a provenance-bound real model process with no ambient network/filesystem/environment access, authenticated IPC, model digest binding, and resource limits. |
 
-The first privacy-boundary slice closes the legacy raw cloud authority; adding a parallel safe path while leaving the bypass public is not completion. The program-level first hardening slice is RFC 0005 Vault v2 because new long-term privacy secrets must not inherit the current co-located-key weakness.
+The first privacy-boundary slice closes the legacy raw cloud authority on the
+supported model-gateway API; adding a parallel safe path while leaving a
+caller-label bypass public is not completion. Later slices (compiler-owned
+public jobs, sandboxed local model, presets) remain Target. The program-level
+first hardening slice is RFC 0005 Vault v2 because new long-term privacy
+secrets must not inherit the current co-located-key weakness.
 
 ## 2. Non-negotiable invariants
 
