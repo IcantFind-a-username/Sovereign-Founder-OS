@@ -27,6 +27,9 @@ pub enum WorkspaceError {
     NotFound(String),
     #[error("storage error: {0}")]
     Storage(String),
+    /// RFC 0007 Amendment 1 limited recovery — not a normal workspace open.
+    #[error("limited recovery: {0}")]
+    LimitedRecovery(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -32,11 +32,47 @@ impl Store {
             .map_err(storage)?
             .recover()
             .map_err(storage)?;
+        Self::finish_open(root, device, execution_recovery, None)
+    }
+
+    /// Open with Amendment 1 enrolled-generation protection. `enrollment_dir`
+    /// must live outside the workspace tree if the caller wants paired
+    /// tree-restore rejection. A co-located path is not independently
+    /// protected until RFC 0005 / 1C1.
+    pub fn open_enrolled(root: &Path, enrollment_dir: &Path) -> Result<Self, WorkspaceError> {
+        std::fs::create_dir_all(root).map_err(storage)?;
+        let device_path = root.join("device.json");
+        let device = if device_path.exists() {
+            DeviceIdentity::load(&device_path).map_err(storage)?
+        } else {
+            let device = DeviceIdentity::generate();
+            device.save(&device_path).map_err(storage)?;
+            device
+        };
+        let execution_recovery = ExecutionJournal::open(root.join("executions"))
+            .map_err(storage)?
+            .recover()
+            .map_err(storage)?;
+        Self::finish_open(
+            root,
+            device,
+            execution_recovery,
+            Some(enrollment_dir.to_path_buf()),
+        )
+    }
+
+    fn finish_open(
+        root: &Path,
+        device: DeviceIdentity,
+        execution_recovery: Vec<sovereign_execution::RecoveredExecution>,
+        enrollment_dir: Option<std::path::PathBuf>,
+    ) -> Result<Self, WorkspaceError> {
         let store = Self {
             root: root.to_path_buf(),
             device,
             policy: PolicyEngine::new(),
             execution_recovery,
+            enrollment_dir,
         };
         store.verify_ledger_freshness()?;
         Ok(store)
@@ -48,13 +84,14 @@ impl Store {
     pub(super) fn verify_ledger_freshness(&self) -> Result<(), WorkspaceError> {
         let ledger_path = self.root.join("ledger.json");
         if !ledger_path.exists() {
-            return Ok(());
+            return self.verify_enrolled_generation();
         }
         let ledger =
             AuditLedger::load(&ledger_path, self.device.public_key_b64()).map_err(storage)?;
         ledger
             .verify_freshness_at_head_path(&ledger_path, false)
-            .map_err(storage)
+            .map_err(storage)?;
+        self.verify_enrolled_generation()
     }
 
     pub fn load(&self) -> Result<Workspace, WorkspaceError> {
@@ -171,7 +208,7 @@ impl Store {
                 )
                 .map_err(storage)?;
         }
-        ledger.save(&ledger_path, &self.device).map_err(storage)?;
+        self.persist_authoritative_generation(&ledger, &ledger_path)?;
         Ok(())
     }
 }

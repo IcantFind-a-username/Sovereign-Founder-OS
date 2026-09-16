@@ -48,6 +48,7 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 sovereign-artifact = { workspace = true }
+sovereign-audit-ledger = { workspace = true }
 sovereign-contracts = { workspace = true }
 sovereign-fault-testing = { path = "../fault-testing" }
 sovereign-identity = { workspace = true }
