@@ -39,7 +39,8 @@ const IDEMPOTENCY: TableDefinition<&[u8], &[u8]> =
     TableDefinition::new("fixture-reserved-idempotency-v1");
 const AUTHORITY_NODE: TableDefinition<&[u8], u64> =
     TableDefinition::new("fixture-synthetic-authority-node-v1");
-const INTENTS: TableDefinition<&[u8], &[u8]> = TableDefinition::new("fixture-effect-intents-v1");
+pub(crate) const INTENTS: TableDefinition<&[u8], &[u8]> =
+    TableDefinition::new("fixture-effect-intents-v1");
 const REVOKED_TOKENS: TableDefinition<&[u8], u8> =
     TableDefinition::new("fixture-revoked-tokens-v1");
 const REVOKED_APPROVALS: TableDefinition<&[u8], u8> =
@@ -147,11 +148,28 @@ pub struct PreparedSnapshot {
     pub policy_decision_id: Uuid,
 }
 
-/// Observable intent state. `Dispatching` and later outcomes are D06.
+/// Observable intent state, including D06 terminal outcomes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntentState {
     Prepared,
     AuthorityReserved,
+    Dispatching,
+    Succeeded,
+    FailedBeforeDispatch,
+    Indeterminate,
+}
+
+impl IntentState {
+    pub const fn is_pre_dispatch(self) -> bool {
+        matches!(self, Self::Prepared | Self::AuthorityReserved)
+    }
+
+    pub const fn is_terminal(self) -> bool {
+        matches!(
+            self,
+            Self::Succeeded | Self::FailedBeforeDispatch | Self::Indeterminate
+        )
+    }
 }
 
 /// Value-free inspection of whether a reservation committed. Cannot
@@ -219,14 +237,25 @@ impl From<StoreError> for ReserveError {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct IntentRecord {
-    state: IntentState,
-    session_id: String,
-    logout_epoch: u64,
-    signer_epoch: String,
-    fixture_generation: u64,
-    policy_decision_id: String,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct IntentRecord {
+    pub(crate) state: IntentState,
+    pub(crate) session_id: String,
+    pub(crate) logout_epoch: u64,
+    pub(crate) signer_epoch: String,
+    pub(crate) fixture_generation: u64,
+    pub(crate) policy_decision_id: String,
+}
+
+fn require_prepared(state: IntentState) -> Result<(), ReserveError> {
+    match state {
+        IntentState::Prepared => Ok(()),
+        IntentState::AuthorityReserved
+        | IntentState::Dispatching
+        | IntentState::Succeeded
+        | IntentState::FailedBeforeDispatch
+        | IntentState::Indeterminate => Err(ReserveError::EffectAlreadyReserved),
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -261,10 +290,8 @@ pub fn persist_prepared(
             {
                 let current: IntentRecord = serde_json::from_slice(existing.value())
                     .map_err(|_| ReserveError::Unavailable)?;
-                return match current.state {
-                    IntentState::Prepared => Ok(()),
-                    IntentState::AuthorityReserved => Err(ReserveError::EffectAlreadyReserved),
-                };
+                require_prepared(current.state)?;
+                return Ok(());
             }
             intents
                 .insert(intent_key.as_bytes().as_slice(), bytes.as_slice())
@@ -434,12 +461,7 @@ pub fn reserve_exact_authority(
                     .ok_or(ReserveError::UnknownIntent)?;
                 serde_json::from_slice(existing.value()).map_err(|_| ReserveError::Unavailable)?
             };
-            match record.state {
-                IntentState::Prepared => {}
-                IntentState::AuthorityReserved => {
-                    return Err(ReserveError::EffectAlreadyReserved);
-                }
-            }
+            require_prepared(record.state)?;
             record.state = IntentState::AuthorityReserved;
             let bytes = serde_json::to_vec(&record).map_err(|_| ReserveError::Unavailable)?;
             table
@@ -505,10 +527,7 @@ fn recheck_bindings(
         serde_json::from_slice(existing.value()).map_err(|_| ReserveError::Unavailable)?;
     drop(existing);
     drop(intents);
-    match record.state {
-        IntentState::Prepared => {}
-        IntentState::AuthorityReserved => return Err(ReserveError::EffectAlreadyReserved),
-    }
+    require_prepared(record.state)?;
     if record.session_id != context.session_id.to_string() {
         return Err(ReserveError::SessionMismatch);
     }
@@ -628,4 +647,61 @@ fn expiry_claim(
             Ok((true, Some(claim.expires_at_unix)))
         }
     }
+}
+
+/// Value-free intent state. Cannot reconstruct a reserved handle.
+pub fn inspect_intent_state(
+    store: &OwnedStore<'_>,
+    intent_id: EffectIntentId,
+) -> Result<Option<IntentState>, ReserveError> {
+    store.read(|transaction| {
+        let table = match transaction.open_table(INTENTS) {
+            Ok(table) => table,
+            Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
+            Err(_) => return Err(ReserveError::Unavailable),
+        };
+        match table
+            .get(intent_id.as_uuid().as_bytes().as_slice())
+            .map_err(|_| ReserveError::Unavailable)?
+        {
+            None => Ok(None),
+            Some(value) => {
+                let record: IntentRecord =
+                    serde_json::from_slice(value.value()).map_err(|_| ReserveError::Unavailable)?;
+                Ok(Some(record.state))
+            }
+        }
+    })
+}
+
+pub(crate) fn load_intent_record(
+    store: &OwnedStore<'_>,
+    intent_id: EffectIntentId,
+) -> Result<IntentRecord, ReserveError> {
+    store.read(|transaction| {
+        let table = transaction
+            .open_table(INTENTS)
+            .map_err(|_| ReserveError::Unavailable)?;
+        let existing = table
+            .get(intent_id.as_uuid().as_bytes().as_slice())
+            .map_err(|_| ReserveError::Unavailable)?
+            .ok_or(ReserveError::UnknownIntent)?;
+        serde_json::from_slice(existing.value()).map_err(|_| ReserveError::Unavailable)
+    })
+}
+
+pub(crate) fn store_intent_record(
+    store: &OwnedStore<'_>,
+    intent_id: EffectIntentId,
+    record: &IntentRecord,
+) -> Result<(), ReserveError> {
+    let bytes = serde_json::to_vec(record).map_err(|_| ReserveError::Unavailable)?;
+    store.write(|transaction| {
+        transaction
+            .open_table(INTENTS)
+            .map_err(|_| ReserveError::Unavailable)?
+            .insert(intent_id.as_uuid().as_bytes().as_slice(), bytes.as_slice())
+            .map_err(|_| ReserveError::Unavailable)?;
+        Ok(())
+    })
 }

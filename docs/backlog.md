@@ -193,8 +193,8 @@ repo audit; every entry below points at verified, real state of the code.
   product Current.** Not 1C0, Exact Effect, ActiveV2, RP1, dispatch,
   reservation, or product `low_risk_effectful` admission. Named tests in
   `crates/synthetic-owner-effect/tests/exact_uv_approval.rs` plus
-  `crates/capability/tests/closed_profile_issuance.rs`. v01-D05 landed
-  below; v01-D06…D07 stay unclaimed in
+  `crates/capability/tests/closed_profile_issuance.rs`. v01-D05 and
+  v01-D06 landed; v01-D07 stays unclaimed in
   [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="v01-d05-reserve-exact-authority"></a>
@@ -215,6 +215,22 @@ repo audit; every entry below points at verified, real state of the code.
   AuthorityStore rewrite. Named tests in
   `crates/synthetic-owner-effect/tests/{reserve_atomicity,reserve_races,reserve_kill,reserve_compile_fail}.rs`.
   Full cross-process validator race remains Target.
+
+<a id="v01-d06-publish-once"></a>
+
+- [x] **P1 | fixture coordinator `sovereign-synthetic-owner-effect` | v01-D06 — Publish once and reconcile conservatively.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1. Depends on
+  v01-D05 (`feb291e`). Upper `publish = false` fixture coordinator runs the
+  fixed import-free Core Wasm step, consumes `AuthorityReservedEffect` by
+  value, durably commits `Dispatching` before filesystem I/O, publishes
+  `<effect_intent_id>.eml` once (owner-only same-directory temp, flush,
+  no-replace `hard_link`, directory flush), reconciles without writing,
+  and appends value-free signed fixture evidence. **Design Accept ≠
+  product Current.** Not 1C0, Exact Effect product, ActiveV2, RP1, SMTP,
+  or product outbox. Named tests in
+  `crates/synthetic-owner-effect/tests/{publish_once,publish_compile_fail}.rs`.
+  v01-D07 (qualification soak / limitations note) stays unclaimed in
+  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="runtime-f03-exact-effect-product"></a>
 
@@ -2055,6 +2071,18 @@ Entries here follow the queue rules above; `lane:codex` does not apply.
 
 ## Run log
 
+- 2026-09-16: v01-D06 publish exact local outbox once — fixture coordinator
+  consumes `AuthorityReservedEffect` by value, runs import-free Core Wasm,
+  commits `Dispatching` before filesystem I/O, publishes
+  `<effect_intent_id>.eml` once, reconciles without writing, appends
+  value-free signed evidence. Named tests: no alternate writer, compile-fail
+  reuse-after-move / concurrent clone, guest import refusal, changed output,
+  filesystem/terminal failpoints, crash/reopen identical=`Succeeded`
+  absent/different=`Indeterminate`, old pre-dispatch
+  `FailedBeforeDispatch` with no automatic re-sign, no retry after
+  ambiguity, value-free evidence, table/path-aware canary allowlist.
+  **Design Accept ≠ product Current.** No 1C0 / Exact Effect / ActiveV2 /
+  RP1 / SMTP / D07 soak.
 - 2026-09-16: v01-D05 reserve exact authority atomically — fixture
   coordinator `reserve_exact_authority` consumes opaque proofs by value and
   commits approval/token/idempotency/synthetic-node/intent in one redb

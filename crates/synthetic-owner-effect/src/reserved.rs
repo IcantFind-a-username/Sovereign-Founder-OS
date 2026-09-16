@@ -20,7 +20,6 @@ impl AuthorityReservedEffect {
         Self { intent_id }
     }
 
-    #[allow(dead_code)] // D06 consumes this handle by value.
     pub(crate) fn intent_id(&self) -> EffectIntentId {
         self.intent_id
     }

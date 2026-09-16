@@ -22,7 +22,11 @@ mod boundary;
 #[cfg(feature = "owner-effect-fixture")]
 mod closed_profile;
 #[cfg(feature = "owner-effect-fixture")]
+mod dispatch;
+#[cfg(feature = "owner-effect-fixture")]
 mod effect;
+#[cfg(feature = "owner-effect-fixture")]
+mod evidence;
 #[cfg(feature = "owner-effect-fixture")]
 mod grant;
 #[cfg(feature = "owner-effect-fixture")]
@@ -30,9 +34,13 @@ mod http;
 #[cfg(feature = "owner-effect-fixture")]
 mod listener;
 #[cfg(feature = "owner-effect-fixture")]
+mod outcome;
+#[cfg(feature = "owner-effect-fixture")]
 mod owner_boot;
 #[cfg(feature = "owner-effect-fixture")]
 mod owner_surface;
+#[cfg(feature = "owner-effect-fixture")]
+mod publish;
 #[cfg(feature = "owner-effect-fixture")]
 mod reserve;
 #[cfg(feature = "owner-effect-fixture")]
@@ -41,6 +49,8 @@ mod reserved;
 mod sealed;
 #[cfg(feature = "owner-effect-fixture")]
 mod trust_persist;
+#[cfg(feature = "owner-effect-fixture")]
+mod wasm_step;
 
 #[cfg(feature = "owner-effect-fixture")]
 pub use approval_bridge::{
@@ -50,7 +60,17 @@ pub use approval_bridge::{
 #[cfg(feature = "owner-effect-fixture")]
 pub use boundary::{BoundaryError, ProcessBoundary};
 #[cfg(feature = "owner-effect-fixture")]
+pub use closed_profile::{
+    canonical_guest_input, expected_closed_exit, fixed_core_wasm, FIXED_GUEST_WAT,
+};
+#[cfg(feature = "owner-effect-fixture")]
+pub use dispatch::{publish_once, reconcile_without_writing, DispatchLiveContext};
+#[cfg(feature = "owner-effect-fixture")]
 pub use effect::{EffectCoordinator, SessionBinding, FIXTURE_AUDIENCE, FIXTURE_VENTURE};
+#[cfg(feature = "owner-effect-fixture")]
+pub use evidence::{
+    listed_evidence, SignedFixtureEvidence, EVIDENCE_ISSUER, EVIDENCE_TYPE, EVIDENCE_VERSION,
+};
 #[cfg(feature = "owner-effect-fixture")]
 pub use grant::FreshUvGrant;
 #[cfg(feature = "owner-effect-fixture")]
@@ -58,17 +78,21 @@ pub use http::{check_request, handle_stream, route_path};
 #[cfg(feature = "owner-effect-fixture")]
 pub use listener::{bind_public_origin, LISTEN_PORT, ORIGIN, RP_ID};
 #[cfg(feature = "owner-effect-fixture")]
+pub use outcome::{with_publish_failpoint, ClosedOutcome, PublishError, PublishFailpoint};
+#[cfg(feature = "owner-effect-fixture")]
 pub use owner_boot::{FixtureOwner, LockedSigner};
 #[cfg(feature = "owner-effect-fixture")]
 pub use owner_surface::{
     FixtureRoute, OwnerError, OwnerResponse, OwnerSurface, CSRF_HEADER, SESSION_COOKIE,
 };
 #[cfg(feature = "owner-effect-fixture")]
+pub use publish::{expected_publication_bytes, published_path, temp_path, writer_io_observed};
+#[cfg(feature = "owner-effect-fixture")]
 pub use reserve::{
-    inspect_reservation, persist_prepared, reserve_exact_authority, revoke_approval, revoke_token,
-    with_failpoint, IntentState, PreparedSnapshot, ReservationContext, ReservationFailpoint,
-    ReservationView, ReserveError, BARRIER_AFTER_COMMIT, BARRIER_BEFORE_COMMIT, KILL_BARRIER_ENV,
-    KILL_REACHED_PREFIX, SYNTHETIC_NODE_INITIAL_USES,
+    inspect_intent_state, inspect_reservation, persist_prepared, reserve_exact_authority,
+    revoke_approval, revoke_token, with_failpoint, IntentState, PreparedSnapshot,
+    ReservationContext, ReservationFailpoint, ReservationView, ReserveError, BARRIER_AFTER_COMMIT,
+    BARRIER_BEFORE_COMMIT, KILL_BARRIER_ENV, KILL_REACHED_PREFIX, SYNTHETIC_NODE_INITIAL_USES,
 };
 #[cfg(feature = "owner-effect-fixture")]
 pub use reserved::AuthorityReservedEffect;
@@ -82,6 +106,8 @@ pub use sovereign_owner::session::{
 };
 #[cfg(feature = "owner-effect-fixture")]
 pub use trust_persist::{persist_public_trust, HistoricalTrust, TrustError};
+#[cfg(feature = "owner-effect-fixture")]
+pub use wasm_step::{accept_closed_guest_output, run_core_wasm_module, run_fixed_core_wasm};
 
 /// Distinctive so a product release-symbol scan can prove this crate was not
 /// linked. Must not appear in `target/release/sovereign`.

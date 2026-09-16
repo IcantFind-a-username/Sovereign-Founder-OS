@@ -69,6 +69,16 @@ name = "reserve_compile_fail"
 path = "tests/reserve_compile_fail.rs"
 required-features = ["owner-effect-fixture"]
 
+[[test]]
+name = "publish_once"
+path = "tests/publish_once.rs"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "publish_compile_fail"
+path = "tests/publish_compile_fail.rs"
+required-features = ["owner-effect-fixture"]
+
 [dependencies]
 sovereign-authority = { workspace = true }
 sovereign-capability = { workspace = true }
@@ -77,6 +87,7 @@ sovereign-owner = { workspace = true, optional = true }
 sovereign-artifact = { workspace = true, optional = true }
 sovereign-policy = { workspace = true, optional = true }
 sovereign-contracts = { workspace = true, optional = true }
+sovereign-sandbox = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 redb = { version = "=4.1.0", optional = true }
 uuid = { workspace = true, optional = true }
@@ -85,6 +96,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_json_canonicalizer = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
+wat = { version = "1", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -97,6 +109,7 @@ sovereign-authority = { workspace = true }
 sovereign-capability = { workspace = true }
 sovereign-artifact = { workspace = true }
 sovereign-policy = { workspace = true }
+wat = "1"
 
 [features]
 # Empty default so a workspace build cannot unify owner-effect-fixture into
@@ -112,6 +125,7 @@ owner-effect-fixture = [
     "dep:sovereign-artifact",
     "dep:sovereign-policy",
     "dep:sovereign-contracts",
+    "dep:sovereign-sandbox",
     "dep:chrono",
     "dep:redb",
     "dep:uuid",
@@ -120,4 +134,5 @@ owner-effect-fixture = [
     "dep:serde_json",
     "dep:serde_json_canonicalizer",
     "dep:rand",
+    "dep:wat",
 ]
