@@ -35,7 +35,7 @@ fail() {
   FAILURES=$((FAILURES + 1))
 }
 
-GATE_SCRIPTS="scripts/test_changed.sh scripts/check-file-size.sh scripts/stop_gate.sh scripts/qualify-vault-v2.sh"
+GATE_SCRIPTS="scripts/test_changed.sh scripts/check-file-size.sh scripts/stop_gate.sh scripts/qualify-vault-v2.sh scripts/lib/map_changed_paths.sh"
 
 # ---- 1. no bash-4-only constructs in the gate scripts --------------------
 # Whole-line comments are stripped first: the gate scripts document which
@@ -191,6 +191,125 @@ if scan_file scripts/test_changed.sh -E 'trap[[:space:]]+[^#]*[[:space:]]EXIT'; 
   pass "completion-tripwire-present"
 else
   fail "completion-tripwire-present" "no EXIT trap guards the premature-exit path"
+fi
+
+# ---- 7. a #[path] include target queues the includer's package -----------
+# The scoped gate cannot see a file included by #[path] from another crate:
+# there is no Cargo edge. The mapping lives in scripts/lib/ so this test can
+# feed a change set and read PKGS without an env var that prints scope and
+# exits 0 (self-test #5 forbids that premature-success path).
+# A throwaway git repo under .harness/ is the change set; pwd -P resolution
+# is exercised against a real relative include, not a hardcoded pair.
+PATH_INCLUDE_LIB="$ROOT/scripts/lib/map_changed_paths.sh"
+PATH_INCLUDE_ANCHOR='# ---- resolve #[path] includes'
+PATH_FIXTURE="$FIXTURE/path-include"
+scope_has_pkg() { # <pkg>
+  case " $PKGS " in
+  *" $1 "*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+build_path_include_fixture() (
+  cd "$PATH_FIXTURE" || return 1
+  git init -q . >/dev/null 2>&1 || return 1
+  [ -d "$PATH_FIXTURE/.git" ] || return 1
+  mkdir -p apps/cli/tests crates/other/src || return 1
+  printf '%s\n' \
+    '#[path = "../../../crates/other/src/included.rs"]' \
+    'mod included;' >apps/cli/tests/includer.rs || return 1
+  echo '// include target' >crates/other/src/included.rs || return 1
+  git add -- apps crates >/dev/null 2>&1 || return 1
+  [ -n "$(git ls-files)" ] || return 1
+)
+
+if [ ! -f "$PATH_INCLUDE_LIB" ]; then
+  fail "path-include-target-queues-includer" \
+    "missing $PATH_INCLUDE_LIB — mapping was not extracted for the self-test to call"
+elif ! grep -Fq "$PATH_INCLUDE_ANCHOR" "$PATH_INCLUDE_LIB"; then
+  fail "path-include-target-queues-includer" \
+    "anchor '$PATH_INCLUDE_ANCHOR' is gone from map_changed_paths.sh"
+elif ! grep -q 'map_changed_paths_to_scope' scripts/test_changed.sh; then
+  fail "path-include-target-queues-includer" \
+    "test_changed.sh no longer calls the sourced mapping"
+else
+  rm -rf "$PATH_FIXTURE"
+  mkdir -p "$PATH_FIXTURE" || exit 1
+  if ! build_path_include_fixture; then
+    fail "path-include-target-queues-includer" \
+      "could not build the path-include fixture git repo under $PATH_FIXTURE"
+  else
+    cd "$PATH_FIXTURE" || exit 1
+    # shellcheck source=../../scripts/lib/map_changed_paths.sh
+    . "$PATH_INCLUDE_LIB"
+    CHANGED="crates/other/src/included.rs"
+    map_changed_paths_to_scope
+    if scope_has_pkg "sovereign-cli"; then
+      pass "path-include-target-queues-includer (sovereign-cli via #[path])"
+    else
+      fail "path-include-target-queues-includer" \
+        "changed include target did not queue the includer's package; PKGS='$PKGS'"
+    fi
+    if scope_has_pkg "sovereign-other"; then
+      pass "path-include-target-still-maps-own-crate"
+    else
+      fail "path-include-target-still-maps-own-crate" \
+        "direct crate mapping was lost; PKGS='$PKGS'"
+    fi
+
+    # Teeth: dropping the #[path] resolver must lose the includer. If this
+    # still queues sovereign-cli, the positive result is coming from
+    # somewhere else and the new mapping is not what the test is pinning.
+    MUTATED="$PATH_FIXTURE/map_changed_paths.mutated.sh"
+    awk -v anchor="$PATH_INCLUDE_ANCHOR" '
+      index($0, anchor) == 1 {
+        skip_call = 1
+        next
+      }
+      skip_call == 1 && $0 ~ /^[[:space:]]*$/ { next }
+      skip_call == 1 && $0 ~ /map_path_attr_includes/ {
+        skip_call = 0
+        next
+      }
+      { print }
+    ' "$PATH_INCLUDE_LIB" >"$MUTATED"
+    # shellcheck source=/dev/null
+    . "$MUTATED"
+    CHANGED="crates/other/src/included.rs"
+    map_changed_paths_to_scope
+    if scope_has_pkg "sovereign-cli"; then
+      fail "path-include-mapping-has-teeth" \
+        "dropping map_path_attr_includes still queued sovereign-cli; PKGS='$PKGS' — the positive result is not coming from the new mapping"
+    else
+      pass "path-include-mapping-has-teeth (mutation lost sovereign-cli)"
+    fi
+    cd "$ROOT" || exit 1
+  fi
+fi
+
+# Real-tree pin: the three known cross-crate includes are apps/cli/tests
+# pulling consultant-playground source and test support. Changing the
+# playground *source* must still queue sovereign-cli.
+cd "$ROOT" || exit 1
+if [ -f "$PATH_INCLUDE_LIB" ]; then
+  # shellcheck source=../lib/map_changed_paths.sh
+  . "$PATH_INCLUDE_LIB"
+  CHANGED="crates/consultant-playground/src/catalog.rs"
+  map_changed_paths_to_scope
+  if scope_has_pkg "sovereign-cli"; then
+    pass "path-include-real-catalog-queues-cli"
+  else
+    fail "path-include-real-catalog-queues-cli" \
+      "changed playground source did not queue sovereign-cli; PKGS='$PKGS'"
+  fi
+  CHANGED="crates/consultant-playground/tests/support/transport.rs"
+  map_changed_paths_to_scope
+  if scope_has_pkg "sovereign-cli"; then
+    pass "path-include-real-transport-queues-cli"
+  else
+    fail "path-include-real-transport-queues-cli" \
+      "changed playground test support did not queue sovereign-cli; PKGS='$PKGS'"
+  fi
 fi
 
 echo

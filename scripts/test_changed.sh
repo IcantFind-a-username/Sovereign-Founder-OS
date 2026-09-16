@@ -20,9 +20,13 @@
 #   Cargo.toml / Cargo.lock / rust-toolchain.toml / scripts/ / .github/
 #                            -> full workspace
 #   docs, rfcs, markdown     -> no test run (fmt/file-size still checked)
+#   a file targeted by #[path] from another package also queues the includer
+#                            (no Cargo edge; reverse-dep rebuild is still out)
 #
 # Scoped runs do NOT rebuild reverse dependencies of a changed crate; CI runs
 # the full workspace on every push and is the backstop for cross-crate breakage.
+# #[path] includes are the exception: the target has no Cargo edge to the
+# includer, so even a future reverse-dep scan would miss them.
 #
 # Two properties this script owes its callers (the Stop hook trusts its exit
 # status, and scripts/tests/gate_portability_test.sh pins both):
@@ -101,38 +105,12 @@ CHANGED=$(
 
 # ---- map paths to scopes -------------------------------------------------
 # PKGS is a space-delimited, space-padded list of cargo package names rather
-# than an associative array, because bash 3.2 has none.
-FULL=0
-FRONTEND=0
-PKGS=""
-add_pkg() {
-  case " $PKGS " in
-  *" $1 "*) ;;             # already queued
-  *) PKGS="$PKGS $1" ;;
-  esac
-}
-while IFS= read -r f; do
-  case "$f" in
-  Cargo.toml | Cargo.lock | rust-toolchain.toml | scripts/* | .github/*)
-    FULL=1
-    ;;
-  crates/*/*)
-    rest=${f#crates/}
-    add_pkg "sovereign-${rest%%/*}"
-    ;;
-  apps/cli/assets/*)
-    FRONTEND=1
-    ;;
-  apps/cli/*)
-    add_pkg "sovereign-cli"
-    ;;
-  tests/adversarial/*)
-    add_pkg "sovereign-adversarial-tests"
-    ;;
-  esac
-done <<EOF
-$CHANGED
-EOF
+# than an associative array, because bash 3.2 has none. The mapping itself
+# lives in scripts/lib/map_changed_paths.sh so the self-test can observe
+# scope without an env var that prints it and exits 0 (the premature-success
+# path property 2 / self-test #5 exist to forbid).
+. scripts/lib/map_changed_paths.sh || exit 1
+map_changed_paths_to_scope || exit 1
 
 # Same-image broker gate: a fresh CARGO_TARGET_DIR cannot use the session
 # cache, so this is not always-on. Run it when the fixture image, its
