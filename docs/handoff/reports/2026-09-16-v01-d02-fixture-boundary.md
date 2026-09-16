@@ -1,7 +1,7 @@
 # v01-D02 — Release-excluded single-process fixture boundary
 
 - **Outcome:** landed
-- **Branch:** `cursor/v01-d02-fixture-boundary-4223` · **Base:** `f04b4af` · **Head:** (see git)
+- **Branch:** `cursor/v01-d02-fixture-boundary-4223` · **Base:** `f04b4af` · **Head:** `26991b9`
 - **Backlog entry:** v01-D02 — Release-excluded single-process fixture boundary — checked off: yes
 
 ## What changed
@@ -19,6 +19,10 @@
 - `second_real_fixture_process_fails_on_os_lock_before_redb_open` — second real process gets `E-BROKER-ALREADY-RUNNING`.
 - `product_unmarked_or_symlink_roots_fail_before_listener_or_database_state` — no lock/redb on rejected roots; symlink does not lock the target.
 - `source_inventory_has_one_listener_and_no_internal_transport_module` — one `TcpListener::bind`; no HMAC/hidden-child/second-port residue.
+
+## Gate
+
+`./scripts/test_changed.sh` ALL GREEN — workspace + frontend tsc + vault-v2 qualification. `check-synthetic-owner-effect-boundary.sh`: OK — 25 checks.
 
 ## Out of scope (untouched)
 
