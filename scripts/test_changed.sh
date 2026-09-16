@@ -168,6 +168,8 @@ if [ "${GATE_SELFTEST_RUNNING:-0}" != "1" ]; then
   # self-tests run here, on every session, not only when someone remembers.
   run_step "owner-effect-runner-selftests" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/run-owner-effect-tests.sh
+  run_step "synthetic-owner-effect-soak-selftest" env GATE_SELFTEST_RUNNING=1 \
+    ./scripts/tests/run-synthetic-owner-effect-soak.sh
   run_step "owner-effect-regression-selftest" env GATE_SELFTEST_RUNNING=1 \
     ./scripts/tests/run-owner-effect-regression.sh
   # The same-target broker build is two clean CARGO_TARGET_DIR compiles;

@@ -64,7 +64,10 @@ pub use closed_profile::{
     canonical_guest_input, expected_closed_exit, fixed_core_wasm, FIXED_GUEST_WAT,
 };
 #[cfg(feature = "owner-effect-fixture")]
-pub use dispatch::{publish_once, reconcile_without_writing, DispatchLiveContext};
+pub use dispatch::{
+    publish_once, reconcile_without_writing, DispatchLiveContext, BARRIER_AFTER_DISPATCHING_COMMIT,
+    BARRIER_AFTER_PUBLICATION, BARRIER_BEFORE_DISPATCHING_COMMIT,
+};
 #[cfg(feature = "owner-effect-fixture")]
 pub use effect::{EffectCoordinator, SessionBinding, FIXTURE_AUDIENCE, FIXTURE_VENTURE};
 #[cfg(feature = "owner-effect-fixture")]

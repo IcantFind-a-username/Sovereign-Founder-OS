@@ -13,11 +13,16 @@ use crate::publish::{
     expected_bytes, observe_publication, publish_exact, writer_io_observed, PublicationObservation,
 };
 use crate::reserve::{
-    load_intent_record, store_intent_record, IntentRecord, IntentState, ReserveError,
+    kill_barrier, load_intent_record, store_intent_record, IntentRecord, IntentState, ReserveError,
 };
 use crate::reserved::AuthorityReservedEffect;
 use crate::sealed::EffectIntentId;
 use crate::wasm_step::run_fixed_core_wasm;
+
+/// Real-process crash barriers for v01-D07 soak. Unset outside kill workers.
+pub const BARRIER_BEFORE_DISPATCHING_COMMIT: &str = "BeforeDispatchingCommit";
+pub const BARRIER_AFTER_DISPATCHING_COMMIT: &str = "AfterDispatchingCommit";
+pub const BARRIER_AFTER_PUBLICATION: &str = "AfterPublication";
 
 /// Live facts rechecked immediately before committing `Dispatching`.
 pub struct DispatchLiveContext {
@@ -66,14 +71,19 @@ fn dispatch_reserved(
         return fail_closed(store, fixture_root, intent_id, record, error);
     }
     hit_publish(PublishFailpoint::BeforeDispatchingCommit)?;
+    kill_barrier(BARRIER_BEFORE_DISPATCHING_COMMIT);
     let mut dispatching = record;
     dispatching.state = IntentState::Dispatching;
     store_intent_record(store, intent_id, &dispatching).map_err(map_reserve)?;
+    kill_barrier(BARRIER_AFTER_DISPATCHING_COMMIT);
     hit_publish(PublishFailpoint::AfterDispatchingCommit)?;
 
     let bytes = expected_bytes(intent_id);
     match publish_exact(fixture_root, intent_id, &bytes) {
-        Ok(()) => close(store, intent_id, dispatching, ClosedOutcome::Succeeded),
+        Ok(()) => {
+            kill_barrier(BARRIER_AFTER_PUBLICATION);
+            close(store, intent_id, dispatching, ClosedOutcome::Succeeded)
+        }
         Err(PublishError::AlreadyPublished) => {
             reconcile_without_writing(store, fixture_root, intent_id, live.signer_epoch)
         }

@@ -79,6 +79,16 @@ name = "publish_compile_fail"
 path = "tests/publish_compile_fail.rs"
 required-features = ["owner-effect-fixture"]
 
+[[test]]
+name = "publish_kill"
+path = "tests/publish_kill.rs"
+required-features = ["owner-effect-fixture"]
+
+[[test]]
+name = "publish_races"
+path = "tests/publish_races.rs"
+required-features = ["owner-effect-fixture"]
+
 [dependencies]
 sovereign-authority = { workspace = true }
 sovereign-capability = { workspace = true }
