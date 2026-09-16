@@ -3,7 +3,8 @@
 //! This module does not upgrade or accept a V1 token. It accepts only the
 //! artifact layer's opaque [`PreparedInvocation`], which prevents callers from
 //! inventing digest views that were never prepared by the artifact boundary.
-//! Replay and idempotency defense is process-local. Durable one-use
+//! Replay and idempotency defense is process-local. Cryptographic and
+//! context checks live on [`CapabilityValidatorV2::verify`]; durable one-use
 //! consumption lives on the authority store after a token has been purely
 //! verified here — capability does not own or open a store. Effectful
 //! execution additionally requires crash-safe audit ordering and reviewed
@@ -123,7 +124,8 @@ impl fmt::Debug for CapabilityClaimsV2 {
 }
 
 /// Untrusted, opaque COSE_Sign1 bytes. Constructing this type grants no trust;
-/// only [`CapabilityValidatorV2::authorize_and_consume`] opens it.
+/// only [`CapabilityValidatorV2::verify`] or
+/// [`CapabilityValidatorV2::authorize_and_consume`] opens it.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CapabilityTokenV2 {
     cose_sign1: Vec<u8>,
@@ -518,6 +520,9 @@ pub struct CapabilityV2ValidationContext<'a> {
     pub prepared_invocation: &'a PreparedInvocation,
 }
 
+mod verified;
+pub use verified::{VerifiedApprovalV1, VerifiedCapabilityV2};
+
 #[derive(Debug)]
 pub struct CapabilityValidatorV2<C: TrustedClock> {
     trust_store: RoleTrustStore<AuthorityRole>,
@@ -587,164 +592,18 @@ impl<C: TrustedClock> CapabilityValidatorV2<C> {
     /// Both sides are re-verified so consumption observes the same evidence
     /// bytes that issuance did; the approval id is consumed at most once per
     /// process.
+    ///
+    /// Compatibility wrapper: cryptographic verification is
+    /// [`Self::verify_approved`], then the current process-local token,
+    /// idempotency, and approval occupancy runs with unchanged order.
     pub fn authorize_and_consume_approved(
         &mut self,
         token: &CapabilityTokenV2,
         context: CapabilityV2ValidationContext<'_>,
         approval: Option<&SignedApprovalV1>,
     ) -> Result<AuthorizedCapabilityV2, CapabilityV2Error> {
-        if token.as_bytes().len() > CAPABILITY_V2_MAX_TOKEN_BYTES {
-            return Err(CapabilityV2Error::TokenTooLarge);
-        }
-        let now_unix = self.clock.now_unix();
-        let verified = self
-            .trust_store
-            .verify(token.as_bytes(), &self.expected_issuer, now_unix)
-            .map_err(map_identity_error)?;
-        if verified.payload().len() > CAPABILITY_V2_MAX_PAYLOAD_BYTES {
-            return Err(CapabilityV2Error::ClaimsTooLarge);
-        }
-        let claims: CapabilityClaimsV2 = serde_json::from_slice(verified.payload())
-            .map_err(|_| CapabilityV2Error::InvalidClaims)?;
-        let canonical = canonical_claims(&claims)?;
-        if canonical != verified.payload() {
-            return Err(CapabilityV2Error::NonCanonicalPayload);
-        }
-
-        if claims.typ != CAPABILITY_V2_TYPE {
-            return Err(CapabilityV2Error::TypeMismatch);
-        }
-        if claims.version != CAPABILITY_V2_VERSION {
-            return Err(CapabilityV2Error::UnsupportedVersion);
-        }
-        if claims.issuer != self.expected_issuer || verified.issuer() != self.expected_issuer {
-            return Err(CapabilityV2Error::IssuerMismatch);
-        }
-        if claims.issuer_key_id.as_bytes() != verified.key_id() {
-            return Err(CapabilityV2Error::IssuerKeyMismatch);
-        }
-        if claims.audience != self.expected_audience {
-            return Err(CapabilityV2Error::AudienceMismatch);
-        }
-        validate_claim_lifetime(&claims, now_unix)?;
-        if claims.max_uses != 1 {
-            return Err(CapabilityV2Error::InvalidUseLimit);
-        }
-        if claims.risk_class != RiskClass::PureCompute {
-            return Err(CapabilityV2Error::UnsupportedRiskClass);
-        }
-        if !matches!(
-            claims.backend,
-            ArtifactBackend::CoreWasm | ArtifactBackend::ComponentWasm
-        ) {
-            return Err(CapabilityV2Error::BackendDowngradeDenied);
-        }
-        if claims.venture_id != context.venture_id {
-            return Err(CapabilityV2Error::VentureMismatch);
-        }
-        if claims.subject_id != context.subject_id {
-            return Err(CapabilityV2Error::SubjectMismatch);
-        }
-        if claims.session_id != context.session_id {
-            return Err(CapabilityV2Error::SessionMismatch);
-        }
-
-        validate_supported_invocation(context.prepared_invocation)?;
-        compare_invocation_claims(&claims, context.prepared_invocation)?;
-        validate_policy_authorization(
-            context.policy_decision,
-            &self.expected_audience,
-            context.venture_id,
-            context.subject_id,
-            context.session_id,
-            claims.idempotency_key,
-            context.prepared_invocation,
-        )?;
-        let max_policy_age = if claims.approval_evidence.is_some() {
-            crate::approval::APPROVAL_MAX_TTL_SECONDS
-        } else {
-            CAPABILITY_V2_MAX_POLICY_AGE_SECONDS
-        };
-        validate_policy_freshness(context.policy_decision, now_unix, max_policy_age)?;
-        if !context.policy_decision.allowed() {
-            return Err(CapabilityV2Error::PolicyDenied);
-        }
-        if claims.policy_decision_id != context.policy_decision.decision_id()
-            || claims.policy_decision_digest != policy_decision_digest(context.policy_decision)?
-        {
-            return Err(CapabilityV2Error::PolicyAuthorizationMismatch(
-                "decision_digest",
-            ));
-        }
-
-        if self.consumed_tokens.contains(&claims.token_id) {
-            return Err(CapabilityV2Error::Replay);
-        }
-
-        // RFC 0003: the token's evidence claim, the presented signed object,
-        // and the policy requirement must all agree. Any partial combination
-        // fails closed.
-        let approval_claim = match (
-            context.policy_decision.requires_approval(),
-            &claims.approval_evidence,
-            approval,
-        ) {
-            (false, None, None) => None,
-            (true, None, _) => return Err(CapabilityV2Error::ApprovalEvidenceUnavailable),
-            (false, _, Some(_)) | (false, Some(_), None) => {
-                return Err(CapabilityV2Error::UnexpectedApprovalEvidence)
-            }
-            (true, Some(_), None) => return Err(CapabilityV2Error::ApprovalEvidenceMismatch),
-            (true, Some(evidence), Some(approval)) => {
-                let trust = self
-                    .approvals
-                    .as_ref()
-                    .ok_or(CapabilityV2Error::ApprovalTrustUnavailable)?;
-                let verified = crate::approval::verify_approval(
-                    approval,
-                    crate::approval::ApprovalVerificationContext {
-                        trust: &trust.trust,
-                        expected_issuer: &trust.expected_issuer,
-                        audience: &self.expected_audience,
-                        venture_id: context.venture_id,
-                        subject_id: context.subject_id,
-                        session_id: context.session_id,
-                        policy_decision: context.policy_decision,
-                        prepared: context.prepared_invocation,
-                        now_unix,
-                    },
-                )?;
-                if verified.approval_id != evidence.approval_id
-                    || verified.approver_subject_id != evidence.approver_subject_id
-                    || verified.approved_at_unix != evidence.approved_at_unix
-                {
-                    return Err(CapabilityV2Error::ApprovalEvidenceMismatch);
-                }
-                if self.consumed_approvals.contains(&verified.approval_id) {
-                    return Err(CapabilityV2Error::ApprovalReused);
-                }
-                Some((verified.approval_id, verified.expires_at_unix))
-            }
-        };
-
-        let fingerprint = invocation_fingerprint(&claims)?;
-        if let Some(existing) = self.idempotency.get(&claims.idempotency_key) {
-            if *existing == fingerprint {
-                return Err(CapabilityV2Error::IdempotencyReplay);
-            }
-            return Err(CapabilityV2Error::IdempotencyConflict);
-        }
-
-        // Process-local only. Durable token / idempotency / optional
-        // approval claims live on the inverted authority plane
-        // (`claim_verified`; two-part when this arm is `None`). This crate
-        // must not depend on that plane.
-        self.consumed_tokens.insert(claims.token_id);
-        self.idempotency.insert(claims.idempotency_key, fingerprint);
-        if let Some((approval_id, _)) = approval_claim {
-            self.consumed_approvals.insert(approval_id);
-        }
-        Ok(AuthorizedCapabilityV2 { claims })
+        let (verified, approval) = self.verify_approved(token, context, approval)?;
+        self.consume_verified(verified, approval)
     }
 }
 

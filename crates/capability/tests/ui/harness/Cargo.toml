@@ -1,0 +1,31 @@
+[workspace]
+
+[package]
+name = "sovereign-capability-ui-harness"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies.sovereign-capability]
+path = "../../.."
+default-features = false
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
+[[bin]]
+name = "trybuild000"
+path = "../cannot_construct_verified_capability.rs"
+
+[[bin]]
+name = "trybuild001"
+path = "../cannot_clone_debug_or_serialize_verified_capability.rs"
+
+[[bin]]
+name = "trybuild002"
+path = "../cannot_construct_verified_approval.rs"
+
+[[bin]]
+name = "trybuild003"
+path = "../cannot_clone_debug_or_serialize_verified_approval.rs"

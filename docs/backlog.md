@@ -120,29 +120,16 @@ repo audit; every entry below points at verified, real state of the code.
 
 <a id="v01-d01-capability-verify-consume"></a>
 
-- [ ] **P1 | `crates/capability/` (and capability tests only) | v01-D01 — Separate verification from consumption.**
-  IN PROGRESS (2026-09-16). Licensed 2026-09-16 by RFC 0002 Amendment 1
-  Written Acceptance
-  (`docs/handoff/reports/2026-09-16-rfc-0002-amendment-1-accepted.md`).
-  Split `CapabilityValidatorV2` into a side-effect-free cryptographic /
-  context verifier that returns opaque `VerifiedCapabilityV2` and, when
-  required, `VerifiedApprovalV1` (private fields; no public constructor;
-  no `Clone` / `Serialize` / `Debug`). Legacy `authorize_and_consume*`
-  wrappers call the verifier then perform the current AuthorityStore
-  operations with unchanged order, errors, replay, and approval-retention.
-  **Done when:** named tests prove repeated pure verification mutates
-  neither process-local replay state nor any attached store; compile-fail
-  fixtures reject forging/cloning the proof types; existing
-  `cargo test -p sovereign-capability --locked` regressions stay green;
-  no authority→capability dependency edge.
-  **Out of scope:** fixture crate, redb coordinator, WebAuthn, CLI, enum
-  activation of `low_risk_effectful` on product issuance. Suggested
-  commit: `refactor(capability): separate verification from consumption`.
-  **v01-D02…v01-D07** are now licensed but **not** auto-claimed; they
-  remain in
-  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md)
-  until a later session copies one into this file. Accepting Amendment 1
-  ≠ implementing Wave D ≠ product Exact Effect.
+- [x] **P1 | `crates/capability/` (and capability tests only) | v01-D01 — Separate verification from consumption.**
+  Completed 2026-09-16. Licensed by RFC 0002 Amendment 1 Written Acceptance.
+  Fixture-side capability refactor only: `verify` / `verify_approved` return
+  opaque `VerifiedCapabilityV2` / `VerifiedApprovalV1`; legacy
+  `authorize_and_consume*` wrappers consume process-local replay unchanged.
+  **Design Accept ≠ product Exact Effect.** No product Current, no 1C0, no
+  `low_risk_effectful` admission, no RP1 / ActiveV2 / Wave D completion.
+  Named tests and compile-fail fixtures are in `crates/capability/tests/`.
+  v01-D02…D07 stay unclaimed in
+  [the Wave D queue handoff](handoff/reports/2026-09-13-rfc-0002-amendment-1-wave-d-queue.md).
 
 <a id="runtime-f03-exact-effect-product"></a>
 
