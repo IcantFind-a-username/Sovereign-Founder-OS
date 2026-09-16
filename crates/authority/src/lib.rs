@@ -832,6 +832,9 @@ fn unavailable(error: impl std::fmt::Display) -> AuthorityError {
 #[cfg(feature = "owner-effect-fixture")]
 pub mod broker;
 
+#[cfg(feature = "owner-effect-fixture")]
+pub mod effect_evidence;
+
 #[cfg(feature = "fault-injection")]
 pub mod fault_injection;
 

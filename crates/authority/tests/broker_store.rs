@@ -142,3 +142,18 @@ fn a_committed_write_survives_reopening() {
         .unwrap();
     assert_eq!(value.as_deref(), Some("value"));
 }
+
+/// Every write goes through the helper. A second `begin_write` would be a
+/// path that forgot Immediate durability and two-phase commit.
+#[test]
+fn writes_go_through_begin_immediate_two_phase() {
+    let source = include_str!("../src/broker/store.rs");
+    assert_eq!(
+        source.matches("begin_write").count(),
+        1,
+        "begin_write escaped begin_immediate_two_phase"
+    );
+    assert!(source.contains("fn begin_immediate_two_phase"));
+    assert!(source.contains("set_two_phase_commit(true)"));
+    assert!(source.contains("Durability::Immediate"));
+}

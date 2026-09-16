@@ -2355,6 +2355,7 @@ dependencies = [
  "serde_json_canonicalizer",
  "sha2 0.10.9",
  "sovereign-artifact",
+ "sovereign-audit-ledger",
  "sovereign-capability",
  "sovereign-contracts",
  "sovereign-fault-testing",

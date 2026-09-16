@@ -83,13 +83,25 @@ impl<'lock> OwnedStore<'lock> {
     where
         E: From<StoreError>,
     {
-        let transaction = self
-            .database
-            .begin_write()
-            .map_err(|_| E::from(StoreError::Unavailable))?;
+        let transaction = self.begin_immediate_two_phase().map_err(E::from)?;
         let value = body(&transaction)?;
         transaction.commit().map_err(|_| StoreError::Unavailable)?;
         Ok(value)
+    }
+
+    /// The only write-transaction constructor. Immediate durability plus
+    /// two-phase commit are set before the caller can mutate, so a later
+    /// table write cannot forget them. The raw constructor lives only here.
+    pub(crate) fn begin_immediate_two_phase(&self) -> Result<redb::WriteTransaction, StoreError> {
+        let mut transaction = self
+            .database
+            .begin_write()
+            .map_err(|_| StoreError::Unavailable)?;
+        transaction
+            .set_durability(redb::Durability::Immediate)
+            .map_err(|_| StoreError::Unavailable)?;
+        transaction.set_two_phase_commit(true);
+        Ok(transaction)
     }
 
     pub fn read<T, E>(

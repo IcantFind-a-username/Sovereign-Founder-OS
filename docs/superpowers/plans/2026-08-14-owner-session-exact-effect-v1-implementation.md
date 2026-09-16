@@ -951,6 +951,18 @@ For every task: register only the named tests and their exact package/target/fea
 
 **Produces:** Separate synthetic fixture evidence chain. Coordinator state remains the sole truth.
 
+**Heal remainder (2026-09-16, `runtime-owner-task12-heal`):** The value-free
+projection already lives in `sovereign-audit-ledger` `effect_v1` (10 TSV rows;
+names differ from the RED list below and stay there). Authority now has
+`src/effect_evidence.rs` + `--test effect_evidence`: terminal cursor commit,
+then a separate evidence append; `crash_after_terminal_before_append_heals_evidence_only`
+kills at `AfterTerminalCommitBeforeEvidenceAppend` and heal writes the
+projection only. `OwnedStore::write` goes through `begin_immediate_two_phase`.
+Stay unregistered / not invented here: signed ephemeral event IDs + public-key
+fixture signer, HTTP fixture-login reconcile, table/path scanner extension,
+`begin_immediate_two_phase` as the sole constructor of the filesystem
+`AuthorityStore` (different store). Not product RP1-05.
+
 - [ ] **RED:** Add `projection_contains_only_allowlisted_fields`, `projection_omits_recipient_content_digest_path_size_time_business_policy_and_reason`, `low_entropy_dictionary_has_no_projection_oracle`, `fixture_signer_is_tagged_non_product`, `signature_and_previous_hash_verify`, `same_intent_outcome_appends_once`, `different_outcome_conflicts`, `crash_after_terminal_before_append_heals_evidence_only`, `evidence_never_advances_effect_state`, and `indeterminate_never_relabels`. Run:
 
   ```bash
