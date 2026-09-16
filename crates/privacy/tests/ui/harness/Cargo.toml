@@ -1,0 +1,23 @@
+[workspace]
+
+[package]
+name = "sovereign-privacy-ui-harness"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Nested workspace so compile-fail bins are invisible to parent clippy
+# `--all-targets`. Cargo.lock versions must be a subset of the repo
+# workspace lock: CI fetches only that graph, and these checks run
+# `--offline --locked`.
+
+[dependencies.sovereign-privacy]
+path = "../../.."
+
+[[bin]]
+name = "trybuild000"
+path = "../cannot_borrow_safe_request_or_transition_attempts.rs"
+
+[[bin]]
+name = "trybuild001"
+path = "../cannot_forge_route_evidence_from_caller_strings.rs"

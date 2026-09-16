@@ -19,21 +19,23 @@ Throughout this document, **Current** means merged code with passing repository 
 | Area | Repository today | Required by this design |
 | --- | --- | --- |
 | Raw model route | **Current (supported API slice):** raw `ModelRequest` reaches only a crate-vouched provider that also reports Local. Caller Amber/Green/`DataClass` cannot grant public/cloud egress; a self-reported `local` flag cannot mint that vouch. Remaining: this is still the legacy request type, not compiler-only public dispatch, and Ollama is loopback-routed rather than sandboxed. | Raw request accepted only by a closed local boundary; caller labels never grant egress. |
-| Public compute | Cloud-labelled stand-ins exist only as skip-path test doubles; they do not receive a raw `ModelRequest`. No compiler-owned public projection is dispatched through this crate. | Only a compiler-owned, purpose-bound projection reaches a closed public broker. |
-| Disclosure record | Public fields, caller/provider strings, unsigned and forgeable; useful demo telemetry only. | Private broker-derived evidence, value-free, then signed through the audit ledger. |
-| Presets/visibility | Target UX documentation only. | Deterministic immutable snapshot, simple/pro views, widening approval and revocation. |
-| Owned-node E2EE | Not implemented. | Research concept and non-executable reserved type until measured need and a reviewed Secure Mesh protocol; no configuration CTA. |
+| Public compute | **Current (process-local stand-in):** `sovereign-privacy` compiles purpose-bound projections; the only consumer in this slice is an in-process no-network stand-in. No real public egress / `ProviderTargetV1` adapter. | Only a compiler-owned, purpose-bound projection reaches a closed public broker. |
+| Disclosure record | **Current (in-memory):** broker-derived `RouteEvidence` is value-free. Not yet signed through the audit ledger. The legacy model-gateway `DisclosureRecord` remains demo telemetry for raw requests. | Private broker-derived evidence, value-free, then signed through the audit ledger. |
+| Presets/visibility | **Current (v1 presets):** `AutoProtect` (default) and `LocalOnly` compile to immutable snapshots; a fully local workflow produces zero public/owned-node broker observations. Professional mode, widening approval, and durable queue remain Target. | Deterministic immutable snapshot, simple/pro views, widening approval and revocation. |
+| Owned-node E2EE | **Current:** reserved non-executable vocabulary; public activation and configuration CTAs are rejected. | Research concept and non-executable reserved type until measured need and a reviewed Secure Mesh protocol; no configuration CTA. |
 | Queue | Workflow checkpointing exists but is not an encrypted private-compute queue. | Opaque encrypted-vault handles with expiry/cancel/revocation semantics. |
 | Vault at rest | **Current prototype:** each item is AES-256-GCM encrypted, but the raw Base64 master key is stored beside the ciphertext and manifest names remain visible. | **Target:** pinned SQLCipher transactional business store with a random database key, closed device protector, independent recovery root, typed key wrappers, rotation, and tested migration. |
 | Recovery/export | The JSON export is useful for inspection but is not a clean-machine backup or trust-continuity package. | **Target:** separately handled encrypted business backup and public trust-continuity material, followed by a verified restore ceremony and new device identity. |
 | Local model isolation | Deterministic stand-ins exercise routing; they are not real AI or a sandboxed local model. | **Target:** a provenance-bound real model process with no ambient network/filesystem/environment access, authenticated IPC, model digest binding, and resource limits. |
 
 The first privacy-boundary slice closes the legacy raw cloud authority on the
-supported model-gateway API; adding a parallel safe path while leaving a
-caller-label bypass public is not completion. Later slices (compiler-owned
-public jobs, sandboxed local model, presets) remain Target. The program-level
-first hardening slice is RFC 0005 Vault v2 because new long-term privacy
-secrets must not inherit the current co-located-key weakness.
+supported model-gateway API; slice 2 adds the privacy compiler door,
+`LocalOnly` zero-observation workflows, and a process-local no-network
+stand-in. Adding a parallel safe path while leaving a caller-label bypass
+public is not completion. Later slices (real public egress, sandboxed local
+model, durable queue) remain Target. The program-level first hardening slice
+is RFC 0005 Vault v2 because new long-term privacy secrets must not inherit
+the current co-located-key weakness.
 
 ## 2. Non-negotiable invariants
 

@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::transform::Disposition;
-use crate::types::{Grant, PolicySnapshot, Preset, Purpose, Recipient, Sensitivity};
+use crate::types::{Grant, PolicySnapshot, Purpose, Recipient, Sensitivity};
 use crate::value::SourceRecord;
 
 /// How long a compiled job stays dispatchable. Short on purpose: the preview
@@ -86,7 +86,12 @@ impl PublicJob {
     }
 
     /// Exactly what would be sent — instruction and payload, nothing else.
-    pub fn outbound_text(&self) -> String {
+    ///
+    /// Crate-private: public request bytes become visible to an adapter only
+    /// inside the closed broker dispatch. The owner-facing preview may show
+    /// the same bytes; callers outside this crate cannot borrow them off the
+    /// job and feed multiple adapters by hand.
+    pub(crate) fn outbound_text(&self) -> String {
         format!("{}\n\n{}", self.instruction, self.payload)
     }
 
@@ -210,7 +215,7 @@ pub fn compile(
     policy: PolicySnapshot,
     now_unix: i64,
 ) -> Result<(PublicJob, ExposurePreview), CompileError> {
-    if policy.preset == Preset::LocalOnly {
+    if policy.forbids_public_compute() {
         return Err(CompileError::PresetForbidsPublicCompute);
     }
     let transform = crate::transform::for_purpose(purpose).ok_or(CompileError::NoTransform)?;

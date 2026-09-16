@@ -117,6 +117,10 @@ pub struct PolicySnapshot {
     pub created_at_unix: i64,
 }
 
+/// Canonicalization version bound into every snapshot digest. Timestamps and
+/// random identifiers are not part of the digest (RFC 0004).
+pub const POLICY_SCHEMA_VERSION: u32 = 1;
+
 impl PolicySnapshot {
     pub fn new(preset: Preset, now_unix: i64) -> Self {
         Self {
@@ -124,6 +128,38 @@ impl PolicySnapshot {
             revocation_epoch: 0,
             created_at_unix: now_unix,
         }
+    }
+
+    pub fn preset(&self) -> Preset {
+        self.preset
+    }
+
+    pub fn revocation_epoch(&self) -> u64 {
+        self.revocation_epoch
+    }
+
+    pub fn created_at_unix(&self) -> i64 {
+        self.created_at_unix
+    }
+
+    /// `LocalOnly` never compiles or dispatches a public-compute job.
+    pub fn forbids_public_compute(&self) -> bool {
+        self.preset == Preset::LocalOnly
+    }
+
+    /// Deterministic digest of the security-relevant snapshot fields. The
+    /// creation timestamp is excluded so two equivalent policies hash alike.
+    pub fn digest(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let preset = match self.preset {
+            Preset::AutoProtect => "auto_protect",
+            Preset::LocalOnly => "local_only",
+        };
+        let canonical = format!(
+            "privacy-policy-v{POLICY_SCHEMA_VERSION}:{preset}:{}",
+            self.revocation_epoch
+        );
+        hex::encode(Sha256::digest(canonical.as_bytes()))
     }
 
     /// Where a task may run under this snapshot.
@@ -139,5 +175,122 @@ impl PolicySnapshot {
             },
             (Preset::AutoProtect, false) => PlacementDecision::Run(Placement::PublicProjection),
         }
+    }
+}
+
+/// Observed local compute for this slice: the process-local deterministic
+/// stand-in is either present or not. This is not a real model inventory
+/// and not a sandbox capability probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LocalCapability {
+    stand_in: bool,
+}
+
+impl LocalCapability {
+    /// The in-process deterministic demonstration is available.
+    pub fn stand_in_available() -> Self {
+        Self { stand_in: true }
+    }
+
+    /// No local compute: a `LocalOnly` task must queue rather than widen.
+    pub fn none() -> Self {
+        Self { stand_in: false }
+    }
+
+    pub fn is_available(self) -> bool {
+        self.stand_in
+    }
+}
+
+/// Closed, value-free reasons a task cannot run now. Owned-node compute is
+/// not an option in this version.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ComputeUnavailable {
+    LocalOnlyNoLocalCompute,
+    InstallOrConfigureLocalModel,
+    ReduceTheTask,
+    Wait,
+}
+
+impl ComputeUnavailable {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LocalOnlyNoLocalCompute => "local_only_no_local_compute",
+            Self::InstallOrConfigureLocalModel => "install_or_configure_local_model",
+            Self::ReduceTheTask => "reduce_the_task",
+            Self::Wait => "wait",
+        }
+    }
+
+    /// Safe alternatives offered when local compute is missing. Owned mesh
+    /// is deliberately absent: it is not a configure action.
+    pub const fn local_only_alternatives() -> &'static [Self] {
+        &[
+            Self::InstallOrConfigureLocalModel,
+            Self::ReduceTheTask,
+            Self::Wait,
+        ]
+    }
+}
+
+/// Why a reserved Owned Mesh / fake configuration action was refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ActivationError {
+    #[error(
+        "owned mesh is not available in this version; this version will not connect another device"
+    )]
+    OwnedMeshNotAvailableInThisVersion,
+    #[error("unknown preset")]
+    UnknownPreset,
+}
+
+impl Preset {
+    /// Parse a selectable v1 preset. `AutoProtect` and `LocalOnly` are the
+    /// only accepted names. Owned Mesh labels are refused without echoing the
+    /// caller string (value-free diagnostic).
+    pub fn parse_selectable(label: &str) -> Result<Self, ActivationError> {
+        match label {
+            "auto_protect" | "auto-protect" | "AutoProtect" => Ok(Self::AutoProtect),
+            "local_only" | "local-only" | "LocalOnly" => Ok(Self::LocalOnly),
+            "owned_mesh"
+            | "owned-mesh"
+            | "OwnedMesh"
+            | "my_devices"
+            | "company_nodes"
+            | "My Devices & Company Nodes" => {
+                Err(ActivationError::OwnedMeshNotAvailableInThisVersion)
+            }
+            _ => Err(ActivationError::UnknownPreset),
+        }
+    }
+}
+
+/// Reserved Research activation. Always refuses: there is no configuration
+/// CTA and no Secure Mesh in this version. Takes no configuration so a
+/// caller cannot pretend to supply node identities.
+pub fn activate_owned_mesh() -> Result<(), ActivationError> {
+    Err(ActivationError::OwnedMeshNotAvailableInThisVersion)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_digest_ignores_timestamp_and_is_stable() {
+        let early = PolicySnapshot::new(Preset::LocalOnly, 1);
+        let late = PolicySnapshot::new(Preset::LocalOnly, 9_999_999);
+        assert_eq!(early.digest(), late.digest());
+        assert_ne!(
+            PolicySnapshot::new(Preset::AutoProtect, 1).digest(),
+            early.digest()
+        );
+        assert_eq!(early.digest().len(), 64);
+    }
+
+    #[test]
+    fn default_preset_is_auto_protect() {
+        assert_eq!(Preset::default(), Preset::AutoProtect);
     }
 }
